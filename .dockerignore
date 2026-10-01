@@ -21,6 +21,10 @@
 # OS noise
 .DS_Store
 
+# Self-host runtime data must not enter the image build
+.docker/selfhost/data
+.docker/selfhost/config
+
 # Sourcemaps (keep server sourcemap for backend stacktraces)
 **/*.map
 !packages/backend/server/dist/main.js.map

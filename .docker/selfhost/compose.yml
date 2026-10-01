@@ -1,7 +1,14 @@
 name: affine
+
+x-affine-source: &affine-source
+  image: affine:local
+  build:
+    context: ../..
+    dockerfile: .docker/selfhost/Dockerfile
+
 services:
   affine:
-    image: ghcr.io/toeverything/affine:stable
+    <<: *affine-source
     container_name: affine_server
     ports:
       - '3010:3010'
@@ -22,7 +29,7 @@ services:
     restart: unless-stopped
 
   affine_migration:
-    image: ghcr.io/toeverything/affine:stable
+    <<: *affine-source
     container_name: affine_migration_job
     volumes:
       - ./data/storage:/root/.affine/storage
