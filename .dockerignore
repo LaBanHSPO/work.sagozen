@@ -5,6 +5,10 @@
 # Local dependency/build artifacts
 /node_modules
 /target
+packages/backend/native/target
+packages/common/native/target
+packages/frontend/native/target
+packages/frontend/mobile-native/target
 
 # Yarn v4 artifacts (not needed for image packaging)
 /.yarn/cache
