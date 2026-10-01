@@ -58,12 +58,17 @@ RUN arch="$(dpkg --print-architecture)" \
  && native=packages/backend/native/server-native.node \
  && cp "$native" packages/backend/native/server-native.x64.node \
  && cp "$native" packages/backend/native/server-native.arm64.node \
- && cp "$native" packages/backend/native/server-native.armv7.node \
- && yarn workspace @affine/server build \
+ && cp "$native" packages/backend/native/server-native.armv7.node
+
+# .git is not in the build context. The web bundler reads GITHUB_SHA instead.
+ARG SOURCE_SHA=selfhost
+ENV GITHUB_SHA=${SOURCE_SHA}
+RUN yarn workspace @affine/server build \
  && yarn affine @affine/web build \
  && yarn affine @affine/admin build \
- && yarn affine @affine/mobile build \
- && rm -rf node_modules \
+ && yarn affine @affine/mobile build
+
+RUN rm -rf node_modules \
  && HUSKY=0 yarn workspaces focus @affine/server --production \
  && yarn workspace @affine/server prisma generate \
  && mv node_modules packages/backend/server/node_modules \
