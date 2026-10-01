@@ -1,9 +1,4 @@
 use std::collections::HashMap;
-#[cfg(not(test))]
-use std::{
-  sync::{Mutex, OnceLock},
-  time::Duration,
-};
 
 use anyhow::{Context, Result as AnyResult, bail};
 use serde::de::DeserializeOwned;
@@ -13,11 +8,6 @@ const AFFINE_PRO_ENDPOINT: &str = "https://app.affine.pro";
 const AFFINE_PRO_HOST: &str = "app.affine.pro";
 const AFFINE_PRO_REQUEST_TIMEOUT_MS: u32 = 10_000;
 const AFFINE_PRO_MAX_BYTES: u32 = 1024 * 1024;
-#[cfg(not(test))]
-const ECH_DNS_QUERY_TIMEOUT_MS: u32 = 5_000;
-
-#[cfg(not(test))]
-static AFFINE_PRO_ECH_CONFIG: OnceLock<Mutex<Option<Vec<u8>>>> = OnceLock::new();
 
 pub(crate) struct LicenseKeyRequest {
   pub license_key: String,
@@ -267,9 +257,8 @@ fn affine_pro_request(
   }
   #[cfg(not(test))]
   {
-    let mut request = request;
-    request.ech_config_list = Some(affine_pro_ech_config()?);
-    safefetch::safe_fetch(&request)
+    let _ = request;
+    bail!("external license service is disabled");
   }
 }
 
@@ -325,25 +314,6 @@ fn internal_affine_pro_error() -> LicenseError {
 
 fn parse_body<T: DeserializeOwned>(response: &safefetch::SafeFetchResponse) -> AnyResult<T> {
   serde_json::from_slice(&response.body).context("invalid affine pro response")
-}
-
-#[cfg(not(test))]
-fn affine_pro_ech_config() -> AnyResult<Vec<u8>> {
-  let cache = AFFINE_PRO_ECH_CONFIG.get_or_init(|| Mutex::new(None));
-  {
-    let cached = cache.lock().map_err(|_| anyhow::anyhow!("ech cache poisoned"))?;
-    if let Some(config) = cached.as_ref() {
-      return Ok(config.clone());
-    }
-  }
-
-  let config = safefetch::ech::cloudflare_https_ech_config_list(
-    AFFINE_PRO_HOST,
-    Duration::from_millis(ECH_DNS_QUERY_TIMEOUT_MS as u64),
-  )?;
-  let mut cached = cache.lock().map_err(|_| anyhow::anyhow!("ech cache poisoned"))?;
-  *cached = Some(config.clone());
-  Ok(config)
 }
 
 #[derive(serde::Deserialize)]

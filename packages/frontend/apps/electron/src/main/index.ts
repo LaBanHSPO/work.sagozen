@@ -1,7 +1,5 @@
 import path from 'node:path';
 
-import * as Sentry from '@sentry/electron/main';
-import { IPCMode } from '@sentry/electron/main';
 import { app, protocol } from 'electron';
 
 import { createApplicationMenu } from './application-menu/create';
@@ -120,23 +118,6 @@ app
   .then(setupRecordingFeature)
   .then(setupTrayState)
   .catch(e => console.error('Failed create window:', e));
-
-if (process.env.SENTRY_RELEASE) {
-  // https://docs.sentry.io/platforms/javascript/guides/electron/
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    environment: process.env.BUILD_TYPE ?? 'development',
-    ipcMode: IPCMode.Protocol,
-    transportOptions: {
-      maxAgeDays: 30,
-      maxQueueSize: 100,
-    },
-  });
-  Sentry.setTags({
-    distribution: 'electron',
-    appVersion: app.getVersion(),
-  });
-}
 
 protocol.registerSchemesAsPrivileged([
   {

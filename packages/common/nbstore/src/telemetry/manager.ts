@@ -144,7 +144,10 @@ export class TelemetryManager {
   }
 
   private async sendBatch(events: TelemetryEvent[]): Promise<TelemetryAck> {
-    const useWebsocket = this.context.isAuthed && !this.context.isSelfHosted;
+    const useWebsocket =
+      Boolean(this.context.officialEndpoint) &&
+      this.context.isAuthed &&
+      !this.context.isSelfHosted;
     const transport = useWebsocket ? 'ws' : 'http';
     const batch: TelemetryBatch = {
       schemaVersion: 1,
@@ -301,7 +304,10 @@ export class TelemetryManager {
   }
 
   private updateSocketConnection() {
-    const useWebsocket = this.context.isAuthed && !this.context.isSelfHosted;
+    const useWebsocket =
+      Boolean(this.context.officialEndpoint) &&
+      this.context.isAuthed &&
+      !this.context.isSelfHosted;
     if (!useWebsocket) {
       if (this.socketConnection) {
         this.socketConnection.disconnect(true);

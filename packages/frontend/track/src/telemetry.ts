@@ -55,7 +55,6 @@ type TelemetryContextUpdateOptions = {
 
 const logger = new DebugLogger('telemetry');
 const pendingEvents: TelemetryEvent[] = [];
-const PENDING_LIMIT = 500;
 
 const defaultChannel =
   BUILD_CONFIG.appBuildType === 'beta' ||
@@ -111,13 +110,8 @@ export function getTelemetryContext() {
   return context;
 }
 
-export async function sendTelemetryEvent(event: TelemetryEvent) {
-  if (!transport) {
-    enqueuePending(event);
-    return { queued: true };
-  }
-
-  return await transport.track(event);
+export async function sendTelemetryEvent(_event: TelemetryEvent) {
+  return { queued: false };
 }
 
 export async function flushTelemetry() {
@@ -136,13 +130,6 @@ async function flushPending() {
   for (const event of events) {
     await transport.track(event);
   }
-}
-
-function enqueuePending(event: TelemetryEvent) {
-  if (pendingEvents.length >= PENDING_LIMIT) {
-    pendingEvents.shift();
-  }
-  pendingEvents.push(event);
 }
 
 function applyTransportContext(next: TelemetryContext) {

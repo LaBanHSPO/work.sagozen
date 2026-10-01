@@ -2,8 +2,6 @@ import { Logger } from '@nestjs/common';
 
 import { CleanedTelemetryEvent, Scalar } from './cleaner';
 
-const GA4_ENDPOINT = 'https://www.google-analytics.com/mp/collect';
-
 type Ga4Payload = {
   client_id: string;
   user_id?: string;
@@ -64,25 +62,8 @@ export class Ga4Client {
     }
   }
 
-  private async post(payload: Ga4Payload) {
-    const url = new URL(GA4_ENDPOINT);
-    url.searchParams.set('measurement_id', this.measurementId);
-    url.searchParams.set('api_secret', this.apiSecret);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(
-        `GA4 request failed with ${response.status}: ${body || 'unknown error'}`
-      );
-    }
+  private async post(_payload: Ga4Payload) {
+    return;
   }
 }
 

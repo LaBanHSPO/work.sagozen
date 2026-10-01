@@ -44,13 +44,6 @@ export const AboutAffine = () => {
     [toggleAutoDownload, updateSettings]
   );
 
-  const onSwitchTelemetry = useCallback(
-    (checked: boolean) => {
-      updateSettings('enableTelemetry', checked);
-    },
-    [updateSettings]
-  );
-
   return (
     <>
       <SettingHeader
@@ -105,15 +98,6 @@ export const AboutAffine = () => {
             </SettingRow>
           </>
         ) : null}
-        <SettingRow
-          name={t['com.affine.telemetry.enable']()}
-          desc={t['com.affine.telemetry.enable.desc']()}
-        >
-          <Switch
-            checked={appSettings.enableTelemetry !== false}
-            onChange={onSwitchTelemetry}
-          />
-        </SettingRow>
       </SettingWrapper>
       <SettingWrapper title={t['com.affine.aboutAFFiNE.contact.title']()}>
         <a
