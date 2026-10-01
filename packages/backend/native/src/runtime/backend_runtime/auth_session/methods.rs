@@ -5,6 +5,8 @@ use hickory_resolver::{TokioResolver, net::NetError};
 use serde::Serialize;
 use sqlx::{PgPool, Row};
 
+use crate::runtime::Deployment;
+
 use super::{RuntimeError, RuntimeResult, login::canonical_email, oauth};
 
 #[derive(Serialize)]
@@ -102,7 +104,7 @@ pub(super) async fn login_preflight(
         available: decision.password,
       },
       magic_link: Availability {
-        available: decision.magic_link,
+        available: decision.magic_link && config.deployment != Deployment::SelfHosted,
       },
       oauth: OAuthAvailability {
         available: decision.oauth,

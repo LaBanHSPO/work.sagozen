@@ -71,6 +71,9 @@ pub(super) async fn prepare_magic_link(
   server_name: &str,
   source: Option<&mail::AuthRequestSource>,
 ) -> RuntimeResult<String> {
+  if config.deployment == crate::runtime::Deployment::SelfHosted {
+    return Err(RuntimeError::invalid_state("wrong_sign_in_method"));
+  }
   let email = canonical_email(email)?;
   let known_user: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE lower(email)=lower($1))")
     .bind(&email)

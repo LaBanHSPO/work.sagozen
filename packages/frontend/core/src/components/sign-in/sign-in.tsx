@@ -101,12 +101,14 @@ export const SignInStep = ({
       const hasPassword = methods.password.available;
       const canUseMagicLink = methods.magicLink.available;
 
-      if (hasPassword) {
+      // Self-hosted email login stays on the password form. The mailed
+      // 6-digit code is only the cloud sign-in path.
+      if (isSelfhosted || hasPassword) {
         changeState(prev => ({
           ...prev,
           email,
           step: 'signInWithPassword',
-          hasPassword: true,
+          hasPassword,
         }));
       } else if (canUseMagicLink) {
         changeState(prev => ({
@@ -132,7 +134,7 @@ export const SignInStep = ({
     }
 
     setIsMutating(false);
-  }, [authService, changeState, email]);
+  }, [authService, changeState, email, isSelfhosted]);
 
   const onAddSelfhosted = useCallback(() => {
     changeState(prev => ({
