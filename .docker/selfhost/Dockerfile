@@ -253,6 +253,7 @@ RUN --mount=type=cache,id=affine-cargo-registry,target=/usr/local/cargo/registry
  && cp "$native" packages/backend/native/server-native.armv7.node
 
 COPY . .
+RUN yarn workspace @affine/templates build
 
 ENV BUILD_TYPE=stable
 # .git is not in the build context. The web bundler reads GITHUB_SHA instead.
