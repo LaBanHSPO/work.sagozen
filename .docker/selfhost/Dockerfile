@@ -259,9 +259,9 @@ ENV BUILD_TYPE=stable
 ARG SOURCE_SHA=selfhost
 ENV GITHUB_SHA=${SOURCE_SHA}
 RUN yarn workspace @affine/server build \
- && yarn affine @affine/web build \
- && yarn affine @affine/admin build \
- && yarn affine @affine/mobile build \
+ && node tools/cli/bin/runner.js affine.ts @affine/web build \
+ && node tools/cli/bin/runner.js affine.ts @affine/admin build \
+ && node tools/cli/bin/runner.js affine.ts @affine/mobile build \
  && mkdir -p packages/backend/server/static/admin packages/backend/server/static/mobile \
  && cp -a packages/frontend/apps/web/dist/. packages/backend/server/static/ \
  && cp -a packages/frontend/admin/dist/. packages/backend/server/static/admin/ \
