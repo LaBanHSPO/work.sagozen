@@ -6,6 +6,29 @@ use crate::runtime::{
   BackendRuntimeConfig, backend_runtime::tests::runtime_from_database_url, migrations::DATABASE_TEST_LOCK,
 };
 
+#[test]
+fn free_selfhost_grant_uses_one_thousand_seats() {
+  let free = resolve_grant(
+    Deployment::SelfHosted,
+    "workspace",
+    &[],
+    Utc::now(),
+    TargetType::Workspace,
+  );
+  assert_eq!(free.plan, affine_core::access_control::Plan::SelfHostedFree);
+  assert_eq!(free.limits.seat_limit, 1_000);
+
+  let cloud = resolve_grant(
+    Deployment::Cloud,
+    "workspace",
+    &[],
+    Utc::now(),
+    TargetType::Workspace,
+  );
+  assert_ne!(cloud.plan, affine_core::access_control::Plan::SelfHostedFree);
+  assert_ne!(cloud.limits.seat_limit, 1_000);
+}
+
 pub(super) async fn fixture(runtime: &BackendRuntime) -> (String, String) {
   let owner = uuid::Uuid::new_v4().to_string();
   let workspace = uuid::Uuid::new_v4().to_string();

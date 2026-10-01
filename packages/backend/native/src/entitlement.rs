@@ -133,7 +133,7 @@ pub fn resolve_entitlement_v1(input: ResolveEntitlementInput) -> Result<Resolved
   let ValidatedEntitlement::Catalog(access) = validated else {
     unreachable!();
   };
-  let grant: AccessGrant = access.into();
+  let grant = apply_selfhost_free_member_limit(access.into());
   Ok(active_with_grant(
     grant.plan,
     grant.quantity,
@@ -250,9 +250,24 @@ fn active_with_grant(
   }
 }
 
+/// Self-hosted workspaces without a team license. The published plan catalog
+/// allows 10 members; this deployment raises that cap.
+pub(crate) const SELFHOST_FREE_MEMBER_LIMIT: i32 = 1_000;
+
+pub(crate) fn apply_selfhost_free_member_limit(mut grant: AccessGrant) -> AccessGrant {
+  if grant.plan == Plan::SelfHostedFree {
+    grant.limits.seat_limit = SELFHOST_FREE_MEMBER_LIMIT;
+  }
+  grant
+}
+
 fn invalid_license(code: &str, message: &str) -> ResolvedEntitlement {
   let plan = Plan::SelfHostedFree;
-  let access = describe_plan(plan, None).expect("self-hosted free plan is valid");
+  let grant = apply_selfhost_free_member_limit(
+    describe_plan(plan, None)
+      .expect("self-hosted free plan is valid")
+      .into(),
+  );
   ResolvedEntitlement {
     plan: plan.as_str().to_string(),
     valid: false,
@@ -265,8 +280,8 @@ fn invalid_license(code: &str, message: &str) -> ResolvedEntitlement {
     issued_at: None,
     entity: None,
     issuer: None,
-    quota: quota(access.limits),
-    flags: flags(access.rights),
+    quota: quota(grant.limits),
+    flags: flags(grant.rights),
     error_code: Some(code.to_string()),
     error_message: Some(message.to_string()),
   }
@@ -485,6 +500,19 @@ pub(crate) mod tests {
     let mismatch = resolve_entitlement_v1(license_input(signed_license(claims()), "other-workspace")).unwrap();
     assert!(!mismatch.valid);
     assert_eq!(mismatch.error_code.as_deref(), Some("workspace_mismatch"));
+    assert_eq!(mismatch.quota.seat_limit, Some(SELFHOST_FREE_MEMBER_LIMIT));
+  }
+
+  #[test]
+  fn raises_selfhost_free_member_limit() {
+    let mut free = input(Some("selfhost_free"), None);
+    free.deployment_type = "selfhosted".to_string();
+    let free = resolve_entitlement_v1(free).unwrap();
+    assert_eq!(free.plan, "selfhost_free");
+    assert_eq!(free.quota.seat_limit, Some(SELFHOST_FREE_MEMBER_LIMIT));
+
+    let team = resolve_entitlement_v1(input(Some("team"), Some(5))).unwrap();
+    assert_eq!(team.quota.seat_limit, Some(5));
   }
 
   #[test]

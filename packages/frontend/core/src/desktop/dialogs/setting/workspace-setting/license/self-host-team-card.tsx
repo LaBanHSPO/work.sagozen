@@ -94,7 +94,7 @@ export const SelfHostTeamCard = () => {
     return t[
       'com.affine.settings.workspace.license.self-host-team.free.description'
     ]({
-      memberCount: workspaceQuota?.humanReadable.memberLimit || '10',
+      memberCount: workspaceQuota?.humanReadable.memberLimit || '1000',
     });
   }, [isOneTimePurchase, isTeam, license, t, workspaceQuota]);
   const handleClick = useCallback(() => {
