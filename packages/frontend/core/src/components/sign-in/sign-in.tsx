@@ -15,7 +15,7 @@ import {
 } from '@affine/core/modules/cloud';
 import type { AuthSessionStatus } from '@affine/core/modules/cloud/entities/session';
 import { ServerDeploymentType } from '@affine/graphql';
-import { Trans, useI18n } from '@affine/i18n';
+import { useI18n } from '@affine/i18n';
 import {
   ArrowRightBigIcon,
   LocalWorkspaceIcon,
@@ -207,10 +207,8 @@ export const SignInStep = ({
           <>
             <div className={style.authMessage}>
               {/*prettier-ignore*/}
-              <Trans i18nKey="com.affine.auth.sign.message">
-                By clicking &quot;Continue with Google/Email&quot; above, you acknowledge that
-                you agree to AFFiNE&apos;s <a href="https://affine.pro/terms" target="_blank" rel="noreferrer">Terms of Conditions</a> and <a href="https://affine.pro/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.
-            </Trans>
+              By clicking &quot;Continue with Google/Email&quot; above, you
+              agree to your company&apos;s terms and privacy policy.
             </div>
             <div className={style.skipDivider}>
               <div className={style.skipDividerLine} />

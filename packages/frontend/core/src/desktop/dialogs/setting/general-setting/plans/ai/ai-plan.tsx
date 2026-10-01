@@ -1,4 +1,3 @@
-import { Button } from '@affine/component';
 import { AuthService, SubscriptionService } from '@affine/core/modules/cloud';
 import { i18nTime, useI18n } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
@@ -58,17 +57,10 @@ export const AIPlan = () => {
               <AICancel className={styles.purchaseButton} />
             )
           ) : (
-            <>
-              <AISubscribe
-                className={styles.purchaseButton}
-                displayedFrequency="monthly"
-              />
-              <a href="https://ai.affine.pro" target="_blank" rel="noreferrer">
-                <Button className={styles.learnAIButton}>
-                  {t['com.affine.payment.ai.pricing-plan.learn']()}
-                </Button>
-              </a>
-            </>
+            <AISubscribe
+              className={styles.purchaseButton}
+              displayedFrequency="monthly"
+            />
           )
         ) : (
           <AILogin className={styles.purchaseButton} />

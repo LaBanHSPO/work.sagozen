@@ -230,7 +230,7 @@ export class DocRendererController {
       ? htmlSanitize(`${opts.title} | AFFiNE`)
       : 'AFFiNE';
     const summary = opts ? htmlSanitize(opts.summary) : assets.description;
-    const image = opts?.avatar ?? 'https://affine.pro/og.jpeg';
+    const image = opts?.avatar;
 
     // TODO(@forehalo): parse assets/index.html
     return `<!DOCTYPE html>
@@ -264,11 +264,10 @@ export class DocRendererController {
       content="${title}"
     />
     <meta name="twitter:description" content="${summary}" />
-    <meta name="twitter:site" content="@AffineOfficial" />
-    <meta name="twitter:image" content="${image}" />
+    ${image ? `<meta name="twitter:image" content="${image}" />` : ''}
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${summary}" />
-    <meta property="og:image" content="${image}" />
+    ${image ? `<meta property="og:image" content="${image}" />` : ''}
     ${Object.entries(envMeta)
       .map(([key, val]) => `<meta name="env:${key}" content="${val}" />`)
       .join('\n')}

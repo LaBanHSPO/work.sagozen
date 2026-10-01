@@ -3,8 +3,6 @@ import { Button as EmailButton } from '@react-email/button';
 import { Container } from '@react-email/container';
 import { Head } from '@react-email/head';
 import { Html } from '@react-email/html';
-import { Img } from '@react-email/img';
-import { Link } from '@react-email/link';
 import { Row } from '@react-email/row';
 import { Section } from '@react-email/section';
 import { Text as EmailText } from '@react-email/text';
@@ -211,15 +209,6 @@ export function Template(props: PropsWithChildren) {
             padding: '24px',
           }}
         >
-          <Section>
-            <Link href="https://affine.pro">
-              <Img
-                src="https://cdn.affine.pro/mail/2023-8-9/affine-logo.png"
-                alt="AFFiNE logo"
-                height="32px"
-              />
-            </Link>
-          </Section>
           {content}
         </Container>
         <Footer />

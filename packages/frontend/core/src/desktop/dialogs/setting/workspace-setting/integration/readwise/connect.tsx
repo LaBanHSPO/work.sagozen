@@ -121,14 +121,7 @@ const ConnectDialog = ({
         <Trans
           i18nKey={'com.affine.integration.readwise.connect.desc'}
           components={{
-            a: (
-              <a
-                href="https://readwise.io/access_token"
-                target="_blank"
-                rel="noreferrer"
-                className={getTokenLink}
-              />
-            ),
+            a: <span className={getTokenLink} />,
             br: <br />,
           }}
         />

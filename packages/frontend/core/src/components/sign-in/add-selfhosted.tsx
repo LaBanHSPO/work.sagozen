@@ -154,13 +154,7 @@ export const AddSelfhostedStep = ({
           <Trans
             i18nKey="com.affine.auth.sign.add-selfhosted.description"
             components={{
-              1: (
-                <a
-                  href="https://docs.affine.pro/docs/self-host-affine"
-                  target="_blank"
-                  rel="noreferrer"
-                />
-              ),
+              1: <span />,
             }}
           />
         </div>

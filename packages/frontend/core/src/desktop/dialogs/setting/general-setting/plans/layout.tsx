@@ -1,28 +1,12 @@
 import { Divider } from '@affine/component';
 import { SettingHeader } from '@affine/component/setting-components';
-import { useI18n } from '@affine/i18n';
-import { ArrowRightBigIcon } from '@blocksuite/icons/rc';
 import * as ScrollArea from '@radix-ui/react-scroll-area';
 import { type ReactNode, useRef } from 'react';
 
 import { CollapsibleWrapper } from '../../layout';
 import * as styles from './layout.css';
 
-export const SeeAllLink = () => {
-  const t = useI18n();
-
-  return (
-    <a
-      className={styles.allPlansLink}
-      href="https://affine.pro/pricing"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {t['com.affine.payment.see-all-plans']()}
-      {<ArrowRightBigIcon width="16" height="16" />}
-    </a>
-  );
-};
+export const SeeAllLink = () => null;
 
 export interface PlanLayoutProps {
   cloud?: ReactNode;

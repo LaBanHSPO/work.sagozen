@@ -40,15 +40,7 @@ export const AIOnboardingLocal = () => {
   const notSignedIn = loginStatus !== 'authenticated';
 
   const actions = useMemo(() => {
-    const result: NonNullable<Notification['actions']> = [
-      {
-        key: 'learn-more',
-        label: t['com.affine.ai-onboarding.local.action-learn-more'](),
-        onClick: () => {
-          window.open('https://ai.affine.pro', '_blank', 'noreferrer');
-        },
-      },
-    ];
+    const result: NonNullable<Notification['actions']> = [];
     if (notSignedIn) {
       result.push({
         key: 'get-started',

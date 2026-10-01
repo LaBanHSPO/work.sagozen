@@ -1,11 +1,9 @@
-import { Button } from '@affine/component/ui/button';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { appIconMap, appNames } from '@affine/core/utils/channel';
 import { Trans, useI18n } from '@affine/i18n';
 import { LocalWorkspaceIcon, Logo1Icon } from '@blocksuite/icons/rc';
 import { useServiceOptional } from '@toeverything/infra';
 import type { MouseEvent } from 'react';
-import { useCallback } from 'react';
 
 import { getOpenUrlInDesktopAppLink } from '../utils';
 import * as styles from './open-in-app-page.css';
@@ -18,8 +16,6 @@ interface OpenAppProps {
   mode?: 'auth' | 'open-doc'; // default to 'auth'
 }
 const channel = BUILD_CONFIG.appBuildType;
-const url =
-  'https://affine.pro/download' + (channel !== 'stable' ? '/beta-canary' : '');
 
 export const OpenInAppPage = ({
   urlToOpen,
@@ -30,10 +26,6 @@ export const OpenInAppPage = ({
   urlToOpen ??= getOpenUrlInDesktopAppLink(window.location.href, true);
   const workspaceDialogService = useServiceOptional(WorkspaceDialogService);
   const t = useI18n();
-
-  const openDownloadLink = useCallback(() => {
-    open(url, '_blank');
-  }, []);
 
   const appIcon = appIconMap[channel];
   const appName = appNames[channel];
@@ -63,37 +55,6 @@ export const OpenInAppPage = ({
         <a href="/" rel="noreferrer" className={styles.affineLogo}>
           <Logo1Icon width={24} height={24} />
         </a>
-
-        <div className={styles.topNavLinks}>
-          <a
-            href="https://affine.pro"
-            target="_blank"
-            rel="noreferrer"
-            className={styles.topNavLink}
-          >
-            Official Website
-          </a>
-          <a
-            href="https://affine.pro/blog"
-            target="_blank"
-            rel="noreferrer"
-            className={styles.topNavLink}
-          >
-            Blog
-          </a>
-          <a
-            href="https://affine.pro/about-us"
-            target="_blank"
-            rel="noreferrer"
-            className={styles.topNavLink}
-          >
-            Contact us
-          </a>
-        </div>
-
-        <Button onClick={openDownloadLink}>
-          {t['com.affine.auth.open.affine.download-app']()}
-        </Button>
       </div>
 
       <div className={styles.centerContent}>

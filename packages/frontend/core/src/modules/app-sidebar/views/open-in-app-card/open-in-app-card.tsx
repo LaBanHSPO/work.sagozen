@@ -4,7 +4,7 @@ import {
   OpenLinkMode,
 } from '@affine/core/modules/open-in-app';
 import { appIconMap } from '@affine/core/utils';
-import { Trans, useI18n } from '@affine/i18n';
+import { useI18n } from '@affine/i18n';
 import { CloseIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useCallback, useState } from 'react';
@@ -55,20 +55,6 @@ export const OpenInAppCard = () => {
             icon={<CloseIcon />}
             onClick={onDismiss}
           />
-        </div>
-        <div className={styles.subtitleRow}>
-          <Trans i18nKey="com.affine.open-in-app.card.subtitle">
-            Don&apos;t have the app?
-            <a
-              href="https://affine.pro/download"
-              target="_blank"
-              rel="noreferrer"
-              className={styles.link}
-            >
-              Click to download
-            </a>
-            .
-          </Trans>
         </div>
         <div className={styles.controlsRow}>
           <label className={styles.rememberLabel}>

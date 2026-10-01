@@ -20,5 +20,5 @@ export default function ChangePassword(props: ChangePasswordProps) {
 }
 
 ChangePassword.PreviewProps = {
-  url: 'https://app.affine.pro',
+  url: 'http://localhost:8080',
 };

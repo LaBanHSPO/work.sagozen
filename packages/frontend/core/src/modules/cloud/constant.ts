@@ -65,11 +65,7 @@ export const BUILD_IN_SERVERS: (ServerMetadata & { config: ServerConfig })[] =
         ? [
             {
               id: 'affine-cloud',
-              baseUrl: BUILD_CONFIG.isNative
-                ? BUILD_CONFIG.isIOS
-                  ? 'https://apple.getaffineapp.com'
-                  : 'https://app.affine.pro'
-                : location.origin,
+              baseUrl: location.origin,
               config: {
                 serverName: 'AFFiNE Cloud',
                 features: [
@@ -98,11 +94,7 @@ export const BUILD_IN_SERVERS: (ServerMetadata & { config: ServerConfig })[] =
           ? [
               {
                 id: 'affine-cloud',
-                baseUrl: BUILD_CONFIG.isNative
-                  ? BUILD_CONFIG.isIOS
-                    ? 'https://apple.getaffineapp.com'
-                    : 'https://insider.affine.pro'
-                  : location.origin,
+                baseUrl: location.origin,
                 config: {
                   serverName: 'AFFiNE Cloud',
                   features: [
@@ -131,9 +123,9 @@ export const BUILD_IN_SERVERS: (ServerMetadata & { config: ServerConfig })[] =
             ? [
                 {
                   id: 'affine-cloud',
-                  baseUrl: 'https://insider.affine.pro',
+                  baseUrl: location.origin,
                   config: {
-                    serverName: 'AFFiNE Cloud',
+                    serverName: DEFAULT_SELF_HOSTED_SERVER_NAME,
                     features: [
                       ServerFeature.Indexer,
                       ServerFeature.Copilot,
@@ -146,7 +138,7 @@ export const BUILD_IN_SERVERS: (ServerMetadata & { config: ServerConfig })[] =
                       OAuthProviderType.Google,
                       OAuthProviderType.Apple,
                     ],
-                    type: ServerDeploymentType.Affine,
+                    type: ServerDeploymentType.Selfhosted,
                     credentialsRequirement: {
                       password: {
                         minLength: 8,

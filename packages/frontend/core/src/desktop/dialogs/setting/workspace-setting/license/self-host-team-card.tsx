@@ -18,7 +18,6 @@ import {
 } from '@affine/graphql';
 import { Trans, useI18n } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
-import { cssVarV2 } from '@toeverything/theme/v2';
 import clsx from 'clsx';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -413,16 +412,7 @@ const ActionModal = ({
       <span className={styles.tips}>
         <Trans
           i18nKey="com.affine.settings.workspace.license.activate-modal.tips"
-          components={{
-            1: (
-              <a
-                href="https://affine.pro/pricing/?type=selfhost#table"
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: cssVarV2('text/link') }}
-              />
-            ),
-          }}
+          components={{ 1: <span /> }}
         />
       </span>
     </ConfirmModal>

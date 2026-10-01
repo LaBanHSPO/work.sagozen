@@ -109,15 +109,6 @@ export function copyAsImage(std: BlockStdScope) {
     notify.error({
       title: I18n.t('com.affine.copy.asImage.notAvailable.title'),
       message: I18n.t('com.affine.copy.asImage.notAvailable.message'),
-      actions: [
-        {
-          key: 'download',
-          label: I18n.t('com.affine.copy.asImage.notAvailable.action'),
-          onClick: () => {
-            window.open('https://affine.pro/download');
-          },
-        },
-      ],
     });
     return;
   }

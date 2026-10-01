@@ -139,13 +139,7 @@ export function ContactUS() {
     <Trans
       i18nKey="com.affine.error.contact-us"
       components={{
-        1: (
-          <a
-            style={{ color: 'var(--affine-primary-color)' }}
-            href="https://affine.pro/redirect/discord"
-            target="__blank"
-          />
-        ),
+        1: <span />,
       }}
     />
   );

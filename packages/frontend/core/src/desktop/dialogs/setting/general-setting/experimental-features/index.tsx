@@ -7,12 +7,6 @@ import {
   type Flag,
 } from '@affine/core/modules/feature-flag';
 import { useI18n } from '@affine/i18n';
-import {
-  ArrowRightSmallIcon,
-  DiscordIcon,
-  EmailIcon,
-  GithubIcon,
-} from '@blocksuite/icons/rc';
 import { useLiveData, useServices } from '@toeverything/infra';
 import { useAtom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
@@ -86,25 +80,6 @@ const ExperimentalFeaturesPrompt = ({
   );
 };
 
-const FeedbackIcon = ({ type }: { type: Flag['feedbackType'] }) => {
-  switch (type) {
-    case 'discord':
-      return <DiscordIcon fontSize={16} />;
-    case 'email':
-      return <EmailIcon fontSize={16} />;
-    case 'github':
-      return <GithubIcon fontSize={16} />;
-    default:
-      return null;
-  }
-};
-
-const feedbackLink: Record<NonNullable<Flag['feedbackType']>, string> = {
-  discord: BUILD_CONFIG.discordUrl,
-  email: 'mailto:support@toeverything.info',
-  github: 'https://github.com/toeverything/AFFiNE/issues',
-};
-
 const ExperimentalFeaturesItem = ({
   flag,
   flagKey,
@@ -120,11 +95,6 @@ const ExperimentalFeaturesItem = ({
     },
     [flag]
   );
-  const link = flag.feedbackType
-    ? flag.feedbackLink
-      ? flag.feedbackLink
-      : feedbackLink[flag.feedbackType]
-    : undefined;
 
   if (flag.configurable === false || flag.hide) {
     return null;
@@ -140,21 +110,6 @@ const ExperimentalFeaturesItem = ({
         <Tooltip content={t[flag.description]()}>
           <div className={styles.description}>{t[flag.description]()}</div>
         </Tooltip>
-      )}
-      {!!flag.feedbackType && (
-        <a
-          className={styles.feedback}
-          href={link}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <FeedbackIcon type={flag.feedbackType} />
-          <span>Discussion about this feature</span>
-          <ArrowRightSmallIcon
-            fontSize={20}
-            className={styles.arrowRightIcon}
-          />
-        </a>
       )}
     </div>
   );
