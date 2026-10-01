@@ -26,6 +26,7 @@ services:
       - REDIS_SERVER_HOST=redis
       - DATABASE_URL=postgresql://affine@postgres:5432/affine
       - DEPLOYMENT_TYPE=selfhosted
+      - AFFINE_SERVER_EXTERNAL_URL=https://work.computeruse.best
     restart: unless-stopped
 
   affine_migration:
