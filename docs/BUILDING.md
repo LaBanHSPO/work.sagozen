@@ -139,6 +139,15 @@ Other dev targets include `@affine/server`, `@affine/electron`, `@affine/mobile`
 
 Running `@affine/web` alone is enough for most editor and UI work — workspaces are stored locally in the browser. To work on **cloud** features (accounts, sync, collaboration, AI), run the local server as well: follow [developing-server.md](./developing-server.md).
 
+### Browser login in this fork
+
+Web and mobile browser login use the self-hosted server at
+**https://work.computeruse.best/** with email and password. The login screen
+does not offer cloud OAuth, another server URL, or guest login. Opening login
+from another origin, including a local development server, navigates to that
+server's `/sign-in` page and preserves `redirect_uri`. Native app login flows
+retain their existing server choices.
+
 ## Testing
 
 Adding test cases is strongly encouraged when you contribute new features and bug fixes.

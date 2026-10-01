@@ -1,7 +1,12 @@
 import { DefaultServerService, type Server } from '@affine/core/modules/cloud';
 import type { AuthSessionStatus } from '@affine/core/modules/cloud/entities/session';
+import {
+  getSelfHostedSignInUrl,
+  isFixedSelfHostedSignIn,
+  SELF_HOSTED_SERVER_URL,
+} from '@affine/core/modules/cloud/self-hosted-sign-in';
 import { FrameworkScope, useService } from '@toeverything/infra';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { AddSelfhostedStep } from './add-selfhosted';
 import { SignInStep } from './sign-in';
@@ -36,20 +41,33 @@ export const SignInPanel = ({
   initStep?: SignInStep | undefined;
   redirectUrl?: string;
 }) => {
+  const selfHostedOnly = isFixedSelfHostedSignIn();
+  const shouldRedirect =
+    selfHostedOnly && location.origin !== SELF_HOSTED_SERVER_URL;
   const [state, setState] = useState<SignInState>({
-    step: initStep
-      ? initStep
-      : initialServerBaseUrl
-        ? 'addSelfhosted'
-        : 'signIn',
-    initialServerBaseUrl: initialServerBaseUrl,
+    step: selfHostedOnly
+      ? 'signIn'
+      : (initStep ?? (initialServerBaseUrl ? 'addSelfhosted' : 'signIn')),
+    initialServerBaseUrl: selfHostedOnly ? undefined : initialServerBaseUrl,
     redirectUrl,
   });
 
   const defaultServerService = useService(DefaultServerService);
+  useEffect(() => {
+    if (shouldRedirect) {
+      // Web authentication uses same-origin cookies on the fixed server.
+      location.replace(getSelfHostedSignInUrl(redirectUrl));
+    }
+  }, [redirectUrl, shouldRedirect]);
 
   const step = state.step;
-  const server = state.server ?? defaultServerService.server;
+  const server = selfHostedOnly
+    ? defaultServerService.server
+    : (state.server ?? defaultServerService.server);
+
+  if (shouldRedirect) {
+    return null;
+  }
 
   return (
     <FrameworkScope scope={server.scope}>
@@ -60,7 +78,7 @@ export const SignInPanel = ({
           onSkip={onSkip}
           onAuthenticated={onAuthenticated}
         />
-      ) : step === 'signInWithEmail' ? (
+      ) : step === 'signInWithEmail' && !selfHostedOnly ? (
         <SignInWithEmailStep
           state={state}
           changeState={setState}
@@ -72,7 +90,7 @@ export const SignInPanel = ({
           changeState={setState}
           onAuthenticated={onAuthenticated}
         />
-      ) : step === 'addSelfhosted' ? (
+      ) : step === 'addSelfhosted' && !selfHostedOnly ? (
         <AddSelfhostedStep state={state} changeState={setState} />
       ) : null}
     </FrameworkScope>

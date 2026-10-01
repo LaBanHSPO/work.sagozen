@@ -15,6 +15,10 @@ import {
   ServerService,
 } from '@affine/core/modules/cloud';
 import type { AuthSessionStatus } from '@affine/core/modules/cloud/entities/session';
+import {
+  isFixedSelfHostedSignIn,
+  SELF_HOSTED_SERVER_URL,
+} from '@affine/core/modules/cloud/self-hosted-sign-in';
 import { Unreachable } from '@affine/env/constant';
 import { UserFriendlyError } from '@affine/error';
 import { ServerDeploymentType } from '@affine/graphql';
@@ -38,6 +42,7 @@ export const SignInWithPasswordStep = ({
   onAuthenticated?: (status: AuthSessionStatus) => void;
 }) => {
   const t = useI18n();
+  const selfHostedOnly = isFixedSelfHostedSignIn();
   const authService = useService(AuthService);
 
   const email = state.email;
@@ -59,9 +64,11 @@ export const SignInWithPasswordStep = ({
   const serverName = useLiveData(
     serverService.server.config$.selector(c => c.serverName)
   );
-  const signInServerName = isSelfhosted
-    ? getSelfHostedServerName(serverName)
-    : serverName;
+  const signInServerName = selfHostedOnly
+    ? SELF_HOSTED_SERVER_URL
+    : isSelfhosted
+      ? getSelfHostedServerName(serverName)
+      : serverName;
 
   const verifyToken = useLiveData(captchaService.verifyToken$);
   const needCaptcha = useLiveData(captchaService.needCaptcha$);
@@ -186,7 +193,7 @@ export const SignInWithPasswordStep = ({
             {t['com.affine.auth.sign.in']()}
           </Button>
         </form>
-        {!isSelfhosted && (
+        {!selfHostedOnly && !isSelfhosted && (
           <div className={styles.passwordButtonRow}>
             <a
               data-testid="send-magic-link-button"

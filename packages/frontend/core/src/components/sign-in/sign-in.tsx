@@ -14,6 +14,10 @@ import {
   ServerService,
 } from '@affine/core/modules/cloud';
 import type { AuthSessionStatus } from '@affine/core/modules/cloud/entities/session';
+import {
+  isFixedSelfHostedSignIn,
+  SELF_HOSTED_SERVER_URL,
+} from '@affine/core/modules/cloud/self-hosted-sign-in';
 import { ServerDeploymentType } from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
 import {
@@ -55,6 +59,7 @@ export const SignInStep = ({
   onAuthenticated?: (status: AuthSessionStatus) => void;
 }) => {
   const t = useI18n();
+  const selfHostedOnly = isFixedSelfHostedSignIn();
   const serverService = useService(ServerService);
   const serverName = useLiveData(
     serverService.server.config$.selector(c => c.serverName)
@@ -65,9 +70,11 @@ export const SignInStep = ({
       c => c.type === ServerDeploymentType.Selfhosted
     )
   );
-  const signInServerName = isSelfhosted
-    ? getSelfHostedServerName(serverName)
-    : serverName;
+  const signInServerName = selfHostedOnly
+    ? SELF_HOSTED_SERVER_URL
+    : isSelfhosted
+      ? getSelfHostedServerName(serverName)
+      : serverName;
   const authService = useService(AuthService);
   const [isMutating, setIsMutating] = useState(false);
 
@@ -103,7 +110,7 @@ export const SignInStep = ({
 
       // Self-hosted email login stays on the password form. The mailed
       // 6-digit code is only the cloud sign-in path.
-      if (isSelfhosted || hasPassword) {
+      if (selfHostedOnly || isSelfhosted || hasPassword) {
         changeState(prev => ({
           ...prev,
           email,
@@ -134,7 +141,7 @@ export const SignInStep = ({
     }
 
     setIsMutating(false);
-  }, [authService, changeState, email, isSelfhosted]);
+  }, [authService, changeState, email, isSelfhosted, selfHostedOnly]);
 
   const onAddSelfhosted = useCallback(() => {
     changeState(prev => ({
@@ -165,7 +172,7 @@ export const SignInStep = ({
       />
 
       <AuthContent>
-        <OAuth redirectUrl={state.redirectUrl} />
+        {!selfHostedOnly && <OAuth redirectUrl={state.redirectUrl} />}
 
         <form
           onSubmit={event => {
@@ -203,7 +210,7 @@ export const SignInStep = ({
           </Button>
         </form>
 
-        {!isSelfhosted && (
+        {!selfHostedOnly && !isSelfhosted && (
           <>
             <div className={style.authMessage}>
               {/*prettier-ignore*/}
@@ -244,7 +251,7 @@ export const SignInStep = ({
           </>
         )}
       </AuthContent>
-      {isSelfhosted && (
+      {!selfHostedOnly && isSelfhosted && (
         <AuthFooter>
           <Back changeState={changeState} />
         </AuthFooter>
