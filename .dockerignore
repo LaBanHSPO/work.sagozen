@@ -21,7 +21,10 @@
 # OS noise
 .DS_Store
 
-# Self-host runtime data must not enter the image build
+# Runtime data next to the repo. Postgres owns data/postgres (mode 700),
+# so sending it as build context fails with "permission denied".
+# Leading slash keeps source trees such as packages/backend/server/src/data.
+/data
 .docker/selfhost/data
 .docker/selfhost/config
 
