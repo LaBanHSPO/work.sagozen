@@ -1359,6 +1359,17 @@ type InviteUserType {
   status: WorkspaceMemberStatus!
 }
 
+type WorkspaceMemberAuditLogType {
+  id: ID!
+  action: String!
+  actorName: String!
+  actorEmail: String
+  targetName: String
+  targetEmail: String
+  detail: String
+  createdAt: DateTime!
+}
+
 enum InvoiceStatus {
   Draft
   Open
@@ -2000,6 +2011,9 @@ type Query {
 
   """Get workspace by id"""
   workspace(id: String!): WorkspaceType!
+
+  """Recent member management activity in a workspace"""
+  workspaceMemberAuditLogs(workspaceId: String!, skip: Int! = 0, take: Int! = 20): [WorkspaceMemberAuditLogType!]!
 
   """Get workspace role permissions"""
   workspaceRolePermissions(id: String!): WorkspaceRolePermissions! @deprecated(reason: "use WorkspaceType[permissions] instead")
@@ -2645,7 +2659,7 @@ type UserType {
   name: String!
 
   """Get current user notifications"""
-  notifications(pagination: PaginationInput!): PaginatedNotificationObjectType!
+  notifications(pagination: PaginationInput!, read: Boolean! = false): PaginatedNotificationObjectType!
   quota: UserQuotaType!
   quotaUsage: UserQuotaUsageType!
 

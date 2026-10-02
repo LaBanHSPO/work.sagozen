@@ -57,6 +57,47 @@ type SpacialProperty = {
   valueGet: (rowId: string, propertyId: string) => unknown;
 };
 
+class DatabaseViewManager extends ViewManagerBase {
+  override defaultViewId$: ReadonlySignal<string | undefined>;
+
+  canSavePersonalView$ = computed(() => {
+    const source = this.dataSource as DatabaseBlockDataSource;
+    return !source.readonly$.value && !!source.currentUserId$.value;
+  });
+
+  constructor(override dataSource: DatabaseBlockDataSource) {
+    super(dataSource);
+    this.defaultViewId$ = dataSource.defaultViewId$;
+  }
+
+  viewSavePersonal(id: string): string | undefined {
+    if (!this.canSavePersonalView$.value) {
+      return;
+    }
+    const view = this.dataSource.viewDataGet(id);
+    if (!view) {
+      return;
+    }
+    const newId = this.dataSource.doc.workspace.idGenerator();
+    this.dataSource.viewDataAdd(
+      JSON.parse(
+        JSON.stringify({
+          ...view,
+          id: newId,
+          name: `My ${view.name}`,
+          ownerId: this.dataSource.currentUserId$.value,
+        })
+      ) as DataViewDataType
+    );
+    this.setCurrentView(newId);
+    return newId;
+  }
+
+  viewSetDefault(id: string): void {
+    this.dataSource.setDefaultView(id);
+  }
+}
+
 export class DatabaseBlockDataSource extends DataSourceBase {
   override get parentProvider() {
     return this._model.store.provider;
@@ -174,10 +215,20 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   viewConverts = databaseBlockViewConverts;
 
   viewDataList$: ReadonlySignal<DataViewDataType[]> = computed(() => {
-    return this._model.props.views$.value as DataViewDataType[];
+    const userId = this.currentUserId$.value;
+    // Owner scoping controls the picker; views still live in the synced document.
+    return (this._model.props.views$.value as DataViewDataType[]).filter(
+      view => !view.ownerId || view.ownerId === userId
+    );
   });
 
-  override viewManager: ViewManager = new ViewManagerBase(this);
+  defaultViewId$ = computed(() => {
+    const sharedViews = this.viewDataList$.value.filter(view => !view.ownerId);
+    const selected = this._model.props.defaultViewId$.value;
+    return sharedViews.find(view => view.id === selected)?.id ?? sharedViews[0]?.id;
+  });
+
+  override viewManager: ViewManager = new DatabaseViewManager(this);
 
   viewMetas = databaseBlockViews;
 
@@ -197,7 +248,8 @@ export class DatabaseBlockDataSource extends DataSourceBase {
 
   constructor(
     model: DatabaseBlockModel,
-    init?: (dataSource: DatabaseBlockDataSource) => void
+    init?: (dataSource: DatabaseBlockDataSource) => void,
+    readonly currentUserId$: ReadonlySignal<string> = signal('')
   ) {
     super();
     this._model = model; // ensure invariants first
@@ -577,19 +629,29 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   viewDataDelete(viewId: string): void {
+    const view = this.viewDataGet(viewId);
+    if (!view) return;
+    if (
+      !view.ownerId &&
+      this._model.props.views$.value.filter(item => !item.ownerId).length === 1
+    ) {
+      return;
+    }
     this._model.store.captureSync();
     deleteView(this._model, viewId);
   }
 
   viewDataDuplicate(id: string): string {
+    if (!this.viewDataGet(id)) return id;
     return duplicateView(this._model, id);
   }
 
   viewDataGet(viewId: string): DataViewDataType | undefined {
-    return this.viewDataList$.value.find(data => data.id === viewId)!;
+    return this.viewDataList$.value.find(data => data.id === viewId);
   }
 
   viewDataMoveTo(id: string, position: InsertToPosition): void {
+    if (!this.viewDataGet(id)) return;
     moveViewTo(this._model, id, position);
   }
 
@@ -597,7 +659,17 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     id: string,
     updater: (data: ViewData) => Partial<ViewData>
   ): void {
+    if (!this.viewDataGet(id)) return;
     updateView(this._model, id, updater);
+  }
+
+  setDefaultView(id: string): void {
+    const view = this.viewDataGet(id);
+    if (!view || view.ownerId || this.readonly$.value) return;
+    this.doc.captureSync();
+    this.doc.transact(() => {
+      this._model.props.defaultViewId = id;
+    });
   }
 
   viewMetaGet(type: string): ViewMeta {

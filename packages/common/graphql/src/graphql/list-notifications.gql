@@ -1,6 +1,6 @@
-query listNotifications($pagination: PaginationInput!) {
+query listNotifications($pagination: PaginationInput!, $read: Boolean! = false) {
   currentUser {
-    notifications(pagination: $pagination) {
+    notifications(pagination: $pagination, read: $read) {
       totalCount
       edges {
         cursor

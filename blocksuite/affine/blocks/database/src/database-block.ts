@@ -15,6 +15,7 @@ import {
   DocModeProvider,
   FeatureFlagService,
   NotificationProvider,
+  UserProvider,
   type TelemetryEventMap,
   TelemetryProvider,
 } from '@blocksuite/affine-shared/services';
@@ -46,7 +47,7 @@ import {
 } from '@blocksuite/icons/lit';
 import { type BlockComponent, BlockSelection } from '@blocksuite/std';
 import { RANGE_SYNC_EXCLUDE_ATTR } from '@blocksuite/std/inline';
-import { Slice } from '@blocksuite/store';
+import { nanoid, Slice } from '@blocksuite/store';
 import { autoUpdate } from '@floating-ui/dom';
 import { computed, signal } from '@preact/signals-core';
 import { html, nothing } from 'lit';
@@ -71,9 +72,29 @@ import {
 import { BlockRenderer } from './detail-panel/block-renderer.js';
 import { NoteRenderer } from './detail-panel/note-renderer.js';
 import { DatabaseSelection } from './selection.js';
+import { ProtectedTableApiProvider } from './service/index.js';
 import { currentViewStorage } from './utils/current-view.js';
 import { getSingleDocIdFromText } from './utils/title-doc.js';
 import type { DatabaseViewExtensionOptions } from './view';
+
+const localViewerKey = 'blocksuite:databaseBlock:localViewerId';
+let localViewerId: string | undefined;
+
+function getLocalViewerId(): string {
+  if (localViewerId) return localViewerId;
+  try {
+    localViewerId = globalThis.localStorage?.getItem(localViewerKey) ?? undefined;
+    if (!localViewerId) {
+      localViewerId = `local:${nanoid()}`;
+      globalThis.localStorage?.setItem(localViewerKey, localViewerId);
+    }
+  } catch {
+    localViewerId = `local:${nanoid()}`;
+  }
+  const id = localViewerId ?? `local:${nanoid()}`;
+  localViewerId = id;
+  return id;
+}
 
 export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBlockModel> {
   private readonly clickDatabaseOps = (e: MouseEvent) => {
@@ -115,6 +136,22 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
               .catch(console.error);
           },
         }),
+        menu.action({
+          name: 'Create protected task table',
+          hide: () =>
+            this.store.readonly ||
+            !this.std.getOptional(ProtectedTableApiProvider),
+          select: () => {
+            const parent = this.store.getParent(this.model.id);
+            if (!parent) return;
+            this.store.addBlock(
+              'affine:database',
+              { protectedTable: true },
+              parent,
+              parent.children.indexOf(this.model) + 1
+            );
+          },
+        }),
         menu.group({
           items: [
             menu.action({
@@ -123,7 +160,20 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
                 'delete-item': true,
               },
               name: 'Delete Database',
-              select: () => {
+              select: async () => {
+                if (this.store.readonly) return;
+                if (this.model.props.protectedTable$.value) {
+                  const api = this.std.getOptional(ProtectedTableApiProvider);
+                  if (!api) return;
+                  const url = `/api/workspaces/${encodeURIComponent(this.store.workspace.id)}/docs/${encodeURIComponent(this.store.id)}/protected-tables/${encodeURIComponent(this.model.id)}`;
+                  try {
+                    const response = await api.fetch(url, { method: 'DELETE' });
+                    if (!response.ok) throw new Error('Delete failed');
+                  } catch {
+                    toast(this.host, 'Could not delete protected table');
+                    return;
+                  }
+                }
                 this.model.children.slice().forEach(block => {
                   this.store.deleteBlock(block);
                 });
@@ -141,25 +191,34 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
   };
 
   private readonly dataSource = lazy(() => {
-    const dataSource = new DatabaseBlockDataSource(this.model, dataSource => {
-      dataSource.serviceSet(EditorHostKey, this.host);
-      this.std.provider
-        .getAll(ExternalGroupByConfigProvider)
-        .forEach(config => {
-          dataSource.serviceSet(
-            ExternalGroupByConfigProvider(config.name),
-            config
-          );
-        });
-      this.std.provider
-        .getAll(CalendarExternalSourceProvider)
-        .forEach(source => {
-          dataSource.serviceSet(
-            CalendarExternalSourceProvider(source.id),
-            source
-          );
-        });
-    });
+    const currentUserId$ = computed(
+      () =>
+        this.std.getOptional(UserProvider)?.currentUserInfo$.value?.id ??
+        getLocalViewerId()
+    );
+    const dataSource = new DatabaseBlockDataSource(
+      this.model,
+      dataSource => {
+        dataSource.serviceSet(EditorHostKey, this.host);
+        this.std.provider
+          .getAll(ExternalGroupByConfigProvider)
+          .forEach(config => {
+            dataSource.serviceSet(
+              ExternalGroupByConfigProvider(config.name),
+              config
+            );
+          });
+        this.std.provider
+          .getAll(CalendarExternalSourceProvider)
+          .forEach(source => {
+            dataSource.serviceSet(
+              CalendarExternalSourceProvider(source.id),
+              source
+            );
+          });
+      },
+      currentUserId$
+    );
     const id = currentViewStorage.getCurrentView(this.model.id);
     if (id && dataSource.viewManager.viewGet(id)) {
       dataSource.viewManager.setCurrentView(id);
@@ -507,6 +566,18 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       })
   );
   override renderBlock() {
+    if (this.model.props.protectedTable$.value) {
+      return html`
+        <div contenteditable="false" class="${databaseContentStyles}">
+          <affine-protected-table
+            .workspaceId=${this.model.store.workspace.id}
+            .docId=${this.model.store.id}
+            .blockId=${this.model.id}
+            .apiRequest=${this.std.getOptional(ProtectedTableApiProvider)?.fetch}
+          ></affine-protected-table>
+        </div>
+      `;
+    }
     const widgets = html`${repeat(
       Object.entries(this.widgets),
       ([id]) => id,

@@ -10,11 +10,34 @@ import {
 } from '@blocksuite/icons/lit';
 
 import { insertDatabaseBlockCommand } from '../commands';
+import { ProtectedTableApiProvider } from '../service';
 import { KanbanViewTooltip, TableViewTooltip } from './tooltips';
 
 export const databaseSlashMenuConfig: SlashMenuConfig = {
   disableWhen: ({ model }) => model.flavour === 'affine:database',
   items: [
+    {
+      name: 'Protected Task Table',
+      description: 'Store task cells on the server with row and column access rules.',
+      searchAlias: ['database', 'permissions', 'project'],
+      icon: DatabaseTableViewIcon(),
+      group: '7_Database@0',
+      when: ({ model, std }) =>
+        !!std.getOptional(ProtectedTableApiProvider) &&
+        !isInsideBlockByFlavour(model.store, model, 'affine:edgeless-text'),
+      action: ({ std }) => {
+        std.command
+          .chain()
+          .pipe(getSelectedModelsCommand)
+          .pipe(insertDatabaseBlockCommand, {
+            viewType: viewPresets.tableViewMeta.type,
+            protectedTable: true,
+            place: 'after',
+            removeEmptyLine: true,
+          })
+          .run();
+      },
+    },
     {
       name: 'Table View',
       description: 'Display items in a table format.',

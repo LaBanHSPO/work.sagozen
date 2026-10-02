@@ -8,6 +8,7 @@ import {
   observeIntersection,
   Scrollable,
   Skeleton,
+  Tabs,
 } from '@affine/component';
 import { AuthService, InvitationService } from '@affine/core/modules/cloud';
 import { GlobalDialogService } from '@affine/core/modules/dialogs';
@@ -32,7 +33,7 @@ import { i18nTime, Trans, useI18n } from '@affine/i18n';
 import track from '@affine/track';
 import {
   CollaborationIcon,
-  DeleteIcon,
+  CheckBoxCheckLinearIcon,
   EdgelessIcon,
   MoreHorizontalIcon,
   NotificationIcon,
@@ -59,6 +60,7 @@ export const NotificationList = () => {
   const globalDialogService = useService(GlobalDialogService);
   const authStatus = useLiveData(authService.session.status$);
   const notifications = useLiveData(notificationListService.notifications$);
+  const showRead = useLiveData(notificationListService.showRead$);
   const isLoading = useLiveData(notificationListService.isLoading$);
   const error = useLiveData(notificationListService.error$);
   const hasMore = useLiveData(notificationListService.hasMore$);
@@ -74,6 +76,7 @@ export const NotificationList = () => {
   }, [error]);
 
   useLayoutEffect(() => {
+    notificationListService.setShowRead(false);
     notificationListService.reset();
     if (authStatus === 'authenticated') notificationListService.loadMore();
   }, [authStatus, notificationListService]);
@@ -100,11 +103,19 @@ export const NotificationList = () => {
     globalDialogService.open('sign-in', {});
   }, [globalDialogService]);
 
-  const handleDeleteAll = useCallback(() => {
+  const handleMarkAllRead = useCallback(() => {
     notificationListService.readAllNotifications().catch(err => {
       notify.error(UserFriendlyError.fromAny(err));
     });
   }, [notificationListService]);
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      notificationListService.setShowRead(value === 'history');
+      if (authStatus === 'authenticated') notificationListService.loadMore();
+    },
+    [authStatus, notificationListService]
+  );
 
   return (
     <div
@@ -113,11 +124,14 @@ export const NotificationList = () => {
     >
       <div className={styles.header}>
         <span>{t['com.affine.rootAppSidebar.notifications']()}</span>
-        {notifications.length > 0 && (
+        {!showRead && notifications.length > 0 && (
           <Menu
             items={
-              <MenuItem prefixIcon={<DeleteIcon />} onClick={handleDeleteAll}>
-                <span>{t['com.affine.notification.delete-all']()}</span>
+              <MenuItem
+                prefixIcon={<CheckBoxCheckLinearIcon />}
+                onClick={handleMarkAllRead}
+              >
+                <span>{t['com.affine.notification.mark-all-read']()}</span>
               </MenuItem>
             }
           >
@@ -125,48 +139,67 @@ export const NotificationList = () => {
           </Menu>
         )}
       </div>
-      <Scrollable.Root className={styles.scrollRoot}>
-        <Scrollable.Viewport className={styles.scrollViewport}>
-          {authStatus === 'unauthenticated' ? (
-            <NotificationSignIn onSignIn={handleSignIn} />
-          ) : notifications.length > 0 ? (
-            <ul className={styles.itemList}>
-              {notifications.map(notification => (
-                <li key={notification.id}>
-                  <NotificationItem notification={notification} />
-                </li>
-              ))}
-              {userFriendlyError && (
-                <li>
-                  <NotificationError
-                    message={userFriendlyError.message}
-                    onRetry={() => notificationListService.retry()}
-                  />
-                </li>
+      <Tabs.Root
+        className={styles.tabsRoot}
+        value={showRead ? 'history' : 'new'}
+        onValueChange={handleTabChange}
+      >
+        <Tabs.List className={styles.tabsList}>
+          <Tabs.Trigger value="new">
+            {t['com.affine.notification.tab.new']()}
+          </Tabs.Trigger>
+          <Tabs.Trigger value="history">
+            {t['com.affine.notification.tab.history']()}
+          </Tabs.Trigger>
+        </Tabs.List>
+        <Tabs.Content
+          className={styles.tabsContent}
+          value={showRead ? 'history' : 'new'}
+        >
+          <Scrollable.Root className={styles.scrollRoot}>
+            <Scrollable.Viewport className={styles.scrollViewport}>
+              {authStatus === 'unauthenticated' ? (
+                <NotificationSignIn onSignIn={handleSignIn} />
+              ) : notifications.length > 0 ? (
+                <ul className={styles.itemList}>
+                  {notifications.map(notification => (
+                    <li key={notification.id}>
+                      <NotificationItem notification={notification} />
+                    </li>
+                  ))}
+                  {userFriendlyError && (
+                    <li>
+                      <NotificationError
+                        message={userFriendlyError.message}
+                        onRetry={() => notificationListService.retry()}
+                      />
+                    </li>
+                  )}
+                </ul>
+              ) : isLoading ? (
+                <NotificationItemSkeleton />
+              ) : userFriendlyError ? (
+                <NotificationErrorEmpty
+                  message={userFriendlyError.message}
+                  onRetry={() => notificationListService.retry()}
+                />
+              ) : (
+                <NotificationListEmpty showRead={showRead} />
               )}
-            </ul>
-          ) : isLoading ? (
-            <NotificationItemSkeleton />
-          ) : userFriendlyError ? (
-            <NotificationErrorEmpty
-              message={userFriendlyError.message}
-              onRetry={() => notificationListService.retry()}
-            />
-          ) : (
-            <NotificationListEmpty />
-          )}
 
-          <div
-            ref={loadMoreIndicatorRef}
-            className={showLoadingMore ? styles.loadMoreIndicator : ''}
-          >
-            {showLoadingMore
-              ? t['com.affine.notification.loading-more']()
-              : null}
-          </div>
-        </Scrollable.Viewport>
-        <Scrollable.Scrollbar />
-      </Scrollable.Root>
+              <div
+                ref={loadMoreIndicatorRef}
+                className={showLoadingMore ? styles.loadMoreIndicator : ''}
+              >
+                {showLoadingMore
+                  ? t['com.affine.notification.loading-more']()
+                  : null}
+              </div>
+            </Scrollable.Viewport>
+            <Scrollable.Scrollbar />
+          </Scrollable.Root>
+        </Tabs.Content>
+      </Tabs.Root>
     </div>
   );
 };
@@ -226,7 +259,7 @@ const NotificationError = ({
   );
 };
 
-const NotificationListEmpty = () => {
+const NotificationListEmpty = ({ showRead }: { showRead: boolean }) => {
   const t = useI18n();
   return (
     <div className={styles.listEmpty}>
@@ -234,11 +267,15 @@ const NotificationListEmpty = () => {
         <NotificationIcon width={24} height={24} />
       </div>
       <div className={styles.listEmptyTitle}>
-        {t['com.affine.notification.empty']()}
+        {showRead
+          ? t['com.affine.notification.history.empty']()
+          : t['com.affine.notification.empty']()}
       </div>
-      <div className={styles.listEmptyDescription}>
-        {t['com.affine.notification.empty.description']()}
-      </div>
+      {!showRead && (
+        <div className={styles.listEmptyDescription}>
+          {t['com.affine.notification.empty.description']()}
+        </div>
+      )}
     </div>
   );
 };
@@ -290,7 +327,7 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
       <div className={styles.itemNotSupported}>
         {t['com.affine.notification.unsupported']()} ({type})
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -359,7 +396,7 @@ const MentionNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -423,7 +460,7 @@ const InvitationReviewRequestNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -473,7 +510,7 @@ const InvitationReviewDeclinedNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -551,7 +588,7 @@ const InvitationReviewApprovedNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -607,7 +644,7 @@ const InvitationAcceptedNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -664,7 +701,7 @@ const InvitationBlockedNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -793,21 +830,22 @@ const InvitationNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
 
-const DeleteButton = ({
+const MarkReadButton = ({
   notification,
   onClick,
 }: {
   notification: Notification;
   onClick?: () => void;
 }) => {
+  const t = useI18n();
   const notificationListService = useService(NotificationListService);
 
-  const handleDelete = useCallback(
+  const handleMarkRead = useCallback(
     (e: React.MouseEvent<HTMLButtonElement>) => {
       e.stopPropagation(); // prevent trigger the click event of the parent element
 
@@ -824,12 +862,15 @@ const DeleteButton = ({
     [notificationListService, notification, onClick]
   );
 
+  if (notification.read) return null;
+
   return (
     <IconButton
       size={16}
-      className={styles.itemDeleteButton}
-      icon={<DeleteIcon />}
-      onClick={handleDelete}
+      className={styles.itemMarkReadButton}
+      icon={<CheckBoxCheckLinearIcon />}
+      title={t['com.affine.notification.mark-read']()}
+      onClick={handleMarkRead}
     />
   );
 };
@@ -953,7 +994,7 @@ const CommentNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };
@@ -1023,7 +1064,7 @@ const CommentMentionNotificationItem = ({
           })}
         </div>
       </div>
-      <DeleteButton notification={notification} />
+      <MarkReadButton notification={notification} />
     </div>
   );
 };

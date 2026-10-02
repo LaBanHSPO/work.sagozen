@@ -586,7 +586,10 @@ export class NotificationService {
   /**
    * Find notifications by user id, order by createdAt desc
    */
-  async findManyByUserId(userId: string, options?: PaginationInput) {
+  async findManyByUserId(
+    userId: string,
+    options?: PaginationInput & { read?: boolean }
+  ) {
     const notifications = await this.models.notification.findManyByUserId(
       userId,
       options
@@ -639,8 +642,8 @@ export class NotificationService {
     }));
   }
 
-  async countByUserId(userId: string) {
-    return await this.models.notification.countByUserId(userId);
+  async countByUserId(userId: string, read = false) {
+    return await this.models.notification.countByUserId(userId, { read });
   }
 
   private async publishCountChanged(

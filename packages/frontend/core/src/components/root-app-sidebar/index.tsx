@@ -46,6 +46,7 @@ import {
 } from './index.css';
 import { InviteMembersButton } from './invite-members-button';
 import { AppSidebarJournalButton } from './journal-button';
+import { MemberAuditButton } from './member-audit-button';
 import { NotificationButton } from './notification-button';
 import { SidebarAudioPlayer } from './sidebar-audio-player';
 import { TemplateDocEntrance } from './template-doc-entrance';
@@ -212,6 +213,7 @@ export const RootAppSidebar = memo((): ReactElement => {
         <AllDocsButton />
         <AppSidebarJournalButton />
         {sessionStatus === 'authenticated' && <NotificationButton />}
+        {sessionStatus === 'authenticated' && <MemberAuditButton />}
         <AIChatButton />
         <MenuItem
           data-testid="slider-bar-workspace-setting-button"

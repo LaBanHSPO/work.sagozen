@@ -760,4 +760,14 @@ e2e('should mark all notifications as read', async t => {
     },
   });
   t.is(result.currentUser!.notifications.totalCount, 0);
+
+  const history = await app.gql({
+    query: listNotificationsQuery,
+    variables: {
+      pagination: { first: 10, offset: 0 },
+      read: true,
+    },
+  });
+  t.is(history.currentUser!.notifications.totalCount, 1);
+  t.is(history.currentUser!.notifications.edges[0].node.read, true);
 });

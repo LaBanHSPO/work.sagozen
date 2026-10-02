@@ -2620,6 +2620,8 @@ export interface Query {
   validateAppConfig: Array<AppConfigValidateResult>;
   /** Get workspace by id */
   workspace: WorkspaceType;
+  /** Recent member management activity in a workspace */
+  workspaceMemberAuditLogs: Array<WorkspaceMemberAuditLogType>;
   /**
    * Get workspace role permissions
    * @deprecated use WorkspaceType[permissions] instead
@@ -2696,6 +2698,12 @@ export interface QueryValidateAppConfigArgs {
 
 export interface QueryWorkspaceArgs {
   id: Scalars['String']['input'];
+}
+
+export interface QueryWorkspaceMemberAuditLogsArgs {
+  workspaceId: Scalars['String']['input'];
+  skip?: InputMaybe<Scalars['Int']['input']>;
+  take?: InputMaybe<Scalars['Int']['input']>;
 }
 
 export interface QueryWorkspaceRolePermissionsArgs {
@@ -3357,6 +3365,7 @@ export interface UserTypeInvoicesArgs {
 
 export interface UserTypeNotificationsArgs {
   pagination: PaginationInput;
+  read?: InputMaybe<Scalars['Boolean']['input']>;
 }
 
 export interface ValidationErrorDataType {
@@ -3718,6 +3727,18 @@ export interface WorkspaceType {
   subscription: Maybe<SubscriptionType>;
   /** if workspace is team workspace */
   team: Scalars['Boolean']['output'];
+}
+
+export interface WorkspaceMemberAuditLogType {
+  __typename?: 'WorkspaceMemberAuditLogType';
+  id: Scalars['ID']['output'];
+  action: Scalars['String']['output'];
+  actorName: Scalars['String']['output'];
+  actorEmail: Maybe<Scalars['String']['output']>;
+  targetName: Maybe<Scalars['String']['output']>;
+  targetEmail: Maybe<Scalars['String']['output']>;
+  detail: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
 }
 
 export interface WorkspaceTypeAggregateArgs {
@@ -6527,6 +6548,27 @@ export type GetWorkspaceQuery = {
   workspace: { __typename?: 'WorkspaceType'; id: string };
 };
 
+export type WorkspaceMemberAuditLogsQueryVariables = Exact<{
+  workspaceId: Scalars['String']['input'];
+  skip: Scalars['Int']['input'];
+  take: Scalars['Int']['input'];
+}>;
+
+export type WorkspaceMemberAuditLogsQuery = {
+  __typename?: 'Query';
+  workspaceMemberAuditLogs: Array<{
+    __typename?: 'WorkspaceMemberAuditLogType';
+    id: string;
+    action: string;
+    actorName: string;
+    actorEmail: string | null;
+    targetName: string | null;
+    targetEmail: string | null;
+    detail: string | null;
+    createdAt: string;
+  }>;
+};
+
 export type GetWorkspacesQueryVariables = Exact<{ [key: string]: never }>;
 
 export type GetWorkspacesQuery = {
@@ -6805,6 +6847,7 @@ export type PreviewLicenseMutation = {
 
 export type ListNotificationsQueryVariables = Exact<{
   pagination: PaginationInput;
+  read?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type ListNotificationsQuery = {
@@ -7732,6 +7775,11 @@ export type GrantWorkspaceTeamMemberMutation = {
 };
 
 export type Queries =
+  | {
+      name: 'workspaceMemberAuditLogsQuery';
+      variables: WorkspaceMemberAuditLogsQueryVariables;
+      response: WorkspaceMemberAuditLogsQuery;
+    }
   | {
       name: 'adminAllSharedLinksQuery';
       variables: AdminAllSharedLinksQueryVariables;

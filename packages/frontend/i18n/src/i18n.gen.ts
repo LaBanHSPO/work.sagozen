@@ -8855,6 +8855,26 @@ export function useAFFiNEI18N(): {
       */
     ["com.affine.notification.empty"](): string;
     /**
+      * `No notification history`
+      */
+    ["com.affine.notification.history.empty"](): string;
+    /**
+      * `New`
+      */
+    ["com.affine.notification.tab.new"](): string;
+    /**
+      * `History`
+      */
+    ["com.affine.notification.tab.history"](): string;
+    /**
+      * `Mark all as read`
+      */
+    ["com.affine.notification.mark-all-read"](): string;
+    /**
+      * `Mark as read`
+      */
+    ["com.affine.notification.mark-read"](): string;
+    /**
       * `Loading more...`
       */
     ["com.affine.notification.loading-more"](): string;

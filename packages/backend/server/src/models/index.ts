@@ -29,6 +29,7 @@ import { HistoryModel } from './history';
 import { MailDeliveryModel } from './mail-delivery';
 import { McpCredentialModel } from './mcp-credential';
 import { NotificationModel } from './notification';
+import { ProtectedTableModel } from './protected-table';
 import {
   DocAccessPolicyModel,
   DocGrantModel,
@@ -44,6 +45,7 @@ import { UserSettingsModel } from './user-settings';
 import { WorkspaceModel } from './workspace';
 import { WorkspaceAnalyticsModel } from './workspace-analytics';
 import { WorkspaceCalendarModel } from './workspace-calendar';
+import { WorkspaceMemberAuditLogModel } from './workspace-member-audit-log';
 import { WorkspaceUserModel } from './workspace-user';
 
 const MODELS = {
@@ -58,6 +60,7 @@ const MODELS = {
   docUser: DocUserModel,
   history: HistoryModel,
   notification: NotificationModel,
+  protectedTable: ProtectedTableModel,
   workspaceMember: WorkspaceMemberModel,
   workspaceInvitation: WorkspaceInvitationModel,
   workspaceAccessPolicy: WorkspaceAccessPolicyModel,
@@ -82,6 +85,7 @@ const MODELS = {
   calendarEventInstance: CalendarEventInstanceModel,
   workspaceCalendar: WorkspaceCalendarModel,
   workspaceAnalytics: WorkspaceAnalyticsModel,
+  workspaceMemberAuditLog: WorkspaceMemberAuditLogModel,
 };
 
 type ModelsType = {
@@ -161,5 +165,6 @@ export * from './user-settings';
 export * from './workspace';
 export * from './workspace-analytics';
 export * from './workspace-calendar';
+export * from './workspace-member-audit-log';
 export * from './workspace-user';
 export type { WorkspaceUserCompat } from './workspace-user-compat';

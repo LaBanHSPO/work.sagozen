@@ -16,6 +16,7 @@ import type { NotificationCountService } from './count';
 export class NotificationListService extends Service {
   isLoading$ = new LiveData(false);
   notifications$ = new LiveData<Notification[]>([]);
+  showRead$ = new LiveData(false);
   nextCursor$ = new LiveData<string | undefined>(undefined);
   hasMore$ = new LiveData(true);
   error$ = new LiveData<any>(null);
@@ -40,6 +41,7 @@ export class NotificationListService extends Service {
             first: this.PAGE_SIZE,
             after: this.nextCursor$.value,
           },
+          this.showRead$.value,
           signal
         )
       ).pipe(
@@ -55,7 +57,9 @@ export class NotificationListService extends Service {
           ]);
 
           // keep the notification count in sync
-          this.notificationCount.setCount(totalCount);
+          if (!this.showRead$.value) {
+            this.notificationCount.setCount(totalCount);
+          }
 
           this.hasMore$.next(pageInfo.hasNextPage);
           this.nextCursor$.next(pageInfo.endCursor ?? undefined);
@@ -79,6 +83,12 @@ export class NotificationListService extends Service {
     this.loadMore.reset();
   }
 
+  setShowRead(read: boolean) {
+    if (this.showRead$.value === read) return;
+    this.reset();
+    this.showRead$.setValue(read);
+  }
+
   retry() {
     this.error$.setValue(null);
     this.loadMore.reset();
@@ -86,10 +96,17 @@ export class NotificationListService extends Service {
   }
 
   async readNotification(id: string) {
+    if (
+      this.notifications$.value.find(notification => notification.id === id)?.read
+    ) {
+      return;
+    }
     await this.store.readNotification(id);
-    this.notifications$.next(
-      this.notifications$.value.filter(notification => notification.id !== id)
-    );
+    if (!this.showRead$.value) {
+      this.notifications$.next(
+        this.notifications$.value.filter(notification => notification.id !== id)
+      );
+    }
     this.notificationCount.setCount(
       Math.max(this.notificationCount.count$.value - 1, 0)
     );

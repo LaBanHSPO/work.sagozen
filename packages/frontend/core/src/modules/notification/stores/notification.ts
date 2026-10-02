@@ -51,11 +51,16 @@ export class NotificationStore extends Store {
     );
   }
 
-  async listNotification(pagination: PaginationInput, signal?: AbortSignal) {
+  async listNotification(
+    pagination: PaginationInput,
+    read = false,
+    signal?: AbortSignal
+  ) {
     const result = await this.gqlService.gql({
       query: listNotificationsQuery,
       variables: {
         pagination: pagination,
+        read,
       },
       context: {
         signal,

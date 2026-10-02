@@ -63,6 +63,33 @@ export class InviteUserType extends OmitType(
 }
 
 @ObjectType()
+export class WorkspaceMemberAuditLogType {
+  @Field(() => ID)
+  id!: string;
+
+  @Field()
+  action!: string;
+
+  @Field()
+  actorName!: string;
+
+  @Field(() => String, { nullable: true })
+  actorEmail!: string | null;
+
+  @Field(() => String, { nullable: true })
+  targetName!: string | null;
+
+  @Field(() => String, { nullable: true })
+  targetEmail!: string | null;
+
+  @Field(() => String, { nullable: true })
+  detail!: string | null;
+
+  @Field()
+  createdAt!: Date;
+}
+
+@ObjectType()
 export class WorkspaceFeatureType {
   @Field(() => ID)
   id!: string;

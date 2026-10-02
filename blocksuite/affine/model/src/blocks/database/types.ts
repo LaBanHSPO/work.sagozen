@@ -20,4 +20,5 @@ export type ViewBasicDataType = {
   id: string;
   name: string;
   mode: string;
+  ownerId?: string;
 };
