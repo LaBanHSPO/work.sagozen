@@ -1,0 +1,12 @@
+query workspaceMemberAuditLogs($workspaceId: String!, $skip: Int!, $take: Int!) {
+  workspaceMemberAuditLogs(workspaceId: $workspaceId, skip: $skip, take: $take) {
+    id
+    action
+    actorName
+    actorEmail
+    targetName
+    targetEmail
+    detail
+    createdAt
+  }
+}

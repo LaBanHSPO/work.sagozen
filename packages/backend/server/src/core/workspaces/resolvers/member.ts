@@ -51,6 +51,7 @@ import {
   InviteLink,
   InviteResult,
   InviteUserType,
+  WorkspaceMemberAuditLogType,
   WorkspaceInviteLinkExpireTime,
   WorkspaceType,
 } from '../types';
@@ -94,6 +95,31 @@ export class WorkspaceMemberResolver {
     private readonly inviteQuota: InviteQuotaAssertService,
     private readonly runtime: BackendRuntimeProvider
   ) {}
+
+  @Query(() => [WorkspaceMemberAuditLogType], {
+    description: 'Recent member management activity in a workspace',
+  })
+  async workspaceMemberAuditLogs(
+    @CurrentUser() user: CurrentUser,
+    @Args('workspaceId') workspaceId: string,
+    @Args('skip', { type: () => Int, defaultValue: 0 }) skip: number,
+    @Args('take', { type: () => Int, defaultValue: 20 }) take: number
+  ) {
+    await this.ac
+      .user(user.id)
+      .workspace(workspaceId)
+      .assert('Workspace.Users.Manage');
+    if (
+      !Number.isInteger(skip) ||
+      skip < 0 ||
+      !Number.isInteger(take) ||
+      take < 1 ||
+      take > 50
+    ) {
+      throw new ActionForbidden('Invalid audit log page.');
+    }
+    return this.models.workspaceMemberAuditLog.list(workspaceId, skip, take);
+  }
 
   private async assertWorkspaceNameCanInvite(workspaceId: string) {
     const workspace = await this.workspaceService.getWorkspaceInfo(workspaceId);
@@ -297,6 +323,16 @@ export class WorkspaceMemberResolver {
       }
     }
 
+    await this.models.workspaceMemberAuditLog.recordMany(
+      successfulCandidates.map(candidate => ({
+        workspaceId,
+        actorUserId: me.id,
+        targetUserId: candidate.target?.id,
+        targetEmail: candidate.normalizedEmail,
+        action: 'invited' as const,
+      }))
+    );
+
     this.event.emit('workspace.members.updated', {
       workspaceId,
     });
@@ -368,6 +404,11 @@ export class WorkspaceMemberResolver {
       { workspaceId, inviterUserId: user.id },
       { ttl: expireTime }
     );
+    await this.models.workspaceMemberAuditLog.record({
+      workspaceId,
+      actorUserId: user.id,
+      action: 'invite_link_created',
+    });
     this.event.emit('workspace.invite_link.created', { workspaceId });
     return {
       link: this.url.link(`/invite/${inviteId}`),
@@ -390,6 +431,13 @@ export class WorkspaceMemberResolver {
     const deleted = await this.cache.delete(cacheId);
     if (invite?.inviteId) {
       await this.cache.delete(`workspace:inviteLinkId:${invite.inviteId}`);
+    }
+    if (deleted) {
+      await this.models.workspaceMemberAuditLog.record({
+        workspaceId,
+        actorUserId: user.id,
+        action: 'invite_link_revoked',
+      });
     }
     this.event.emit('workspace.invite_link.revoked', { workspaceId });
     return deleted;
@@ -428,6 +476,13 @@ export class WorkspaceMemberResolver {
           workspaceId,
         });
 
+        await this.models.workspaceMemberAuditLog.record({
+          workspaceId,
+          actorUserId: me.id,
+          targetUserId: userId,
+          action: 'approved',
+        });
+
         await this.workspaceService.sendReviewApprovedNotification(
           role.id,
           me.id
@@ -446,6 +501,7 @@ export class WorkspaceMemberResolver {
     @Args('userId') userId: string,
     @Args('permission', { type: () => WorkspaceRole }) newRole: WorkspaceRole
   ) {
+    const previousRole = await this.models.workspaceUser.get(workspaceId, userId);
     let role: 'member' | 'admin' | 'owner';
     switch (newRole) {
       case WorkspaceRole.External:
@@ -473,6 +529,15 @@ export class WorkspaceMemberResolver {
         throw new SpaceAccessDenied({ spaceId: workspaceId });
       }
       throw error;
+    }
+    if (previousRole?.type !== newRole) {
+      await this.models.workspaceMemberAuditLog.record({
+        workspaceId,
+        actorUserId: user.id,
+        targetUserId: userId,
+        action: 'role_changed',
+        detail: role,
+      });
     }
     this.event.emit('workspace.members.updated', { workspaceId });
 
@@ -555,6 +620,13 @@ export class WorkspaceMemberResolver {
         workspaceId,
       });
     }
+
+    await this.models.workspaceMemberAuditLog.record({
+      workspaceId,
+      actorUserId: me.id,
+      targetUserId: userId,
+      action: previousState === 'waiting_review' ? 'declined' : 'removed',
+    });
 
     this.event.emit('workspace.members.updated', {
       workspaceId,
@@ -654,6 +726,13 @@ export class WorkspaceMemberResolver {
       userId: user.id,
     });
 
+    await this.models.workspaceMemberAuditLog.record({
+      workspaceId,
+      actorUserId: user.id,
+      targetUserId: user.id,
+      action: 'left',
+    });
+
     this.event.emit('workspace.members.updated', {
       workspaceId,
     });
@@ -678,6 +757,13 @@ export class WorkspaceMemberResolver {
 
     this.event.emit('workspace.members.updated', {
       workspaceId: role.workspaceId,
+    });
+
+    await this.models.workspaceMemberAuditLog.record({
+      workspaceId: role.workspaceId,
+      actorUserId: role.userId,
+      targetUserId: role.userId,
+      action: 'joined',
     });
 
     await this.workspaceService.sendInvitationAcceptedNotification(

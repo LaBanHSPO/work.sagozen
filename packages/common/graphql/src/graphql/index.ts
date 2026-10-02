@@ -2041,6 +2041,23 @@ export const getWorkspaceQuery = {
 }`,
 };
 
+export const workspaceMemberAuditLogsQuery = {
+  id: 'workspaceMemberAuditLogsQuery' as const,
+  op: 'workspaceMemberAuditLogs',
+  query: `query workspaceMemberAuditLogs($workspaceId: String!, $skip: Int!, $take: Int!) {
+  workspaceMemberAuditLogs(workspaceId: $workspaceId, skip: $skip, take: $take) {
+    id
+    action
+    actorName
+    actorEmail
+    targetName
+    targetEmail
+    detail
+    createdAt
+  }
+}`,
+};
+
 export const getWorkspacesQuery = {
   id: 'getWorkspacesQuery' as const,
   op: 'getWorkspaces',
@@ -2259,9 +2276,9 @@ export const previewLicenseMutation = {
 export const listNotificationsQuery = {
   id: 'listNotificationsQuery' as const,
   op: 'listNotifications',
-  query: `query listNotifications($pagination: PaginationInput!) {
+  query: `query listNotifications($pagination: PaginationInput!, $read: Boolean! = false) {
   currentUser {
-    notifications(pagination: $pagination) {
+    notifications(pagination: $pagination, read: $read) {
       totalCount
       edges {
         cursor

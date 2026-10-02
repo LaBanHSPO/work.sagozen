@@ -25,8 +25,23 @@ export const header = style({
   borderBottom: `1px solid ${cssVarV2('layer/insideBorder/border')}`,
 });
 
+export const tabsRoot = style({
+  flex: 1,
+  minHeight: 0,
+});
+
+export const tabsList = style({
+  padding: '0 8px',
+});
+
+export const tabsContent = style({
+  flex: 1,
+  minHeight: 0,
+});
+
 export const scrollRoot = style({
   flex: 1,
+  minHeight: 0,
   display: 'flex',
   flexDirection: 'column',
 });
@@ -119,7 +134,7 @@ export const itemSkeletonContainer = style({
   })} 500ms ease forwards 1s`,
 });
 
-export const itemDeleteButton = style({
+export const itemMarkReadButton = style({
   position: 'absolute',
   right: '10px',
   bottom: '8px',

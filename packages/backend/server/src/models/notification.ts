@@ -280,12 +280,13 @@ export class NotificationModel extends BaseModel {
     userId: string,
     options?: {
       includeRead?: boolean;
+      read?: boolean;
     } & PaginationInput
   ) {
     const rows = await this.db.notification.findMany({
       where: {
         userId,
-        ...(options?.includeRead ? {} : { read: false }),
+        ...(options?.includeRead ? {} : { read: options?.read ?? false }),
         ...(options?.after ? { createdAt: { lt: options.after } } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -295,11 +296,14 @@ export class NotificationModel extends BaseModel {
     return rows as UnionNotification[];
   }
 
-  async countByUserId(userId: string, options: { includeRead?: boolean } = {}) {
+  async countByUserId(
+    userId: string,
+    options: { includeRead?: boolean; read?: boolean } = {}
+  ) {
     return this.db.notification.count({
       where: {
         userId,
-        ...(options.includeRead ? {} : { read: false }),
+        ...(options.includeRead ? {} : { read: options.read ?? false }),
       },
     });
   }

@@ -12,6 +12,7 @@ import {
   revokeMemberPermissionMutation,
   WorkspaceInviteLinkExpireTime,
   WorkspaceMemberStatus,
+  workspaceMemberAuditLogsQuery,
 } from '@affine/graphql';
 import { faker } from '@faker-js/faker';
 import {
@@ -74,6 +75,49 @@ async function waitForInvitationNotification(userId: string) {
   }
   throw new Error('Invitation notification was not created');
 }
+
+e2e('records member activity and limits access to managers', async t => {
+  const { owner, workspace } = await createWorkspace();
+  const member = await app.create(Mockers.User);
+  const variables = { workspaceId: workspace.id, skip: 0, take: 20 };
+
+  await app.login(owner);
+  const invitation = await app.gql({
+    query: inviteByEmailsMutation,
+    variables: { emails: [member.email], workspaceId: workspace.id },
+  });
+  const inviteId = invitation.inviteMembers[0].inviteId!;
+  const first = await app.gql({
+    query: workspaceMemberAuditLogsQuery,
+    variables,
+  });
+  t.is(first.workspaceMemberAuditLogs[0].action, 'invited');
+  t.is(first.workspaceMemberAuditLogs[0].actorEmail, owner.email);
+  t.is(first.workspaceMemberAuditLogs[0].targetEmail, member.email);
+
+  await app.login(member);
+  await t.throwsAsync(
+    app.gql({ query: workspaceMemberAuditLogsQuery, variables })
+  );
+  await app.gql({
+    query: acceptInviteByInviteIdMutation,
+    variables: { workspaceId: workspace.id, inviteId },
+  });
+  await t.throwsAsync(
+    app.gql({ query: workspaceMemberAuditLogsQuery, variables })
+  );
+
+  await app.login(owner);
+  const history = await app.gql({
+    query: workspaceMemberAuditLogsQuery,
+    variables,
+  });
+  t.is(history.workspaceMemberAuditLogs.length, 2);
+  t.deepEqual(
+    new Set(history.workspaceMemberAuditLogs.map(log => log.action)),
+    new Set(['joined', 'invited'])
+  );
+});
 
 e2e('should invite a user', async t => {
   const { owner, workspace } = await createWorkspace();

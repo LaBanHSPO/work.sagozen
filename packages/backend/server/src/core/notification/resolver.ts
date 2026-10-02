@@ -76,6 +76,7 @@ export class UserNotificationResolver {
   async notifications(
     @CurrentUser() me: UserType,
     @Args('pagination', PaginationInput.decode) pagination: PaginationInput,
+    @Args('read', { type: () => Boolean, defaultValue: false }) read: boolean,
     @Info() info: GraphQLResolveInfo
   ): Promise<PaginatedNotificationObjectType> {
     const selections = info.fieldNodes.flatMap(node =>
@@ -86,13 +87,13 @@ export class UserNotificationResolver {
       hasSelectedField(selections, 'pageInfo', info.fragments);
 
     if (!includesList) {
-      const totalCount = await this.service.countByUserId(me.id);
+      const totalCount = await this.service.countByUserId(me.id, read);
       return paginate([], 'createdAt', pagination, totalCount);
     }
 
     const [notifications, totalCount] = await Promise.all([
-      this.service.findManyByUserId(me.id, pagination),
-      this.service.countByUserId(me.id),
+      this.service.findManyByUserId(me.id, { ...pagination, read }),
+      this.service.countByUserId(me.id, read),
     ]);
     return paginate(notifications, 'createdAt', pagination, totalCount);
   }

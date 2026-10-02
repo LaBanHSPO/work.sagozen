@@ -214,6 +214,7 @@ model Workspace {
   mcpCredentials             McpCredential[]
   artifacts                  WorkspaceArtifact[]
   protectedTables            ProtectedTable[]
+  memberAuditLogs            WorkspaceMemberAuditLog[]
 
   @@index([lastCheckEmbeddings])
   @@index([createdAt])
@@ -327,6 +328,25 @@ model WorkspaceMember {
   @@index([userId, state])
   @@index([workspaceId, role, state])
   @@map("workspace_members")
+}
+
+model WorkspaceMemberAuditLog {
+  id           String   @id @default(uuid()) @db.VarChar
+  workspaceId  String   @map("workspace_id") @db.VarChar
+  actorUserId  String   @map("actor_user_id") @db.VarChar
+  actorName    String   @map("actor_name") @db.VarChar
+  actorEmail   String?  @map("actor_email") @db.VarChar
+  targetUserId String?  @map("target_user_id") @db.VarChar
+  targetName   String?  @map("target_name") @db.VarChar
+  targetEmail  String?  @map("target_email") @db.VarChar
+  action       String   @db.VarChar
+  detail       String?  @db.VarChar
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt, id])
+  @@map("workspace_member_audit_logs")
 }
 
 model WorkspaceInvitation {
