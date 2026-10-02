@@ -7,7 +7,7 @@ use sqlx::{Postgres, Row, Transaction};
 
 use super::{QuotaReadCache, resolve_user_entitlement, resolve_workspace_entitlement};
 use crate::{
-  entitlement::apply_selfhost_free_member_limit,
+  entitlement::apply_selfhost_free_limits,
   runtime::{
     RuntimeError, RuntimeResult,
     backend_runtime::strict_quota::chargeable_invitation_statuses,
@@ -195,7 +195,7 @@ pub(super) async fn workspace_state(
   let workspace_entitlement = workspace_entitlement(cache, workspace_id).await?;
   let owner_entitlement = user_entitlement(cache, &owner_user_id).await?;
   let decision = resolve_quota_subject(&workspace_entitlement.grant, &owner_entitlement.grant);
-  let grant = apply_selfhost_free_member_limit(decision.grant);
+  let grant = apply_selfhost_free_limits(decision.grant);
   let (used_storage_quota, uses_owner_quota) = match decision.subject {
     QuotaSubject::Workspace => (workspace_storage(cache, workspace_id).await?, false),
     QuotaSubject::Owner => (

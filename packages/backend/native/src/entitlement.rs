@@ -133,7 +133,7 @@ pub fn resolve_entitlement_v1(input: ResolveEntitlementInput) -> Result<Resolved
   let ValidatedEntitlement::Catalog(access) = validated else {
     unreachable!();
   };
-  let grant = apply_selfhost_free_member_limit(access.into());
+  let grant = apply_selfhost_free_limits(access.into());
   Ok(active_with_grant(
     grant.plan,
     grant.quantity,
@@ -253,17 +253,20 @@ fn active_with_grant(
 /// Self-hosted workspaces without a team license. The published plan catalog
 /// allows 10 members; this deployment raises that cap.
 pub(crate) const SELFHOST_FREE_MEMBER_LIMIT: i32 = 1_000;
+/// Retention for newly created versions in the default self-hosted plan.
+pub(crate) const SELFHOST_FREE_HISTORY_PERIOD_SECONDS: i64 = 365 * 24 * 60 * 60;
 
-pub(crate) fn apply_selfhost_free_member_limit(mut grant: AccessGrant) -> AccessGrant {
+pub(crate) fn apply_selfhost_free_limits(mut grant: AccessGrant) -> AccessGrant {
   if grant.plan == Plan::SelfHostedFree {
     grant.limits.seat_limit = SELFHOST_FREE_MEMBER_LIMIT;
+    grant.limits.history_period = SELFHOST_FREE_HISTORY_PERIOD_SECONDS;
   }
   grant
 }
 
 fn invalid_license(code: &str, message: &str) -> ResolvedEntitlement {
   let plan = Plan::SelfHostedFree;
-  let grant = apply_selfhost_free_member_limit(
+  let grant = apply_selfhost_free_limits(
     describe_plan(plan, None)
       .expect("self-hosted free plan is valid")
       .into(),
@@ -501,6 +504,7 @@ pub(crate) mod tests {
     assert!(!mismatch.valid);
     assert_eq!(mismatch.error_code.as_deref(), Some("workspace_mismatch"));
     assert_eq!(mismatch.quota.seat_limit, Some(SELFHOST_FREE_MEMBER_LIMIT));
+    assert_eq!(mismatch.quota.history_period, 365 * 24 * 60 * 60);
   }
 
   #[test]
@@ -513,6 +517,30 @@ pub(crate) mod tests {
 
     let team = resolve_entitlement_v1(input(Some("team"), Some(5))).unwrap();
     assert_eq!(team.quota.seat_limit, Some(5));
+  }
+
+  #[test]
+  fn retains_selfhost_free_history_for_one_year() {
+    for target_type in ["user", "workspace"] {
+      let mut free = input(None, None);
+      free.deployment_type = "selfhosted".to_string();
+      free.target_type = target_type.to_string();
+      let free = resolve_entitlement_v1(free).unwrap();
+      assert_eq!(free.quota.history_period, 365 * 24 * 60 * 60);
+    }
+
+    for (plan, quantity) in [("free", None), ("pro", None), ("team", Some(5))] {
+      let mut cloud = input(Some(plan), quantity);
+      if plan == "pro" {
+        cloud.target_type = "user".to_string();
+      }
+      let resolved = resolve_entitlement_v1(cloud).unwrap();
+      let expected = if plan == "free" { 7 } else { 30 };
+      assert_eq!(resolved.quota.history_period, expected * 24 * 60 * 60);
+    }
+
+    let licensed = resolve_entitlement_v1(license_input(signed_license(claims()), TEST_WORKSPACE_ID)).unwrap();
+    assert_eq!(licensed.quota.history_period, 30 * 24 * 60 * 60);
   }
 
   #[test]

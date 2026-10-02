@@ -1,5 +1,6 @@
 name: affine
 
+# Bind mounts use the repository-root data directory, two levels above this file.
 x-affine-source: &affine-source
   image: affine:local
   build:
@@ -20,7 +21,7 @@ services:
       affine_migration:
         condition: service_completed_successfully
     volumes:
-      - ./data/storage:/root/.affine/storage
+      - ../../data/storage:/root/.affine/storage
       - ./config:/root/.affine/config
     environment:
       - REDIS_SERVER_HOST=redis
@@ -33,7 +34,7 @@ services:
     <<: *affine-source
     container_name: affine_migration_job
     volumes:
-      - ./data/storage:/root/.affine/storage
+      - ../../data/storage:/root/.affine/storage
       - ./config:/root/.affine/config
     command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
     environment:
@@ -60,7 +61,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: affine_postgres
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ../../data/postgres:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: affine
       POSTGRES_DB: affine

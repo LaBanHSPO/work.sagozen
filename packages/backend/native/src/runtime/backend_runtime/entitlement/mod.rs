@@ -27,7 +27,7 @@ use super::{
   parse_target_type,
 };
 use crate::{
-  AFFINE_PRO_PUBLIC_KEY, entitlement::apply_selfhost_free_member_limit, license_import::normalize_license,
+  AFFINE_PRO_PUBLIC_KEY, entitlement::apply_selfhost_free_limits, license_import::normalize_license,
   runtime::Deployment,
 };
 
@@ -110,7 +110,7 @@ fn resolve_grant(
       signed_payload: row.signed_payload.as_deref(),
     })
     .collect::<Vec<_>>();
-  apply_selfhost_free_member_limit(resolve_entitlements(
+  apply_selfhost_free_limits(resolve_entitlements(
     &AccessContext {
       deployment: match deployment {
         Deployment::Cloud => CoreDeployment::Cloud,
@@ -165,7 +165,7 @@ pub(super) async fn resolve_quota_charge(
   Ok(ChargeSubject {
     owner_id,
     subject: decision.subject,
-    grant: apply_selfhost_free_member_limit(decision.grant),
+    grant: apply_selfhost_free_limits(decision.grant),
   })
 }
 

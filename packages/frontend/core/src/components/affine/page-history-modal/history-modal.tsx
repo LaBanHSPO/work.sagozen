@@ -2,12 +2,14 @@ import { Avatar, Loading, Scrollable } from '@affine/component';
 import { EditorLoading } from '@affine/component/page-detail-skeleton';
 import { Button, IconButton } from '@affine/component/ui/button';
 import { Modal, useConfirmModal } from '@affine/component/ui/modal';
+import { ServerService } from '@affine/core/modules/cloud';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { DocDisplayMetaService } from '@affine/core/modules/doc-display-meta';
 import { EditorService } from '@affine/core/modules/editor';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkspaceQuotaService } from '@affine/core/modules/quota';
 import { WorkspaceService } from '@affine/core/modules/workspace';
+import { ServerDeploymentType } from '@affine/graphql';
 import { i18nTime, Trans, useI18n } from '@affine/i18n';
 import { track } from '@affine/track';
 import type { DocMode } from '@blocksuite/affine/model';
@@ -171,16 +173,25 @@ const HistoryEditorPreview = ({
 const planPromptClosedAtom = atom(false);
 
 const PlanPrompt = () => {
+  const serverService = useService(ServerService);
+  const isSelfhosted = useLiveData(
+    serverService.server.config$.selector(
+      config => config?.type === ServerDeploymentType.Selfhosted
+    )
+  );
   const workspaceQuotaService = useService(WorkspaceQuotaService);
   useEffect(() => {
     workspaceQuotaService.quota.revalidate();
   }, [workspaceQuotaService]);
   const workspaceQuota = useLiveData(workspaceQuotaService.quota.quota$);
   const isProWorkspace = useMemo(() => {
+    if (isSelfhosted) {
+      return true;
+    }
     return workspaceQuota
       ? workspaceQuota.humanReadable.name.toLowerCase() !== 'free'
       : null;
-  }, [workspaceQuota]);
+  }, [isSelfhosted, workspaceQuota]);
   const permissionService = useService(WorkspacePermissionService);
   const isOwner = useLiveData(permissionService.permission.isOwner$);
   useEffect(() => {
@@ -227,6 +238,9 @@ const PlanPrompt = () => {
   }, [closeFreePlanPrompt, isProWorkspace, t]);
 
   const planDescription = useMemo(() => {
+    if (isProWorkspace === null) {
+      return null;
+    }
     if (!isProWorkspace) {
       return (
         <>
@@ -247,14 +261,15 @@ const PlanPrompt = () => {
         </>
       );
     } else {
-      return (
-        <Trans i18nKey="com.affine.history.confirm-restore-modal.pro-plan-prompt.description">
-          With the workspace creator&apos;s Pro account, every member enjoys the
-          privilege of accessing up to <b>30 days</b> of version history.
-        </Trans>
-      );
+      return workspaceQuota
+        ? t['com.affine.payment.benefit-7']({
+            capacity: (workspaceQuota.historyPeriod / (24 * 60 * 60)).toFixed(
+              0
+            ),
+          })
+        : null;
     }
-  }, [isOwner, isProWorkspace, onClickUpgrade, t]);
+  }, [isOwner, isProWorkspace, onClickUpgrade, t, workspaceQuota]);
 
   return !planPromptClosed ? (
     <div className={styles.planPromptWrapper}>

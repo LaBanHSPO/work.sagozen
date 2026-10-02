@@ -93,6 +93,17 @@ Now you should be able to start developing affine with server enabled.
 
 ## Bonus
 
+### Self-hosted version history
+
+The default self-hosted plan retains newly created document versions for 365
+days. The history dialog displays the retention period from the workspace quota.
+Self-hosted workspaces use the Pro history view, including while quota data loads,
+and do not display the Free-plan upgrade prompt.
+Cloud plans and licensed self-hosted Team plans retain their existing limits.
+Rebuild and restart the self-hosted image after changing the native plan limits.
+Existing versions keep their recorded expiration dates; deleted versions cannot
+be recovered by increasing retention.
+
 ### Enable prisma studio (Database GUI)
 
 ```sh

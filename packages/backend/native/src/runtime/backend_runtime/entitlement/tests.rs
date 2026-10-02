@@ -17,16 +17,12 @@ fn free_selfhost_grant_uses_one_thousand_seats() {
   );
   assert_eq!(free.plan, affine_core::access_control::Plan::SelfHostedFree);
   assert_eq!(free.limits.seat_limit, 1_000);
+  assert_eq!(free.limits.history_period, 365 * 24 * 60 * 60);
 
-  let cloud = resolve_grant(
-    Deployment::Cloud,
-    "workspace",
-    &[],
-    Utc::now(),
-    TargetType::Workspace,
-  );
+  let cloud = resolve_grant(Deployment::Cloud, "workspace", &[], Utc::now(), TargetType::Workspace);
   assert_ne!(cloud.plan, affine_core::access_control::Plan::SelfHostedFree);
   assert_ne!(cloud.limits.seat_limit, 1_000);
+  assert_eq!(cloud.limits.history_period, 7 * 24 * 60 * 60);
 }
 
 pub(super) async fn fixture(runtime: &BackendRuntime) -> (String, String) {

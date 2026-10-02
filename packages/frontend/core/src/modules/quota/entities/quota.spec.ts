@@ -54,17 +54,22 @@ function createEntity(store: WorkspaceQuotaStore) {
 }
 
 describe('WorkspaceQuota', () => {
-  test('projects workspace quota state', async () => {
+  test.each([30, 365])('projects %i days of workspace history', async days => {
     const store = createStore({
-      fetchWorkspaceQuotaState: vi
-        .fn()
-        .mockResolvedValue(createQuotaState({ memberCount: 3 })),
+      fetchWorkspaceQuotaState: vi.fn().mockResolvedValue(
+        createQuotaState({
+          memberCount: 3,
+          historyPeriodSeconds: days * 24 * 60 * 60,
+        })
+      ),
     });
     const quota = createEntity(store);
 
     quota.revalidate();
     await vi.waitFor(() => expect(quota.quota$.value?.memberCount).toBe(3));
-    expect(quota.quota$.value?.humanReadable.historyPeriod).toBe('30 days');
+    expect(quota.quota$.value?.humanReadable.historyPeriod).toBe(
+      `${days} days`
+    );
     expect(store.fetchWorkspaceQuotaState).toHaveBeenCalledWith(
       'workspace-1',
       expect.any(AbortSignal)
