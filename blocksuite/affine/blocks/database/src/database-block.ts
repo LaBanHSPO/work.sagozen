@@ -72,6 +72,7 @@ import {
 import { BlockRenderer } from './detail-panel/block-renderer.js';
 import { NoteRenderer } from './detail-panel/note-renderer.js';
 import { DatabaseSelection } from './selection.js';
+import { ProtectedTableApiProvider } from './service/index.js';
 import { currentViewStorage } from './utils/current-view.js';
 import { getSingleDocIdFromText } from './utils/title-doc.js';
 import type { DatabaseViewExtensionOptions } from './view';
@@ -135,6 +136,22 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
               .catch(console.error);
           },
         }),
+        menu.action({
+          name: 'Create protected task table',
+          hide: () =>
+            this.store.readonly ||
+            !this.std.getOptional(ProtectedTableApiProvider),
+          select: () => {
+            const parent = this.store.getParent(this.model.id);
+            if (!parent) return;
+            this.store.addBlock(
+              'affine:database',
+              { protectedTable: true },
+              parent,
+              parent.children.indexOf(this.model) + 1
+            );
+          },
+        }),
         menu.group({
           items: [
             menu.action({
@@ -143,7 +160,20 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
                 'delete-item': true,
               },
               name: 'Delete Database',
-              select: () => {
+              select: async () => {
+                if (this.store.readonly) return;
+                if (this.model.props.protectedTable$.value) {
+                  const api = this.std.getOptional(ProtectedTableApiProvider);
+                  if (!api) return;
+                  const url = `/api/workspaces/${encodeURIComponent(this.store.workspace.id)}/docs/${encodeURIComponent(this.store.id)}/protected-tables/${encodeURIComponent(this.model.id)}`;
+                  try {
+                    const response = await api.fetch(url, { method: 'DELETE' });
+                    if (!response.ok) throw new Error('Delete failed');
+                  } catch {
+                    toast(this.host, 'Could not delete protected table');
+                    return;
+                  }
+                }
                 this.model.children.slice().forEach(block => {
                   this.store.deleteBlock(block);
                 });
@@ -536,6 +566,18 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       })
   );
   override renderBlock() {
+    if (this.model.props.protectedTable$.value) {
+      return html`
+        <div contenteditable="false" class="${databaseContentStyles}">
+          <affine-protected-table
+            .workspaceId=${this.model.store.workspace.id}
+            .docId=${this.model.store.id}
+            .blockId=${this.model.id}
+            .apiRequest=${this.std.getOptional(ProtectedTableApiProvider)?.fetch}
+          ></affine-protected-table>
+        </div>
+      `;
+    }
     const widgets = html`${repeat(
       Object.entries(this.widgets),
       ([id]) => id,

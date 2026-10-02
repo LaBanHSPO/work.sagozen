@@ -13,12 +13,20 @@ export const insertDatabaseBlockCommand: Command<
     viewType: string;
     place?: 'after' | 'before';
     removeEmptyLine?: boolean;
+    protectedTable?: boolean;
   },
   {
     insertedDatabaseBlockId: string;
   }
 > = (ctx, next) => {
-  const { selectedModels, viewType, place, removeEmptyLine, std } = ctx;
+  const {
+    selectedModels,
+    viewType,
+    place,
+    removeEmptyLine,
+    protectedTable,
+    std,
+  } = ctx;
   if (!selectedModels?.length) return;
 
   const targetModel =
@@ -30,14 +38,16 @@ export const insertDatabaseBlockCommand: Command<
 
   const result = std.store.addSiblingBlocks(
     targetModel,
-    [{ flavour: 'affine:database' }],
+    [{ flavour: 'affine:database', protectedTable: !!protectedTable }],
     place
   );
   const string = result[0];
 
   if (string == null) return;
 
-  initDatabaseBlock(std.store, targetModel, string, viewType, false);
+  if (!protectedTable) {
+    initDatabaseBlock(std.store, targetModel, string, viewType, false);
+  }
 
   if (removeEmptyLine && targetModel.text?.length === 0) {
     std.store.deleteBlock(targetModel);
