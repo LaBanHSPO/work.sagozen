@@ -72,28 +72,50 @@ export class DataViewHeaderViews extends WidgetBase {
       color: var(--affine-text-primary-color);
       background-color: var(--affine-hover-color-filled);
     }
+
+    .database-view-button .scope {
+      font-size: 11px;
+      margin-left: 4px;
+      color: var(--affine-text-secondary-color);
+    }
   `;
 
   private addView(type: string) {
     const id = this.viewManager.viewAdd(type);
     this.viewManager.setCurrentView(id);
+    this.onChangeView?.(id);
     this.dataViewLogic.root.config.eventTrace('AddDatabaseView', {
       type: type,
     });
   }
 
   _addViewMenu = (event: MouseEvent) => {
+    const currentId = this.viewManager.currentViewId$.value;
     popFilterableSimpleMenu(
       popupTargetFromElement(event.currentTarget as HTMLElement),
-      this.dataSource.viewMetas.map(v => {
-        return menu.action({
-          name: v.model.defaultName,
-          prefix: html`<uni-lit .uni=${v.renderer.icon}></uni-lit>`,
-          select: () => {
-            this.addView(v.type);
-          },
-        });
-      })
+      [
+        ...(currentId && this.viewManager.canSavePersonalView$?.value
+          ? [
+              menu.action({
+                name: 'Save current view for me',
+                prefix: DuplicateIcon(),
+                select: () => {
+                  const id = this.viewManager.viewSavePersonal?.(currentId);
+                  if (id) this.onChangeView?.(id);
+                },
+              }),
+            ]
+          : []),
+        ...this.dataSource.viewMetas.map(v => {
+          return menu.action({
+            name: `Create shared ${v.model.defaultName}`,
+            prefix: html`<uni-lit .uni=${v.renderer.icon}></uni-lit>`,
+            select: () => {
+              this.addView(v.type);
+            },
+          });
+        }),
+      ]
     );
   };
 
@@ -120,10 +142,11 @@ export class DataViewHeaderViews extends WidgetBase {
                 .uni=${this.getRenderer(id)?.icon}
               ></uni-lit>`,
               name: view.name$.value ?? '',
-              label: () => html`${view.name$.value}`,
+              label: () => html`${view.name$.value}${this.getViewSuffix(id)}`,
               isSelected: this.viewManager.currentViewId$.value === id,
               select: () => {
                 this.viewManager.setCurrentView(id);
+                this.onChangeView?.(id);
               },
               postfix: html`<div
                 class="dv-hover dv-round-4"
@@ -136,9 +159,25 @@ export class DataViewHeaderViews extends WidgetBase {
           }),
         }),
         menu.group({
+          items: [
+            menu.action({
+              name: 'Save current view for me',
+              hide: () =>
+                !this.viewManager.canSavePersonalView$?.value ||
+                !this.viewManager.currentViewId$.value,
+              select: () => {
+                const currentId = this.viewManager.currentViewId$.value;
+                if (!currentId) return;
+                const id = this.viewManager.viewSavePersonal?.(currentId);
+                if (id) this.onChangeView?.(id);
+              },
+            }),
+          ],
+        }),
+        menu.group({
           items: this.dataSource.viewMetas.map(v => {
             return menu.action({
-              name: `Create ${v.model.defaultName}`,
+              name: `Create shared ${v.model.defaultName}`,
               hide: () => this.readonly,
               prefix: PlusIcon(),
               select: () => {
@@ -177,6 +216,25 @@ export class DataViewHeaderViews extends WidgetBase {
           }),
           menu.group({
             items: [
+              menu.action({
+                name: 'Save as my view',
+                prefix: DuplicateIcon(),
+                hide: () => !this.viewManager.canSavePersonalView$?.value,
+                select: () => {
+                  const savedId = this.viewManager.viewSavePersonal?.(id);
+                  if (savedId) this.onChangeView?.(savedId);
+                },
+              }),
+              menu.action({
+                name: 'Set as default for everyone',
+                hide: () =>
+                  !this.viewManager.viewSetDefault ||
+                  !!this.viewManager.viewDataGet(id)?.ownerId ||
+                  this.viewManager.defaultViewId$?.value === id,
+                select: () => {
+                  this.viewManager.viewSetDefault?.(id);
+                },
+              }),
               menu.action({
                 name: 'Edit View',
                 prefix: InfoIcon(),
@@ -224,6 +282,11 @@ export class DataViewHeaderViews extends WidgetBase {
               menu.action({
                 name: 'Delete',
                 prefix: DeleteIcon(),
+                hide: () =>
+                  !this.viewManager.viewDataGet(id)?.ownerId &&
+                  views.filter(viewId =>
+                    !this.viewManager.viewDataGet(viewId)?.ownerId
+                  ).length === 1,
                 select: () => {
                   view.delete();
                 },
@@ -274,6 +337,7 @@ export class DataViewHeaderViews extends WidgetBase {
         >
           <uni-lit class="icon" .uni="${this.getRenderer(id)?.icon}"></uni-lit>
           <div class="name">${view?.name}</div>
+          ${this.getViewSuffix(id)}
         </div>
       `;
     });
@@ -285,6 +349,17 @@ export class DataViewHeaderViews extends WidgetBase {
 
   private getRenderer(viewId: string) {
     return this.dataSource.viewMetaGetById(viewId)?.renderer;
+  }
+
+  private getViewSuffix(viewId: string) {
+    const view = this.viewManager.viewDataGet(viewId);
+    if (view?.ownerId) {
+      return html`<span class="scope">Mine</span>`;
+    }
+    if (this.viewManager.defaultViewId$?.value === viewId) {
+      return html`<span class="scope">Default</span>`;
+    }
+    return null;
   }
 
   private clickView(event: MouseEvent, id: string) {

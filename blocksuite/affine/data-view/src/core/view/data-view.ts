@@ -12,6 +12,7 @@ export type BasicViewDataType<
   id: string;
   name: string;
   mode: Type;
+  ownerId?: string;
 } & T;
 
 export type DefaultViewDataType = BasicViewDataType & {

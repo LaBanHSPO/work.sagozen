@@ -15,6 +15,7 @@ import {
   DocModeProvider,
   FeatureFlagService,
   NotificationProvider,
+  UserProvider,
   type TelemetryEventMap,
   TelemetryProvider,
 } from '@blocksuite/affine-shared/services';
@@ -46,7 +47,7 @@ import {
 } from '@blocksuite/icons/lit';
 import { type BlockComponent, BlockSelection } from '@blocksuite/std';
 import { RANGE_SYNC_EXCLUDE_ATTR } from '@blocksuite/std/inline';
-import { Slice } from '@blocksuite/store';
+import { nanoid, Slice } from '@blocksuite/store';
 import { autoUpdate } from '@floating-ui/dom';
 import { computed, signal } from '@preact/signals-core';
 import { html, nothing } from 'lit';
@@ -74,6 +75,25 @@ import { DatabaseSelection } from './selection.js';
 import { currentViewStorage } from './utils/current-view.js';
 import { getSingleDocIdFromText } from './utils/title-doc.js';
 import type { DatabaseViewExtensionOptions } from './view';
+
+const localViewerKey = 'blocksuite:databaseBlock:localViewerId';
+let localViewerId: string | undefined;
+
+function getLocalViewerId(): string {
+  if (localViewerId) return localViewerId;
+  try {
+    localViewerId = globalThis.localStorage?.getItem(localViewerKey) ?? undefined;
+    if (!localViewerId) {
+      localViewerId = `local:${nanoid()}`;
+      globalThis.localStorage?.setItem(localViewerKey, localViewerId);
+    }
+  } catch {
+    localViewerId = `local:${nanoid()}`;
+  }
+  const id = localViewerId ?? `local:${nanoid()}`;
+  localViewerId = id;
+  return id;
+}
 
 export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBlockModel> {
   private readonly clickDatabaseOps = (e: MouseEvent) => {
@@ -141,25 +161,34 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
   };
 
   private readonly dataSource = lazy(() => {
-    const dataSource = new DatabaseBlockDataSource(this.model, dataSource => {
-      dataSource.serviceSet(EditorHostKey, this.host);
-      this.std.provider
-        .getAll(ExternalGroupByConfigProvider)
-        .forEach(config => {
-          dataSource.serviceSet(
-            ExternalGroupByConfigProvider(config.name),
-            config
-          );
-        });
-      this.std.provider
-        .getAll(CalendarExternalSourceProvider)
-        .forEach(source => {
-          dataSource.serviceSet(
-            CalendarExternalSourceProvider(source.id),
-            source
-          );
-        });
-    });
+    const currentUserId$ = computed(
+      () =>
+        this.std.getOptional(UserProvider)?.currentUserInfo$.value?.id ??
+        getLocalViewerId()
+    );
+    const dataSource = new DatabaseBlockDataSource(
+      this.model,
+      dataSource => {
+        dataSource.serviceSet(EditorHostKey, this.host);
+        this.std.provider
+          .getAll(ExternalGroupByConfigProvider)
+          .forEach(config => {
+            dataSource.serviceSet(
+              ExternalGroupByConfigProvider(config.name),
+              config
+            );
+          });
+        this.std.provider
+          .getAll(CalendarExternalSourceProvider)
+          .forEach(source => {
+            dataSource.serviceSet(
+              CalendarExternalSourceProvider(source.id),
+              source
+            );
+          });
+      },
+      currentUserId$
+    );
     const id = currentViewStorage.getCurrentView(this.model.id);
     if (id && dataSource.viewManager.viewGet(id)) {
       dataSource.viewManager.setCurrentView(id);

@@ -18,6 +18,11 @@ export interface ViewManager {
   currentViewId$: ReadonlySignal<string | undefined>;
   currentView$: ReadonlySignal<SingleView | undefined>;
 
+  defaultViewId$?: ReadonlySignal<string | undefined>;
+  canSavePersonalView$?: ReadonlySignal<boolean>;
+  viewSavePersonal?(id: string): string | undefined;
+  viewSetDefault?(id: string): void;
+
   setCurrentView(id: string): void;
 
   views$: ReadonlySignal<string[]>;
@@ -45,8 +50,14 @@ export class ViewManagerBase implements ViewManager {
   });
 
   currentViewId$ = computed(() => {
-    return this._currentViewId$.value ?? this.views$.value[0];
+    const selected = this._currentViewId$.value;
+    if (selected && this.views$.value.includes(selected)) {
+      return selected;
+    }
+    return this.defaultViewId$?.value ?? this.views$.value[0];
   });
+
+  defaultViewId$?: ReadonlySignal<string | undefined>;
 
   currentView$ = computed(() => {
     const id = this.currentViewId$.value;
@@ -94,6 +105,7 @@ export class ViewManagerBase implements ViewManager {
         id: old.id,
         name: old.name,
         mode: type,
+        ownerId: old.ownerId,
       };
       const convertFunction = this.dataSource.viewConverts.find(
         v => v.from === from && v.to === type
@@ -114,7 +126,7 @@ export class ViewManagerBase implements ViewManager {
 
   viewDelete(id: string): void {
     this.dataSource.viewDataDelete(id);
-    this.setCurrentView(this.views$.value[0]);
+    this.setCurrentView(this.defaultViewId$?.value ?? this.views$.value[0]);
   }
 
   viewDuplicate(id: string): void {

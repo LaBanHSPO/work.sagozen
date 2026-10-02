@@ -13,6 +13,7 @@ import type {
 
 export type DatabaseBlockProps = {
   views: ViewBasicDataType[];
+  defaultViewId?: string;
   title: Text;
   cells: SerializedCells;
   columns: Array<ColumnDataType>;
@@ -25,6 +26,7 @@ export const DatabaseBlockSchema = defineBlockSchema({
   flavour: 'affine:database',
   props: (internal): DatabaseBlockProps => ({
     views: [],
+    defaultViewId: undefined,
     title: internal.Text(),
     cells: Object.create(null),
     columns: [],
