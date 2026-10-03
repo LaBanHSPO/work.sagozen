@@ -1,5 +1,6 @@
 import { AffineErrorBoundary } from '@affine/core/components/affine/affine-error-boundary';
 import { AffineErrorComponent } from '@affine/core/components/affine/affine-error-boundary/affine-error-fallback';
+import { WorkspaceAccessGate } from '@affine/core/components/providers/workspace-access-gate';
 import { PageNotFound } from '@affine/core/desktop/pages/404';
 import { SharePage } from '@affine/core/desktop/pages/workspace/share/share-page';
 import { workbenchRoutes } from '@affine/core/mobile/workbench-router';
@@ -205,14 +206,24 @@ export const Component = () => {
         </FrameworkScope>
       );
     }
-    return <PageNotFound noPermission />;
+    return (
+      <FrameworkScope scope={server?.scope}>
+        <WorkspaceAccessGate>
+          <PageNotFound noPermission />
+        </WorkspaceAccessGate>
+      </FrameworkScope>
+    );
   }
   if (!meta) {
     return;
   }
   return (
-    <WorkspaceLayout meta={meta}>
-      <MobileWorkbenchRoot routes={warpedRoutes} />
-    </WorkspaceLayout>
+    <FrameworkScope scope={server?.scope}>
+      <WorkspaceAccessGate>
+        <WorkspaceLayout meta={meta}>
+          <MobileWorkbenchRoot routes={warpedRoutes} />
+        </WorkspaceLayout>
+      </WorkspaceAccessGate>
+    </FrameworkScope>
   );
 };

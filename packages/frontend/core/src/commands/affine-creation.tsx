@@ -1,7 +1,7 @@
 import type { useI18n } from '@affine/i18n';
 import { track } from '@affine/track';
 import type { DocMode } from '@blocksuite/affine/model';
-import { ImportIcon, PlusIcon } from '@blocksuite/icons/rc';
+import { PlusIcon } from '@blocksuite/icons/rc';
 
 import type { usePageHelper } from '../blocksuite/block-suite-page-list/utils';
 import type { GlobalDialogService } from '../modules/dialogs';
@@ -68,25 +68,6 @@ export function registerAffineCreationCommands({
       })
     );
   }
-  unsubs.push(
-    registerAffineCommand({
-      id: 'affine:import-workspace',
-      category: 'affine:creation',
-      icon: <ImportIcon />,
-      label: t['com.affine.cmdk.affine.import-workspace'](),
-      preconditionStrategy: () => {
-        return BUILD_CONFIG.isElectron;
-      },
-      run() {
-        track.$.cmdk.workspace.createWorkspace({
-          control: 'import',
-        });
-
-        globalDialogService.open('import-workspace', undefined);
-      },
-    })
-  );
-
   return () => {
     unsubs.forEach(unsub => unsub());
   };

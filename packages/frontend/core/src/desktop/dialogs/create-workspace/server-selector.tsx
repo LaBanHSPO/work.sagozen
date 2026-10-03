@@ -1,11 +1,9 @@
 import { Menu, MenuItem } from '@affine/component';
 import { type Server, ServersService } from '@affine/core/modules/cloud';
-import { useI18n } from '@affine/i18n';
 import {
   ArrowDownSmallIcon,
   CloudWorkspaceIcon,
   DoneIcon,
-  LocalWorkspaceIcon,
   SelfhostIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
@@ -35,7 +33,6 @@ export const ServerSelector = ({
   className,
   ...props
 }: ServerSelectorProps) => {
-  const t = useI18n();
   const [open, setOpen] = useState(false);
 
   const serversService = useService(ServersService);
@@ -48,10 +45,7 @@ export const ServerSelector = ({
   const serverName = useLiveData(
     selectedServer?.config$.selector(c => c.serverName)
   );
-  const selectedServerName =
-    selectedId === 'local'
-      ? t['com.affine.workspaceList.workspaceListType.local']()
-      : serverName;
+  const selectedServerName = serverName;
 
   return (
     <Menu
@@ -67,10 +61,6 @@ export const ServerSelector = ({
       }}
       items={
         <ul className={styles.list} data-testid="server-selector-list">
-          <LocalSelectorItem
-            onSelect={onChange}
-            active={selectedId === 'local'}
-          />
           {servers.map(server => (
             <ServerSelectorItem
               key={server.id}
@@ -91,30 +81,6 @@ export const ServerSelector = ({
         <ArrowDownSmallIcon className={clsx(styles.arrow, { open })} />
       </div>
     </Menu>
-  );
-};
-
-const LocalSelectorItem = ({
-  onSelect,
-  active,
-}: {
-  onSelect?: (id: string) => void;
-  active?: boolean;
-}) => {
-  const t = useI18n();
-  const handleSelect = useCallback(() => {
-    onSelect?.('local');
-  }, [onSelect]);
-  return (
-    <MenuItem
-      data-testid="local"
-      className={styles.item}
-      prefixIcon={<LocalWorkspaceIcon />}
-      onClick={handleSelect}
-      suffixIcon={active ? <DoneIcon className={styles.done} /> : null}
-    >
-      {t['com.affine.workspaceList.workspaceListType.local']()}
-    </MenuItem>
   );
 };
 

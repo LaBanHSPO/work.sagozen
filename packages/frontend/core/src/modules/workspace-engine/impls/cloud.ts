@@ -164,6 +164,9 @@ class CloudWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
       docStorage: DocStorage
     ) => Promise<void>
   ): Promise<WorkspaceMetadata> {
+    if (this.authService.session.status$.value !== 'authenticated') {
+      throw new Error('Sign in before creating a cloud workspace.');
+    }
     // create workspace on cloud, get workspace id
     const {
       createWorkspace: { id: workspaceId },

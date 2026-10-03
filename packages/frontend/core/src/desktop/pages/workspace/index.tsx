@@ -1,5 +1,6 @@
 import { DNDContext } from '@affine/component';
 import { AffineOtherPageLayout } from '@affine/component/affine-other-page-layout';
+import { WorkspaceAccessGate } from '@affine/core/components/providers/workspace-access-gate';
 import { workbenchRoutes } from '@affine/core/desktop/workbench-router';
 import {
   DefaultServerService,
@@ -207,9 +208,11 @@ export const Component = (): ReactElement => {
     }
     return (
       <FrameworkScope scope={server?.scope}>
-        <AffineOtherPageLayout>
-          <PageNotFound noPermission />
-        </AffineOtherPageLayout>
+        <WorkspaceAccessGate>
+          <AffineOtherPageLayout>
+            <PageNotFound noPermission />
+          </AffineOtherPageLayout>
+        </WorkspaceAccessGate>
       </FrameworkScope>
     );
   }
@@ -219,7 +222,9 @@ export const Component = (): ReactElement => {
 
   return (
     <FrameworkScope scope={server?.scope}>
-      <WorkspacePage meta={meta} />
+      <WorkspaceAccessGate>
+        <WorkspacePage meta={meta} />
+      </WorkspaceAccessGate>
     </FrameworkScope>
   );
 };

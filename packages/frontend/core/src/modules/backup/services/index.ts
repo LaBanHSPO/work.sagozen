@@ -11,7 +11,6 @@ import { switchMap, tap } from 'rxjs';
 
 import type { DesktopApiService } from '../../desktop-api';
 import type { WorkspacesService } from '../../workspace';
-import { _addLocalWorkspace } from '../../workspace-engine';
 
 type BackupWorkspaceResult = Awaited<
   ReturnType<DesktopApiService['handler']['workspace']['getBackupWorkspaces']>
@@ -20,7 +19,7 @@ type BackupWorkspaceResult = Awaited<
 export class BackupService extends Service {
   constructor(
     private readonly desktopApiService: DesktopApiService,
-    private readonly workspacesService: WorkspacesService
+    _workspacesService: WorkspacesService
   ) {
     super();
   }
@@ -47,16 +46,12 @@ export class BackupService extends Service {
     )
   );
 
-  async recoverBackupWorkspace(backupWorkspaceId: string) {
-    const result =
-      await this.desktopApiService.handler.workspace.recoverBackupWorkspace(
-        backupWorkspaceId
-      );
-    if (result.workspaceId) {
-      _addLocalWorkspace(result.workspaceId);
-      this.workspacesService.list.revalidate();
-    }
-    return result.workspaceId;
+  async recoverBackupWorkspace(
+    backupWorkspaceId: string
+  ): Promise<string | undefined> {
+    throw new Error(
+      `Cannot recover local workspace ${backupWorkspaceId}. Create or join a cloud workspace instead.`
+    );
   }
 
   async deleteBackupWorkspace(backupWorkspaceId: string) {

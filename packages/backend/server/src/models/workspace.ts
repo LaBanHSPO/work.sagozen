@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { Prisma, type Workspace as WorkspaceRecord } from '@prisma/client';
 
-import { EventBus } from '../base';
+import { ActionForbidden, EventBus } from '../base';
 import { BackendRuntimeProvider } from '../core/backend-runtime/provider';
 import { BaseModel } from './base';
 
@@ -89,6 +89,29 @@ export class WorkspaceModel extends BaseModel {
   }
 
   // #region workspace
+  /** Serialize personal workspace creation per owner, including across servers. */
+  @Transactional()
+  async createPersonal(userId: string) {
+    await this.db
+      .$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`personal-workspace:${userId}`}, 0))`;
+
+    if (!(await this.models.userFeature.has(userId, 'administrator'))) {
+      const owned = await this.db.workspaceMember.findMany({
+        where: { userId, role: 'owner', state: 'active' },
+        select: { workspaceId: true },
+      });
+      for (const { workspaceId } of owned) {
+        if (!(await this.isTeamWorkspace(workspaceId))) {
+          throw new ActionForbidden(
+            'You can only create one personal workspace. Join an existing workspace instead.'
+          );
+        }
+      }
+    }
+
+    return this.create(userId);
+  }
+
   /**
    * Create a new workspace for the user, default to private.
    */

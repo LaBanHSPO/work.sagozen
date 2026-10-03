@@ -403,11 +403,6 @@ export class ServerService
   }
 
   private onFlagsChanged() {
-    const flags = this.configFactory.config.flags;
-    if (flags.allowGuestDemoWorkspace) {
-      this.enableFeature(ServerFeature.LocalWorkspace);
-    } else {
-      this.disableFeature(ServerFeature.LocalWorkspace);
-    }
+    this.disableFeature(ServerFeature.LocalWorkspace);
   }
 }

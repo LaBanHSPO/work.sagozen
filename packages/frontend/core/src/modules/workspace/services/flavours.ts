@@ -10,7 +10,7 @@ export class WorkspaceFlavoursService extends Service {
 
   flavours$ = LiveData.from(
     combineLatest(this.providers.map(p => p.workspaceFlavours$)).pipe(
-      map(flavours => flavours.flat())
+      map(flavours => flavours.flat().filter(p => p.flavour !== 'local'))
     ),
     []
   );

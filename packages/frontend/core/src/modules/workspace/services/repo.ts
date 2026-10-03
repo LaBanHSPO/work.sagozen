@@ -46,6 +46,11 @@ export class WorkspaceRepositoryService extends Service {
     workspace: Workspace;
     dispose: () => void;
   } => {
+    if (options.metadata.flavour === 'local') {
+      throw new Error(
+        'Local workspaces are disabled. Create or join a cloud workspace.'
+      );
+    }
     if (options.isSharedMode) {
       const workspace = this.instantiate(
         options,

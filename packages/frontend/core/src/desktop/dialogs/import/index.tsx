@@ -36,7 +36,6 @@ import {
   HelpIcon,
   NotionIcon,
   PageIcon,
-  SaveIcon,
   ZipIcon,
 } from '@blocksuite/icons/rc';
 import { useService } from '@toeverything/infra';
@@ -266,21 +265,6 @@ const importOptions = [
     testId: 'editor-option-menu-import-snapshot',
     type: 'snapshot' as ImportType,
   },
-  BUILD_CONFIG.isElectron
-    ? {
-        key: 'dotaffinefile',
-        label: 'com.affine.import.dotaffinefile',
-        prefixIcon: (
-          <SaveIcon color={cssVarV2('icon/primary')} width={20} height={20} />
-        ),
-        suffixIcon: (
-          <HelpIcon color={cssVarV2('icon/primary')} width={20} height={20} />
-        ),
-        suffixTooltip: 'com.affine.import.dotaffinefile.tooltip',
-        testId: 'editor-option-menu-import-dotaffinefile',
-        type: 'dotaffinefile' as ImportType,
-      }
-    : null,
 ].filter(v => v !== null);
 
 const importConfigs: Record<ImportType, ImportConfig> = {

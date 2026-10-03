@@ -1,9 +1,8 @@
 import { ScrollableContainer } from '@affine/component';
 import { MenuItem } from '@affine/component/ui/menu';
-import { AuthService, DefaultServerService } from '@affine/core/modules/cloud';
+import { AuthService } from '@affine/core/modules/cloud';
 import { GlobalDialogService } from '@affine/core/modules/dialogs';
 import { type WorkspaceMetadata } from '@affine/core/modules/workspace';
-import { ServerFeature } from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
 import { track } from '@affine/track';
 import { Logo1Icon } from '@blocksuite/icons/rc';
@@ -66,7 +65,6 @@ export const UserWithWorkspaceList = ({
 }: UserWithWorkspaceListProps) => {
   const globalDialogService = useService(GlobalDialogService);
   const session = useLiveData(useService(AuthService).session.session$);
-  const defaultServerService = useService(DefaultServerService);
 
   const isAuthenticated = session.status === 'authenticated';
 
@@ -75,12 +73,7 @@ export const UserWithWorkspaceList = ({
   }, [globalDialogService]);
 
   const onNewWorkspace = useCallback(() => {
-    const enableLocalWorkspace =
-      BUILD_CONFIG.isNative ||
-      defaultServerService.server.config$.value.features.includes(
-        ServerFeature.LocalWorkspace
-      );
-    if (!isAuthenticated && !enableLocalWorkspace) {
+    if (!isAuthenticated) {
       return openSignInModal();
     }
     track.$.navigationPanel.workspaceList.createWorkspace();
@@ -92,24 +85,11 @@ export const UserWithWorkspaceList = ({
     onEventEnd?.();
   }, [
     globalDialogService,
-    defaultServerService,
     isAuthenticated,
     onCreatedWorkspace,
     onEventEnd,
     openSignInModal,
   ]);
-
-  const onAddWorkspace = useCallback(() => {
-    track.$.navigationPanel.workspaceList.createWorkspace({
-      control: 'import',
-    });
-    globalDialogService.open('import-workspace', undefined, payload => {
-      if (payload) {
-        onCreatedWorkspace?.({ metadata: payload.workspace });
-      }
-    });
-    onEventEnd?.();
-  }, [globalDialogService, onCreatedWorkspace, onEventEnd]);
 
   return (
     <>
@@ -126,10 +106,7 @@ export const UserWithWorkspaceList = ({
         />
       </ScrollableContainer>
       <div className={styles.workspaceFooter}>
-        <AddWorkspace
-          onAddWorkspace={onAddWorkspace}
-          onNewWorkspace={onNewWorkspace}
-        />
+        <AddWorkspace onNewWorkspace={onNewWorkspace} />
       </div>
     </>
   );

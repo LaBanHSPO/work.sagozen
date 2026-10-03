@@ -1,11 +1,7 @@
 import { DefaultServerService } from '@affine/core/modules/cloud';
 import { DesktopApiService } from '@affine/core/modules/desktop-api';
 import { WorkspacesService } from '@affine/core/modules/workspace';
-import {
-  buildShowcaseWorkspace,
-  createFirstAppData,
-} from '@affine/core/utils/first-app-data';
-import { ServerFeature } from '@affine/graphql';
+import { buildShowcaseWorkspace } from '@affine/core/utils/first-app-data';
 import {
   useLiveData,
   useService,
@@ -39,32 +35,19 @@ export const Component = ({
   defaultIndexRoute = 'all',
   children,
   fallback,
-  createErrorFallback,
 }: {
   defaultIndexRoute?: string;
   children?: ReactNode;
   fallback?: ReactNode;
   createErrorFallback?: (retry: () => void) => ReactNode;
 }) => {
-  // navigating and creating may be slow, to avoid flickering, we show workspace fallback
+  // Navigating may be slow, so show the workspace fallback until ready.
   const [navigating, setNavigating] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState(false);
-  const [createAttempt, setCreateAttempt] = useState(0);
   const authService = useService(AuthService);
   const defaultServerService = useService(DefaultServerService);
-
   const loggedIn = useLiveData(
     authService.session.status$.map(s => s === 'authenticated')
   );
-  const enableLocalWorkspace =
-    useLiveData(
-      defaultServerService.server.config$.selector(
-        c =>
-          c.features.includes(ServerFeature.LocalWorkspace) ||
-          BUILD_CONFIG.isNative
-      )
-    ) ?? true;
 
   const workspacesService = useService(WorkspacesService);
   const list = useLiveData(workspacesService.list.workspaces$);
@@ -78,8 +61,11 @@ export const Component = ({
   const createCloudWorkspace = useCallback(() => {
     if (createOnceRef.current) return;
     createOnceRef.current = true;
-    // TODO: support selfhosted
-    buildShowcaseWorkspace(workspacesService, 'affine-cloud', 'AFFiNE Cloud')
+    buildShowcaseWorkspace(
+      workspacesService,
+      defaultServerService.server.id,
+      'My Workspace'
+    )
       .then(({ meta, defaultDocId }) => {
         if (defaultDocId) {
           jumpToPage(meta.id, defaultDocId);
@@ -87,44 +73,46 @@ export const Component = ({
           openPage(meta.id, defaultIndexRoute);
         }
       })
-      .catch(err => console.error('Failed to create cloud workspace', err));
-  }, [defaultIndexRoute, jumpToPage, openPage, workspacesService]);
+      .catch(err => {
+        console.error('Failed to create cloud workspace', err);
+        createOnceRef.current = false;
+        setNavigating(false);
+      });
+  }, [
+    defaultIndexRoute,
+    defaultServerService,
+    jumpToPage,
+    openPage,
+    workspacesService,
+  ]);
 
   useLayoutEffect(() => {
-    if (!navigating) {
-      return;
-    }
-
-    if (listIsLoading) {
-      return;
-    }
-
-    if (!enableLocalWorkspace && !loggedIn) {
+    if (!loggedIn) {
       localStorage.removeItem('last_workspace_id');
       jumpToSignIn();
       return;
     }
 
+    if (!navigating) return;
+
+    if (listIsLoading) return;
+
     // check is user logged in && has cloud workspace
     if (searchParams.get('initCloud') === 'true') {
       if (loggedIn) {
-        if (list.every(w => w.flavour !== 'affine-cloud')) {
+        if (list.length === 0) {
           createCloudWorkspace();
           return;
         }
 
         // open first cloud workspace
-        const openWorkspace =
-          list.find(w => w.flavour === 'affine-cloud') ?? list[0];
+        const openWorkspace = list[0];
         openPage(openWorkspace.id, defaultIndexRoute);
       } else {
         return;
       }
     } else {
       if (list.length === 0) {
-        if (BUILD_CONFIG.isMobileEdition && enableLocalWorkspace) {
-          return;
-        }
         setNavigating(false);
         return;
       }
@@ -135,7 +123,6 @@ export const Component = ({
       openPage(openWorkspace.id, defaultIndexRoute, RouteLogic.REPLACE);
     }
   }, [
-    enableLocalWorkspace,
     createCloudWorkspace,
     list,
     openPage,
@@ -153,55 +140,7 @@ export const Component = ({
     desktopApi?.handler.ui.pingAppLayoutReady().catch(console.error);
   }, [desktopApi]);
 
-  useEffect(() => {
-    if (listIsLoading || list.length > 0 || !enableLocalWorkspace) {
-      return;
-    }
-
-    const creation = createFirstAppData(workspacesService);
-    if (!creation) return;
-
-    setCreateError(false);
-    setCreating(true);
-    creation
-      .then(createdWorkspace => {
-        if (createdWorkspace) {
-          if (createdWorkspace.defaultPageId) {
-            jumpToPage(
-              createdWorkspace.meta.id,
-              createdWorkspace.defaultPageId
-            );
-          } else {
-            openPage(createdWorkspace.meta.id, 'all');
-          }
-        }
-      })
-      .catch(err => {
-        console.error('Failed to create first app data', err);
-        setCreateError(true);
-      })
-      .finally(() => {
-        setCreating(false);
-      });
-  }, [
-    jumpToPage,
-    openPage,
-    workspacesService,
-    listIsLoading,
-    list,
-    enableLocalWorkspace,
-    createAttempt,
-  ]);
-
-  const retryCreate = useCallback(() => {
-    setCreateAttempt(attempt => attempt + 1);
-  }, []);
-
-  if (createError && createErrorFallback) {
-    return createErrorFallback(retryCreate);
-  }
-
-  if (navigating || creating) {
+  if (navigating || !loggedIn) {
     return fallback ?? <AppContainer fallback />;
   }
 
@@ -215,6 +154,7 @@ export const Component = ({
           top: '50%',
         }}
       >
+        <p>Create a cloud workspace or open an invitation to join one.</p>
         <WorkspaceNavigator
           open={true}
           menuContentOptions={{

@@ -87,6 +87,18 @@ yarn dev
 
 You can login with the user (dev@affine.pro / dev) above to test the server.
 
+## Workspace access policy
+
+Workspace access requires sign-in. Users create cloud workspaces or join existing
+workspaces through invitations. Local workspace creation and opening are disabled;
+previously stored local data is preserved. Published document links remain public.
+
+Creating a personal workspace is blocked while the user already owns a personal
+workspace. Active server administrators are exempt. Joined workspaces and owned
+team workspaces do not count toward this creation limit. Deleting the owned
+personal workspace permits creating a replacement. The server serializes creation
+per owner so concurrent requests cannot bypass the limit.
+
 ## Done
 
 Now you should be able to start developing affine with server enabled.

@@ -212,7 +212,7 @@ export class WorkspaceResolver {
     @Args({ name: 'init', type: () => GraphQLUpload, nullable: true })
     init: FileUpload | null
   ) {
-    const workspace = await this.models.workspace.create(user.id);
+    const workspace = await this.models.workspace.createPersonal(user.id);
 
     if (init) {
       // convert stream to buffer

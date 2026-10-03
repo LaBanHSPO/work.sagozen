@@ -165,6 +165,7 @@ const BackupWorkspaceItem = ({ item }: { item: BackupWorkspaceItem }) => {
             <>
               <MenuItem
                 prefixIcon={<LocalWorkspaceIcon />}
+                disabled
                 onClick={handleImport}
               >
                 {t['com.affine.settings.workspace.backup.import']()}

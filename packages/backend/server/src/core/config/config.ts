@@ -78,7 +78,7 @@ Default to be \`[server.protocol]://[server.host][:server.port]\` if not specifi
 
 defineModuleConfig('flags', {
   allowGuestDemoWorkspace: {
-    desc: 'Whether allow guest users to create demo workspaces.',
-    default: true,
+    desc: 'Legacy guest demo flag. Local workspaces are disabled.',
+    default: false,
   },
 });

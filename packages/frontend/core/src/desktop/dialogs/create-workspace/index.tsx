@@ -2,6 +2,8 @@ import { Button, ConfirmModal, notify, RowInput } from '@affine/component';
 import { useAsyncCallback } from '@affine/core/components/hooks/affine-async-hooks';
 import {
   AuthService,
+  DefaultServerService,
+  GraphQLService,
   type Server,
   ServersService,
 } from '@affine/core/modules/cloud';
@@ -12,10 +14,16 @@ import {
 } from '@affine/core/modules/dialogs';
 import { WorkspacesService } from '@affine/core/modules/workspace';
 import { buildShowcaseWorkspace } from '@affine/core/utils/first-app-data';
+import { UserFriendlyError } from '@affine/error';
+import {
+  FeatureType,
+  getCurrentUserQuery,
+  getWorkspacesQuery,
+} from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
 import track from '@affine/track';
 import { FrameworkScope, useLiveData, useService } from '@toeverything/infra';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import * as styles from './index.css';
 import { ServerSelector } from './server-selector';
@@ -43,8 +51,9 @@ export const CreateWorkspaceDialog = ({
   const t = useI18n();
 
   const [workspaceName, setWorkspaceName] = useState('');
+  const defaultServer = useService(DefaultServerService).server;
   const [inputServerId, setInputServerId] = useState(
-    serverId ?? 'affine-cloud'
+    serverId && serverId !== 'local' ? serverId : defaultServer.id
   );
 
   const serversService = useService(ServersService);
@@ -129,18 +138,60 @@ const CustomConfirmButton = ({
 
   const session = useService(AuthService).session;
   const loginStatus = useLiveData(session.status$);
+  const account = useLiveData(session.account$);
+  const graphqlService = useService(GraphQLService);
+  const [creationAllowed, setCreationAllowed] = useState<boolean | null>(null);
+  const [creationCheckError, setCreationCheckError] = useState(false);
+  const [checkAttempt, setCheckAttempt] = useState(0);
   const globalDialogService = useService(GlobalDialogService);
   const workspacesService = useService(WorkspacesService);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setCreationAllowed(null);
+    setCreationCheckError(false);
+    if (!server || loginStatus !== 'authenticated' || !account) return;
+    Promise.all([
+      graphqlService.gql({
+        query: getWorkspacesQuery,
+        context: { signal: controller.signal },
+      }),
+      graphqlService.gql({
+        query: getCurrentUserQuery,
+        context: { signal: controller.signal },
+      }),
+    ])
+      .then(([{ workspaces }, { currentUser }]) => {
+        if (controller.signal.aborted) return;
+        setCreationAllowed(
+          !!currentUser?.features.includes(FeatureType.Admin) ||
+            !workspaces.some(w => !w.team && w.owner.id === account.id)
+        );
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) {
+          console.error(error);
+          setCreationCheckError(true);
+        }
+      });
+    return () => controller.abort();
+  }, [account, checkAttempt, graphqlService, loginStatus, server]);
 
   const openSignInModal = useCallback(() => {
     globalDialogService.open('sign-in', { server: server?.baseUrl });
   }, [globalDialogService, server?.baseUrl]);
 
   const handleConfirm = useAsyncCallback(async () => {
-    if (loading) return;
+    if (
+      loading ||
+      !server ||
+      loginStatus !== 'authenticated' ||
+      creationAllowed !== true
+    )
+      return;
     setLoading(true);
     track.$.$.$.createWorkspace({
-      flavour: !server ? 'local' : 'affine-cloud',
+      flavour: server.id,
     });
 
     // this will be the last step for web for now
@@ -148,7 +199,7 @@ const CustomConfirmButton = ({
     try {
       const res = await buildShowcaseWorkspace(
         workspacesService,
-        server?.id ?? 'local',
+        server.id,
         workspaceName
       );
       onCreated(res);
@@ -156,29 +207,57 @@ const CustomConfirmButton = ({
       console.error(e);
       notify.error({
         title: 'Failed to create workspace',
-        message: 'please try again later.',
+        message: UserFriendlyError.fromAny(e).message,
       });
     } finally {
       setLoading(false);
     }
-  }, [loading, onCreated, server, workspaceName, workspacesService]);
+  }, [
+    creationAllowed,
+    loading,
+    loginStatus,
+    onCreated,
+    server,
+    workspaceName,
+    workspacesService,
+  ]);
 
   const handleCheckSessionAndConfirm = useCallback(() => {
-    if (server && loginStatus !== 'authenticated') {
+    if (loginStatus !== 'authenticated') {
       return openSignInModal();
     }
     handleConfirm();
-  }, [handleConfirm, loginStatus, openSignInModal, server]);
+  }, [handleConfirm, loginStatus, openSignInModal]);
 
   return (
-    <Button
-      disabled={!workspaceName}
-      data-testid="create-workspace-create-button"
-      variant="primary"
-      onClick={handleCheckSessionAndConfirm}
-      loading={loading}
-    >
-      {t['com.affine.nameWorkspace.button.create']()}
-    </Button>
+    <>
+      {creationCheckError && (
+        <div role="alert">
+          Unable to check workspace creation permissions.
+          <Button onClick={() => setCheckAttempt(attempt => attempt + 1)}>
+            Retry
+          </Button>
+        </div>
+      )}
+      {creationAllowed === false && (
+        <p>
+          You already own a personal workspace. Join another workspace using an
+          invitation.
+        </p>
+      )}
+      <Button
+        disabled={
+          !workspaceName ||
+          !server ||
+          (loginStatus === 'authenticated' && creationAllowed !== true)
+        }
+        data-testid="create-workspace-create-button"
+        variant="primary"
+        onClick={handleCheckSessionAndConfirm}
+        loading={loading}
+      >
+        {t['com.affine.nameWorkspace.button.create']()}
+      </Button>
+    </>
   );
 };
