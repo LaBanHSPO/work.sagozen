@@ -100,6 +100,12 @@ export class MentionNotificationBodyType extends BaseNotificationBodyType {
 }
 
 @ObjectType()
+export class DocPublishedNotificationBodyType extends BaseNotificationBodyType {
+  @Field(() => MentionDocType)
+  doc!: MentionDocType;
+}
+
+@ObjectType()
 export abstract class InvitationBaseNotificationBodyType extends BaseNotificationBodyType {
   @Field(() => ID)
   inviteId!: string;
@@ -138,6 +144,7 @@ export const UnionNotificationBodyType = createUnionType({
   types: () =>
     [
       MentionNotificationBodyType,
+      DocPublishedNotificationBodyType,
       InvitationNotificationBodyType,
       InvitationAcceptedNotificationBodyType,
       InvitationBlockedNotificationBodyType,

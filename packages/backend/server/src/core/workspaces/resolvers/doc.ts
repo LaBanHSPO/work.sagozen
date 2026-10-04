@@ -39,6 +39,7 @@ import {
   BackendRuntimeProvider,
 } from '../../backend-runtime';
 import { Editor } from '../../doc';
+import { NotificationService } from '../../notification/service';
 import {
   DOC_ACTIONS,
   DocAction,
@@ -315,7 +316,8 @@ export class WorkspaceDocResolver {
     private readonly models: Models,
     private readonly cache: Cache,
     private readonly event: EventBus,
-    private readonly runtime: BackendRuntimeProvider
+    private readonly runtime: BackendRuntimeProvider,
+    private readonly notifications: NotificationService
   ) {}
 
   @ResolveField(() => WorkspaceDocMeta, {
@@ -449,14 +451,16 @@ export class WorkspaceDocResolver {
       throw new ExpectToPublishDoc();
     }
 
+    let notifiedUserIds: string[] = [];
     try {
-      await this.runtime.executeDomainCommandV1({
+      const result = await this.runtime.executeDomainCommandV1({
         command: 'publish_doc',
         actorUserId: user.id,
         workspaceId,
         docId,
         mode,
       });
+      notifiedUserIds = result.notifiedUserIds as string[];
     } catch (error) {
       if (
         ['domain_permission_denied', 'workspace_not_found'].includes(
@@ -479,6 +483,7 @@ export class WorkspaceDocResolver {
       throw new DocNotFound({ spaceId: workspaceId, docId });
     }
     this.event.emit('doc.public_state.changed', { workspaceId, docId });
+    await this.notifications.notifyPublicShareRecipients(notifiedUserIds);
 
     this.logger.log(
       `Publish page ${docId} with mode ${mode} in workspace ${workspaceId}`

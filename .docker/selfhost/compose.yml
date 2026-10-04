@@ -6,6 +6,8 @@ x-affine-source: &affine-source
   build:
     context: ../..
     dockerfile: .docker/selfhost/Dockerfile
+    args:
+      NATIVE_SOURCE: ${NATIVE_SOURCE:-build}
 
 services:
   affine:

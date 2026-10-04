@@ -1537,6 +1537,18 @@ input MentionInput {
   workspaceId: String!
 }
 
+type DocPublishedNotificationBodyType {
+  """
+  The user who created the notification, maybe null when user is deleted or sent by system
+  """
+  createdByUser: PublicUserType
+  doc: MentionDocType!
+
+  """The type of the notification"""
+  type: NotificationType!
+  workspace: NotificationWorkspaceType
+}
+
 type MentionNotificationBodyType {
   """
   The user who created the notification, maybe null when user is deleted or sent by system
@@ -1803,6 +1815,7 @@ type NotificationObjectTypeEdge {
 enum NotificationType {
   Comment
   CommentMention
+  DocPublished
   Invitation
   InvitationAccepted
   InvitationBlocked
@@ -2488,7 +2501,7 @@ type TranscriptionSourceAudioType {
   sampleRate: Int
 }
 
-union UnionNotificationBodyType = InvitationAcceptedNotificationBodyType | InvitationBlockedNotificationBodyType | InvitationNotificationBodyType | InvitationReviewApprovedNotificationBodyType | InvitationReviewDeclinedNotificationBodyType | InvitationReviewRequestNotificationBodyType | MentionNotificationBodyType
+union UnionNotificationBodyType = DocPublishedNotificationBodyType | InvitationAcceptedNotificationBodyType | InvitationBlockedNotificationBodyType | InvitationNotificationBodyType | InvitationReviewApprovedNotificationBodyType | InvitationReviewDeclinedNotificationBodyType | InvitationReviewRequestNotificationBodyType | MentionNotificationBodyType
 
 type UnknownOauthProviderDataType {
   name: String!

@@ -998,6 +998,16 @@ export interface DocPermissions {
   Doc_Users_Read: Scalars['Boolean']['output'];
 }
 
+export interface DocPublishedNotificationBodyType {
+  __typename?: 'DocPublishedNotificationBodyType';
+  /** The user who created the notification, maybe null when user is deleted or sent by system */
+  createdByUser: Maybe<PublicUserType>;
+  doc: MentionDocType;
+  /** The type of the notification */
+  type: NotificationType;
+  workspace: Maybe<NotificationWorkspaceType>;
+}
+
 /** User permission in doc */
 export enum DocRole {
   Commenter = 'Commenter',
@@ -2418,6 +2428,7 @@ export interface NotificationObjectTypeEdge {
 export enum NotificationType {
   Comment = 'Comment',
   CommentMention = 'CommentMention',
+  DocPublished = 'DocPublished',
   Invitation = 'Invitation',
   InvitationAccepted = 'InvitationAccepted',
   InvitationBlocked = 'InvitationBlocked',
@@ -3175,6 +3186,7 @@ export interface TranscriptionSourceAudioType {
 }
 
 export type UnionNotificationBodyType =
+  | DocPublishedNotificationBodyType
   | InvitationAcceptedNotificationBodyType
   | InvitationBlockedNotificationBodyType
   | InvitationNotificationBodyType

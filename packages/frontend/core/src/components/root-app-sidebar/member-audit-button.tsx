@@ -45,6 +45,8 @@ function describe(log: AuditLog) {
       return `${log.actorName} created an invite link`;
     case 'invite_link_revoked':
       return `${log.actorName} revoked an invite link`;
+    case 'doc_published':
+      return `${log.actorName} shared ${log.detail ?? 'a document'} with anyone with the link`;
     default:
       return `${log.actorName} updated a member`;
   }

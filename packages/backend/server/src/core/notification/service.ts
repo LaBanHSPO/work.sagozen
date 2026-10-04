@@ -53,6 +53,12 @@ export class NotificationService {
     return count;
   }
 
+  async notifyPublicShareRecipients(userIds: string[]) {
+    await Promise.all(
+      userIds.map(userId => this.publishCountChanged(userId, 'created'))
+    );
+  }
+
   async createComment(input: CommentNotificationCreate, isMention?: boolean) {
     const notification = isMention
       ? await this.models.notification.createCommentMention(input)
@@ -613,6 +619,7 @@ export class NotificationService {
     const mentions = notifications.filter(
       n =>
         n.type === NotificationType.Mention ||
+        n.type === NotificationType.DocPublished ||
         n.type === NotificationType.CommentMention ||
         n.type === NotificationType.Comment
     ) as (MentionNotification | CommentNotification)[];

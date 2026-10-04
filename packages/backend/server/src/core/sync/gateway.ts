@@ -1496,13 +1496,21 @@ export class SpaceSyncGateway
       }
       timestamp = new Date(output.timestamp as string).getTime();
     } else {
-      timestamp = await adapter.push(
-        spaceId,
-        docId,
-        [Buffer.from(update, 'base64')],
-        user.id,
-        permissionGeneration
-      );
+      try {
+        timestamp = await adapter.push(
+          spaceId,
+          docId,
+          [Buffer.from(update, 'base64')],
+          user.id,
+          permissionGeneration
+        );
+      } catch (error) {
+        if (spaceType === SpaceType.Workspace && error instanceof DocNotFound) {
+          // Acknowledge stale updates without broadcasting content that was not saved.
+          return { data: { accepted: true, timestamp: Date.now() } };
+        }
+        throw error;
+      }
     }
 
     this.publishDocUpdate(

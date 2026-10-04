@@ -32,6 +32,18 @@ pub(super) async fn set_published(
   )
   .await?;
 
+  // Authorization holds the workspace transaction lock, so concurrent publishes
+  // observe the committed visibility before recording another sharing event.
+  let was_public = sqlx::query_scalar::<_, bool>(
+    "SELECT EXISTS(SELECT 1 FROM doc_access_policies WHERE workspace_id=$1 AND doc_id=$2 AND visibility='public' \
+     AND public_role='external')",
+  )
+  .bind(&workspace_id)
+  .bind(&doc_id)
+  .fetch_one(&mut **transaction)
+  .await
+  .map_err(|error| RuntimeError::database("check public doc transition", error))?;
+
   if publish {
     let snapshot =
       sqlx::query_scalar::<_, String>("SELECT guid FROM snapshots WHERE workspace_id=$1 AND guid=$2 FOR UPDATE")
@@ -51,19 +63,8 @@ pub(super) async fn set_published(
     if snapshot.is_none() && updates.is_empty() {
       return Err(RuntimeError::invalid_input("doc_not_found"));
     }
-  } else {
-    let is_public = sqlx::query_scalar::<_, bool>(
-      "SELECT EXISTS(SELECT 1 FROM doc_access_policies WHERE workspace_id=$1 AND doc_id=$2 AND visibility='public' \
-       AND public_role='external')",
-    )
-    .bind(&workspace_id)
-    .bind(&doc_id)
-    .fetch_one(&mut **transaction)
-    .await
-    .map_err(|error| RuntimeError::database("check public doc", error))?;
-    if !is_public {
-      return Err(RuntimeError::invalid_input("doc_is_not_public"));
-    }
+  } else if !was_public {
+    return Err(RuntimeError::invalid_input("doc_is_not_public"));
   }
 
   sqlx::query(
@@ -100,19 +101,244 @@ pub(super) async fn set_published(
   .await
   .map_err(|error| RuntimeError::database("write public doc metadata", error))?;
 
+  let notified_user_ids = if publish && !was_public {
+    record_public_share(transaction, &actor_user_id, &workspace_id, &doc_id, mode).await?
+  } else {
+    Vec::new()
+  };
+
   Ok(json!({
     "workspaceId": workspace_id,
     "docId": doc_id,
     "mode": row.try_get::<i16, _>("mode").map_err(|error| RuntimeError::database("decode doc mode", error))?,
     "public": publish,
     "publishedAt": row.try_get::<Option<chrono::DateTime<chrono::Utc>>, _>("published_at").map_err(|error| RuntimeError::database("decode published time", error))?,
+    "notifiedUserIds": notified_user_ids,
   }))
+}
+
+async fn record_public_share(
+  transaction: &mut Transaction<'_, Postgres>,
+  actor_user_id: &str,
+  workspace_id: &str,
+  doc_id: &str,
+  mode: i16,
+) -> RuntimeResult<Vec<String>> {
+  let title =
+    sqlx::query_scalar::<_, Option<String>>("SELECT title FROM workspace_pages WHERE workspace_id=$1 AND page_id=$2")
+      .bind(workspace_id)
+      .bind(doc_id)
+      .fetch_one(&mut **transaction)
+      .await
+      .map_err(|error| RuntimeError::database("load public share title", error))?
+      .unwrap_or_default();
+  let detail = format!("{} ({doc_id})", if title.is_empty() { "Untitled" } else { &title });
+  sqlx::query(
+    "INSERT INTO workspace_member_audit_logs(id,workspace_id,actor_user_id,actor_name,actor_email,action,detail) \
+     SELECT gen_random_uuid()::text,$1,id,name,email,'doc_published',$3 FROM users WHERE id=$2",
+  )
+  .bind(workspace_id)
+  .bind(actor_user_id)
+  .bind(detail)
+  .execute(&mut **transaction)
+  .await
+  .map_err(|error| RuntimeError::database("record public share activity", error))?;
+
+  let body = json!({
+    "workspaceId": workspace_id,
+    "createdByUserId": actor_user_id,
+    "doc": { "id": doc_id, "title": title, "mode": if mode == 1 { "edgeless" } else { "page" } },
+  });
+  sqlx::query_scalar::<_, String>(
+    r#"INSERT INTO notifications(id,user_id,level,type,body)
+       SELECT gen_random_uuid()::text,user_id,'Default','DocPublished',$3
+       FROM workspace_members
+       WHERE workspace_id=$1 AND state='active' AND role IN ('owner','admin') AND user_id<>$2
+       RETURNING user_id"#,
+  )
+  .bind(workspace_id)
+  .bind(actor_user_id)
+  .bind(sqlx::types::Json(body))
+  .fetch_all(&mut **transaction)
+  .await
+  .map_err(|error| RuntimeError::database("create public share notifications", error))
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::runtime::Deployment;
+
+  #[tokio::test]
+  async fn public_share_records_managers_once_per_transition() {
+    use super::super::{DomainCommandInputV1, execute::execute};
+    use crate::runtime::backend_runtime::permission::PermissionTelemetry;
+
+    let _guard = crate::runtime::migrations::DATABASE_TEST_LOCK.lock().await;
+    let Some((pool, workspace_id, actor_user_id)) = super::super::test_support::owner_workspace().await else {
+      return;
+    };
+    let admin_id = format!("share-admin-{}", uuid::Uuid::new_v4().simple());
+    let member_id = format!("share-member-{}", uuid::Uuid::new_v4().simple());
+    let inactive_id = format!("share-inactive-{}", uuid::Uuid::new_v4().simple());
+    for (id, role, state) in [
+      (&admin_id, "admin", "active"),
+      (&member_id, "member", "active"),
+      (&inactive_id, "admin", "left"),
+    ] {
+      sqlx::query("INSERT INTO users(id,name,email,registered,disabled) VALUES($1,'Share User',$2,true,false)")
+        .bind(id)
+        .bind(format!("{id}@example.com"))
+        .execute(&pool)
+        .await
+        .unwrap();
+      sqlx::query("INSERT INTO workspace_members(workspace_id,user_id,role,state) VALUES($1,$2,$3,$4)")
+        .bind(&workspace_id)
+        .bind(id)
+        .bind(role)
+        .bind(state)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let doc_id = format!("share-doc-{}", uuid::Uuid::new_v4().simple());
+    sqlx::query("INSERT INTO snapshots(workspace_id,guid,blob,updated_at) VALUES($1,$2,$3,now())")
+      .bind(&workspace_id)
+      .bind(&doc_id)
+      .bind([0_u8, 0_u8])
+      .execute(&pool)
+      .await
+      .unwrap();
+    sqlx::query("INSERT INTO workspace_pages(workspace_id,page_id,title) VALUES($1,$2,'Shared doc')")
+      .bind(&workspace_id)
+      .bind(&doc_id)
+      .execute(&pool)
+      .await
+      .unwrap();
+    let authorizer = PermissionAuthorizer::new(pool.clone(), Deployment::Cloud);
+    let mut transaction = pool.begin().await.unwrap();
+    set_published(
+      &authorizer,
+      &mut transaction,
+      actor_user_id.clone(),
+      workspace_id.clone(),
+      doc_id.clone(),
+      1,
+      true,
+    )
+    .await
+    .unwrap();
+    transaction.rollback().await.unwrap();
+    let count = |table: &'static str| {
+      let pool = pool.clone();
+      let workspace_id = workspace_id.clone();
+      async move {
+        let sql = if table == "audit" {
+          "SELECT count(*) FROM workspace_member_audit_logs WHERE workspace_id=$1"
+        } else {
+          "SELECT count(*) FROM notifications WHERE body->>'workspaceId'=$1"
+        };
+        sqlx::query_scalar::<_, i64>(sql)
+          .bind(&workspace_id)
+          .fetch_one(&pool)
+          .await
+          .unwrap()
+      }
+    };
+    assert_eq!(count("audit").await, 0);
+    assert_eq!(count("notifications").await, 0);
+    let publish = || {
+      execute(
+        pool.clone(),
+        Deployment::Cloud,
+        PermissionTelemetry::default(),
+        true,
+        DomainCommandInputV1::PublishDoc {
+          actor_user_id: actor_user_id.clone(),
+          workspace_id: workspace_id.clone(),
+          doc_id: doc_id.clone(),
+          mode: 1,
+        },
+      )
+    };
+    let (first, repeated) = tokio::join!(publish(), publish());
+    let results = [first.unwrap().value, repeated.unwrap().value];
+    assert_eq!(
+      results
+        .iter()
+        .filter(|result| result["notifiedUserIds"] == json!([admin_id]))
+        .count(),
+      1
+    );
+    assert_eq!(count("audit").await, 1);
+    assert_eq!(count("notifications").await, 1);
+    let body: Value = sqlx::query_scalar("SELECT body FROM notifications WHERE user_id=$1")
+      .bind(&admin_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
+    assert_eq!(body["createdByUserId"], actor_user_id);
+    assert_eq!(body["doc"], json!({"id":doc_id,"title":"Shared doc","mode":"edgeless"}));
+    let audit =
+      sqlx::query("SELECT actor_name,actor_email,action,detail FROM workspace_member_audit_logs WHERE workspace_id=$1")
+        .bind(&workspace_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(audit.get::<String, _>("actor_name"), "Domain Owner");
+    assert_eq!(audit.get::<String, _>("action"), "doc_published");
+    assert_eq!(audit.get::<String, _>("detail"), format!("Shared doc ({doc_id})"));
+    assert!(audit.get::<String, _>("actor_email").contains("@example.com"));
+
+    let denied = execute(
+      pool.clone(),
+      Deployment::Cloud,
+      PermissionTelemetry::default(),
+      true,
+      DomainCommandInputV1::PublishDoc {
+        actor_user_id: inactive_id,
+        workspace_id: workspace_id.clone(),
+        doc_id: doc_id.clone(),
+        mode: 0,
+      },
+    )
+    .await;
+    assert!(denied.is_err());
+    assert_eq!(count("audit").await, 1);
+    assert_eq!(count("notifications").await, 1);
+    execute(
+      pool.clone(),
+      Deployment::Cloud,
+      PermissionTelemetry::default(),
+      true,
+      DomainCommandInputV1::UnpublishDoc {
+        actor_user_id: actor_user_id.clone(),
+        workspace_id: workspace_id.clone(),
+        doc_id: doc_id.clone(),
+      },
+    )
+    .await
+    .unwrap();
+    assert_eq!(count("audit").await, 1);
+    // An admin sharing again notifies the owner rather than the admin actor.
+    let reshared = execute(
+      pool.clone(),
+      Deployment::Cloud,
+      PermissionTelemetry::default(),
+      true,
+      DomainCommandInputV1::PublishDoc {
+        actor_user_id: admin_id,
+        workspace_id: workspace_id.clone(),
+        doc_id,
+        mode: 0,
+      },
+    )
+    .await
+    .unwrap();
+    assert_eq!(reshared.value["notifiedUserIds"], json!([actor_user_id]));
+    assert_eq!(count("audit").await, 2);
+    assert_eq!(count("notifications").await, 2);
+  }
 
   #[tokio::test]
   async fn readonly_denies_publish_but_allows_unpublish() {

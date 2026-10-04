@@ -14,7 +14,10 @@ import {
 } from '../../../base';
 import { retryable } from '../../../base/utils/promise';
 import { Models } from '../../../models';
-import { BackendRuntimeProvider } from '../../backend-runtime';
+import {
+  backendRuntimeErrorCode,
+  BackendRuntimeProvider,
+} from '../../backend-runtime';
 import { DocStorageOptions } from '../options';
 import {
   DocRecord,
@@ -140,7 +143,7 @@ export class PgWorkspaceDocStorageAdapter extends DocStorageAdapter {
     let done = 0;
     let timestamp = Date.now();
     try {
-      await retryable(async () => {
+      const appendError = await retryable(async () => {
         if (done !== 0) {
           pendings = pendings.slice(done);
         }
@@ -152,19 +155,29 @@ export class PgWorkspaceDocStorageAdapter extends DocStorageAdapter {
             docId,
             updates: batch.map(update => Buffer.from(update)),
           };
-          timestamp =
-            'trusted' in contract
-              ? await this.runtime.appendWorkspaceDocUpdatesTrustedV1({
-                  ...input,
-                  editorId,
-                })
-              : await this.runtime.appendWorkspaceDocUpdatesV1({
-                  ...input,
-                  ...contract,
-                });
+          try {
+            timestamp =
+              'trusted' in contract
+                ? await this.runtime.appendWorkspaceDocUpdatesTrustedV1({
+                    ...input,
+                    editorId,
+                  })
+                : await this.runtime.appendWorkspaceDocUpdatesV1({
+                    ...input,
+                    ...contract,
+                  });
+          } catch (error) {
+            // Missing documents are permanent failures; let sync acknowledge them.
+            if (backendRuntimeErrorCode(error) === 'doc_not_found') {
+              return new DocNotFound({ spaceId: workspaceId, docId });
+            }
+            throw error;
+          }
           done += batch.length;
         }
+        return undefined;
       });
+      if (appendError) throw appendError;
 
       if (isNewDoc) {
         await this.event.emitDetachedAsync('doc.created', {
@@ -174,6 +187,7 @@ export class PgWorkspaceDocStorageAdapter extends DocStorageAdapter {
         });
       }
     } catch (e) {
+      if (e instanceof DocNotFound) throw e;
       this.logger.error('Failed to insert doc updates', e);
       metrics.doc.counter('doc_update_insert_failed').add(1);
       throw new FailedToSaveUpdates();

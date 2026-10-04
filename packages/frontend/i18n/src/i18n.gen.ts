@@ -11104,6 +11104,16 @@ export const TypedTrans: {
         ["2"]: JSX.Element;
     }>>;
     /**
+      * `<1>{{username}}</1> shared <2>{{docTitle}}</2> with anyone with the link`
+      */
+    ["com.affine.notification.doc-published"]: ComponentType<TypedTransProps<Readonly<{
+        username: string;
+        docTitle: string;
+    }>, {
+        ["1"]: JSX.Element;
+        ["2"]: JSX.Element;
+    }>>;
+    /**
       * `<1>{{username}}</1> commented in <2>{{docTitle}}</2>`
       */
     ["com.affine.notification.comment"]: ComponentType<TypedTransProps<Readonly<{

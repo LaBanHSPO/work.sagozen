@@ -7,6 +7,8 @@
 # edit reuses the native build. Release optimization stays enabled; cross-crate
 # LTO is optional to keep native linking inexpensive for local self-host builds.
 
+ARG NATIVE_SOURCE=build
+
 FROM node:22-bookworm AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -185,7 +187,6 @@ RUN --mount=type=cache,id=affine-yarn,target=/root/.yarn/berry/cache,sharing=loc
       @affine/server \
       @affine/web \
       @affine/admin \
-      @affine/mobile \
       @affine/server-native \
       @affine-tools/cli
 
@@ -231,6 +232,8 @@ COPY Cargo.toml Cargo.lock ./
 COPY .cargo/config.toml .cargo/config.toml
 COPY packages/backend/native packages/backend/native
 COPY packages/common/native packages/common/native
+# Cargo resolves every workspace member's manifest, but napi builds only
+# packages/backend/native and its dependencies, not desktop or mobile apps.
 COPY packages/frontend/native packages/frontend/native
 COPY packages/frontend/mobile-native packages/frontend/mobile-native
 
@@ -274,25 +277,40 @@ RUN --mount=type=cache,id=affine-cargo-registry,target=/usr/local/cargo/registry
  && cp "$native" packages/backend/native/server-native.arm64.node \
  && cp "$native" packages/backend/native/server-native.armv7.node
 
+# Export only deployable bindings, rather than the Cargo target cache.
+FROM scratch AS native-export
+COPY --from=native-build /src/packages/backend/native/server-native*.node /
+COPY --from=native-build /src/packages/backend/native/index.js /index.js
+COPY --from=native-build /src/packages/backend/native/index.d.ts /index.d.ts
+
+FROM base AS native-prebuilt
+ARG TARGETARCH
+COPY .docker/selfhost/native/${TARGETARCH}/ /src/packages/backend/native/
+# Fail early for a binary compiled for another OS/architecture or missing exports.
+RUN node -e "require('/src/packages/backend/native/server-native.node')"
+
+FROM native-${NATIVE_SOURCE} AS native-selected
+
 FROM deps AS build
 
 COPY . .
 # Copy last so host binaries and checked-in bindings cannot replace Linux output.
-COPY --from=native-build /src/packages/backend/native/ packages/backend/native/
+COPY --from=native-selected /src/packages/backend/native/ packages/backend/native/
 RUN yarn workspace @affine/templates build
 
 ENV BUILD_TYPE=stable
 # .git is not in the build context. The web bundler reads GITHUB_SHA instead.
 ARG SOURCE_SHA=selfhost
 ENV GITHUB_SHA=${SOURCE_SHA}
+# The server loads both manifests at startup. Serve the same web application
+# to mobile browsers without compiling the separate mobile application.
 RUN yarn workspace @affine/server build \
  && node tools/cli/bin/runner.js affine.ts @affine/web build \
  && node tools/cli/bin/runner.js affine.ts @affine/admin build \
- && node tools/cli/bin/runner.js affine.ts @affine/mobile build \
  && mkdir -p packages/backend/server/static/admin packages/backend/server/static/mobile \
  && cp -a packages/frontend/apps/web/dist/. packages/backend/server/static/ \
  && cp -a packages/frontend/admin/dist/. packages/backend/server/static/admin/ \
- && cp -a packages/frontend/apps/mobile/dist/. packages/backend/server/static/mobile/
+ && cp -a packages/frontend/apps/web/dist/. packages/backend/server/static/mobile/
 
 FROM node:22-bookworm-slim
 WORKDIR /app

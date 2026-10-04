@@ -37,12 +37,134 @@ yarn affine @affine/server-native build
 
 ## Build the self-hosted image from this checkout
 
+The image builds the server, web application, and admin web interface. It does
+not build Electron, Android, iOS, or the separate mobile web application. Mobile
+browsers receive the same web assets; these are also copied to `static/mobile`
+because the server loads that asset manifest at startup.
+
+The Rust step builds `@affine/server-native`, a required Node module used by the
+backend. Cargo needs the frontend native workspace directories to resolve its
+workspace, but copying them does not compile desktop or mobile applications.
+
 From the repository root, build the shared server/migration image once:
 
 ```sh
 docker compose -f .docker/selfhost/compose.yml build affine
 docker compose -f .docker/selfhost/compose.yml up -d --no-build
 ```
+
+### Reuse a local Linux Rust build
+
+Build the native bindings once on your local Docker engine and save them in this
+checkout. This works on macOS too: the compiler runs in Linux, so the exported
+module is compatible with the Docker runtime.
+
+```sh
+sh .docker/selfhost/build-native.sh
+NATIVE_SOURCE=prebuilt docker compose -f .docker/selfhost/compose.yml build affine
+```
+
+Artifacts live in `.docker/selfhost/native/arm64/` or
+`.docker/selfhost/native/amd64/` and are ignored by Git. Keep them locally, or copy
+the matching directory into the deployment checkout before building. The
+prebuilt path skips the Rust toolchain and compilation stages entirely. It
+checks that Node can load the module before building the application.
+
+Rerun the script after changes to Rust sources, Cargo dependencies, the Rust
+toolchain, native bindings, or the embedded public key. Prebuilt selection is
+explicit and does not detect stale artifacts automatically. Missing or
+incompatible binaries fail the build. The normal build remains available by
+omitting `NATIVE_SOURCE=prebuilt`.
+
+For another deployment architecture, select it explicitly (emulation can be slow):
+
+```sh
+sh .docker/selfhost/build-native.sh amd64 --build-arg CARGO_BUILD_JOBS=4
+DOCKER_DEFAULT_PLATFORM=linux/amd64 NATIVE_SOURCE=prebuilt docker compose -f .docker/selfhost/compose.yml build affine
+```
+
+The script accepts the same Cargo and `AFFINE_PRO_PUBLIC_KEY` build arguments as
+the Dockerfile. Set these when exporting; they do not change an already compiled
+module during the prebuilt image build. The first export needs a full compilation;
+later exports reuse the existing Docker Cargo caches.
+
+### Deploy from macOS to the Ubuntu AMD64 VPS
+
+The target VPS runs Ubuntu 24.04 on `x86_64`, with 4 CPU cores and about 8 GiB
+RAM. Build Linux AMD64 Rust bindings on the Mac, then build the JavaScript apps
+and image on the VPS. Docker Desktop must be running on the Mac; the VPS needs
+Docker Engine with the Compose plugin. Run commands from the repository root
+unless noted otherwise.
+
+1. On the Mac, build the bindings for the VPS architecture:
+
+   ```sh
+   sh .docker/selfhost/build-native.sh amd64
+   ```
+
+   An Apple Silicon Mac uses emulation for this build, so the first compilation
+   can be slow. The output is saved in `.docker/selfhost/native/amd64/`.
+
+2. Put the same source revision on the VPS, including the updated Dockerfile,
+   Compose file, and any Rust changes used for the export. Compare
+   `git rev-parse HEAD` on both machines; also transfer any uncommitted changes
+   needed for deployment. Git does not transfer the ignored native artifacts.
+
+3. On the Mac, replace the SSH destination and absolute VPS checkout path below,
+   then transfer the bindings:
+
+   ```sh
+   VPS_SSH=deploy@your-vps
+   VPS_REPO=/srv/work.sagozen
+   ssh "$VPS_SSH" "mkdir -p '$VPS_REPO/.docker/selfhost/native/amd64'"
+   scp -r .docker/selfhost/native/amd64/. \
+     "$VPS_SSH:$VPS_REPO/.docker/selfhost/native/amd64/"
+   ```
+
+4. On the VPS, build the shared server/migration image using the saved bindings:
+
+   ```sh
+   cd /srv/work.sagozen
+   NATIVE_SOURCE=prebuilt docker compose -f .docker/selfhost/compose.yml build affine
+   ```
+
+   This skips Rust compilation. Server and frontend JavaScript still build on
+   the VPS. Missing or incompatible native artifacts fail the build.
+
+5. Before updating an existing deployment, back up its database and storage.
+   For the running Compose database, save a database dump outside the image
+   build context:
+
+   ```sh
+   mkdir -p "$HOME/affine-backups"
+   docker compose -f .docker/selfhost/compose.yml exec -T postgres \
+     pg_dump -U affine -d affine -Fc \
+     > "$HOME/affine-backups/affine-$(date +%Y%m%d-%H%M%S).dump"
+   ```
+
+   Preserve `data/storage/` and `.docker/selfhost/config/` with your normal
+   backup process. For a new deployment, configure the public URL and server
+   settings in [Compose](../.docker/selfhost/compose.yml) and its mounted config
+   directory before starting services.
+
+6. On the VPS, start the deployment and check migration and server status:
+
+   ```sh
+   docker compose -f .docker/selfhost/compose.yml up -d --no-build
+   docker compose -f .docker/selfhost/compose.yml ps -a
+   docker compose -f .docker/selfhost/compose.yml logs --tail=100 affine_migration affine
+   ```
+
+   Startup runs the migration job before starting the server. Confirm that the
+   migration job exits successfully and the application is reachable through
+   the configured public URL. For an existing deployment, verify that the
+   migration job ran for the new image.
+
+Repeat the AMD64 export and transfer whenever Rust sources, Cargo dependencies,
+the toolchain, generated native bindings, or the embedded public key change.
+For JavaScript-only changes, reuse the saved AMD64 artifacts and repeat the VPS
+image build and deployment steps. Keeping artifacts in the checkout avoids
+depending on the VPS Rust build cache; they remain local files, not Git commits.
 
 The [self-host Dockerfile](../.docker/selfhost/Dockerfile) builds Rust separately
 from the server and frontend JavaScript dependencies. Frontend source edits reuse
@@ -128,11 +250,28 @@ Workspace access requires sign-in. Users create cloud workspaces or join existin
 workspaces through invitations. Local workspace creation and opening are disabled;
 previously stored local data is preserved. Published document links remain public.
 
+Enabling “Anyone with the link” records the actor and document in Member activity
+and sends an inbox notification to active workspace owners and admins, excluding
+the person sharing. The notification opens the document. Repeated publishing of
+an already-public document does not create duplicate records; disabling the link
+and enabling it again records a new share. Activity and notifications commit with
+the publish operation, so rejected or failed shares leave no records.
+Apply the `DocPublished` notification migration before running the updated server
+and native module. Back up the database before applying migrations.
+
 Creating a personal workspace is blocked while the user already owns a personal
 workspace. Active server administrators are exempt. Joined workspaces and owned
 team workspaces do not count toward this creation limit. Deleting the owned
 personal workspace permits creating a replacement. The server serializes creation
 per owner so concurrent requests cannot bypass the limit.
+
+## Missing document updates during sync
+
+Workspace sync acknowledges and discards updates when the document writer reports
+`doc_not_found`. These stale updates are not retried, recreated, or broadcast to
+other clients. The acknowledgement includes a timestamp so the client can clear
+the pending update and continue syncing. Subscription and permission checks still
+apply; other save failures remain errors.
 
 ## Done
 

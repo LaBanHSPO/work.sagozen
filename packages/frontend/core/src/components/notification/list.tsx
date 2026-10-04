@@ -32,8 +32,8 @@ import type {
 import { i18nTime, Trans, useI18n } from '@affine/i18n';
 import track from '@affine/track';
 import {
-  CollaborationIcon,
   CheckBoxCheckLinearIcon,
+  CollaborationIcon,
   EdgelessIcon,
   MoreHorizontalIcon,
   NotificationIcon,
@@ -303,7 +303,8 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
   const t = useI18n();
   const type = notification.type;
 
-  return type === NotificationType.Mention ? (
+  return type === NotificationType.Mention ||
+    type === NotificationType.DocPublished ? (
     <MentionNotificationItem notification={notification} />
   ) : type === NotificationType.Comment ? (
     <CommentNotificationItem notification={notification} />
@@ -373,7 +374,11 @@ const MentionNotificationItem = ({
       <div className={styles.itemMain}>
         <span>
           <Trans
-            i18nKey={'com.affine.notification.mention'}
+            i18nKey={
+              notification.type === NotificationType.DocPublished
+                ? 'com.affine.notification.doc-published'
+                : 'com.affine.notification.mention'
+            }
             components={{
               1: (
                 <b

@@ -11,7 +11,8 @@ export type MemberAuditAction =
   | 'joined'
   | 'left'
   | 'invite_link_created'
-  | 'invite_link_revoked';
+  | 'invite_link_revoked'
+  | 'doc_published';
 
 export type MemberAuditInput = {
   workspaceId: string;
