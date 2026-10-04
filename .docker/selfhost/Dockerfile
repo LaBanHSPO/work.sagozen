@@ -3,9 +3,9 @@
 # Compiles this checkout, then packages the same runtime layout as the
 # published AFFiNE image: server dist, production node_modules, and static apps.
 #
-# Dependency install and the Rust compile are their own layers. A frontend
-# edit reuses both. Rust uses thin LTO so a native rebuild is not a 30+ minute
-# single-threaded link.
+# Rust and JavaScript builds have independent dependency stages. A frontend
+# edit reuses the native build. Release optimization stays enabled; cross-crate
+# LTO is optional to keep native linking inexpensive for local self-host builds.
 
 FROM node:22-bookworm AS base
 
@@ -202,13 +202,19 @@ RUN --mount=type=cache,id=affine-yarn,target=/root/.yarn/berry/cache,sharing=loc
  && yarn workspaces focus @affine/server --production \
  && yarn workspace @affine/server prisma generate
 
-FROM deps AS build
+FROM manifests AS native-deps
+
+ENV HUSKY=0
+
+RUN --mount=type=cache,id=affine-yarn,target=/root/.yarn/berry/cache,sharing=locked \
+    corepack enable \
+ && yarn workspaces focus @affine/server-native
+
+FROM base AS rust-toolchain
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH \
-    CARGO_PROFILE_RELEASE_LTO=thin \
-    CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16
+    PATH=/usr/local/cargo/bin:$PATH
 
 RUN curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain none --profile minimal
@@ -218,6 +224,9 @@ RUN rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolcha
       --profile minimal --no-self-update \
  && rustup default "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
 
+FROM rust-toolchain AS native-build
+
+COPY --from=native-deps /src/node_modules /src/node_modules
 COPY Cargo.toml Cargo.lock ./
 COPY .cargo/config.toml .cargo/config.toml
 COPY packages/backend/native packages/backend/native
@@ -235,9 +244,17 @@ otcrb0V6dlS2ijKEShm7ZttTwQn08xzesdjX/AxpoR5X9yfoHkauIBuuMQ==
 EOF
 
 ARG AFFINE_PRO_PUBLIC_KEY
+ARG TARGETARCH
+ARG TARGETVARIANT
+# Match Cargo's normal release defaults. Use CARGO_LTO=thin for cross-crate LTO.
+ARG CARGO_LTO=false
+ARG CARGO_CODEGEN_UNITS=16
+# Leave RAM for the running self-hosted services on small builders.
+# Override on larger builders, or pass an empty value for Cargo's CPU default.
+ARG CARGO_BUILD_JOBS=2
 RUN --mount=type=cache,id=affine-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=affine-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=affine-cargo-target,target=/src/target,sharing=locked \
+    --mount=type=cache,id=affine-cargo-target-${TARGETARCH}${TARGETVARIANT},target=/src/target,sharing=locked \
     arch="$(dpkg --print-architecture)" \
  && if [ "$arch" = "arm64" ]; then \
       export CC="clang -D_BSD_SOURCE -DAT_HWCAP2=26"; \
@@ -246,13 +263,22 @@ RUN --mount=type=cache,id=affine-cargo-registry,target=/usr/local/cargo/registry
     fi \
  && export TARGET_CC="$CC" \
  && export AFFINE_PRO_PUBLIC_KEY="${AFFINE_PRO_PUBLIC_KEY:-$(cat /tmp/affine-pro-public-key.pem)}" \
- && yarn workspace @affine/server-native build \
+ && export CARGO_PROFILE_RELEASE_LTO="$CARGO_LTO" \
+ && export CARGO_PROFILE_RELEASE_CODEGEN_UNITS="$CARGO_CODEGEN_UNITS" \
+ && if [ -z "$CARGO_BUILD_JOBS" ]; then unset CARGO_BUILD_JOBS; fi \
+ && cd packages/backend/native \
+ && /src/node_modules/.bin/napi build --release --strip --no-const-enum \
+ && cd /src \
  && native=packages/backend/native/server-native.node \
  && cp "$native" packages/backend/native/server-native.x64.node \
  && cp "$native" packages/backend/native/server-native.arm64.node \
  && cp "$native" packages/backend/native/server-native.armv7.node
 
+FROM deps AS build
+
 COPY . .
+# Copy last so host binaries and checked-in bindings cannot replace Linux output.
+COPY --from=native-build /src/packages/backend/native/ packages/backend/native/
 RUN yarn workspace @affine/templates build
 
 ENV BUILD_TYPE=stable

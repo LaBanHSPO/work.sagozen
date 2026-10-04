@@ -35,6 +35,41 @@ Server also requires native packages to be built, you can build them by running 
 yarn affine @affine/server-native build
 ```
 
+## Build the self-hosted image from this checkout
+
+From the repository root, build the shared server/migration image once:
+
+```sh
+docker compose -f .docker/selfhost/compose.yml build affine
+docker compose -f .docker/selfhost/compose.yml up -d --no-build
+```
+
+The [self-host Dockerfile](../.docker/selfhost/Dockerfile) builds Rust separately
+from the server and frontend JavaScript dependencies. Frontend source edits reuse
+the native layer; Cargo's download and architecture-specific compilation caches
+also survive native source edits on the same builder. Keep the builder cache
+between builds. A new builder or a cache prune requires a cold compile again.
+
+The native module uses release optimization with 16 codegen units and Cargo's
+default release LTO setting (`false`, local thin LTO only). To restore cross-crate
+thin LTO, pass `--build-arg CARGO_LTO=thin` to the build command. Changing this
+setting recompiles the affected Rust artifacts; runtime performance may differ.
+
+The default caps concurrent Rust compiler jobs at two to leave RAM for running
+services on small builders such as a 4-core, 8 GiB VPS. On larger builders, raise
+the limit, for example:
+
+```sh
+docker compose -f .docker/selfhost/compose.yml build --build-arg CARGO_BUILD_JOBS=4 affine
+```
+
+Pass `--build-arg CARGO_BUILD_JOBS=` to let Cargo choose concurrency from the
+available CPUs. Build on the target CPU architecture when possible: compiling an
+amd64 image under emulation on an
+arm64 machine (or vice versa) can be much slower. For cross-architecture deployment,
+use a native builder for that target. The first build still compiles the full Rust
+dependency graph.
+
 ## Prepare dev environment
 
 ```sh
