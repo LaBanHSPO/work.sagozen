@@ -134,6 +134,50 @@ test.describe('embed iframe block', () => {
     await expect(embedIframeBlock).toHaveCount(1);
   });
 
+  test('custom embed height persists and can be reset', async ({ page }) => {
+    const { embedIframeBlock, input } = await addEmbedIframeBlock(page);
+    await input.fill(TEST_SPOTIFY_URL);
+    await input.press('Enter');
+
+    const iframe = embedIframeBlock.locator('iframe');
+    await expect(iframe).toBeVisible();
+    const defaultHeight = await iframe.getAttribute('height');
+    await embedIframeBlock.click();
+
+    const heightInput = page.getByRole('spinbutton', {
+      name: 'Embed height in pixels',
+    });
+    await heightInput.fill('2400');
+    await heightInput.press('Tab');
+    await expect(iframe).toHaveAttribute('height', '2400');
+    await expect(iframe).toHaveCSS('height', '2400px');
+    const container = embedIframeBlock.locator(
+      '.affine-embed-iframe-block-container'
+    );
+    await expect(container).toHaveCSS('height', '2400px');
+    await expect(container).toHaveCSS('min-height', '2400px');
+    await expect(container).toHaveCSS('max-height', '2400px');
+
+    await page.reload();
+    await expect(iframe).toHaveAttribute('height', '2400');
+    // Select the top of the tall embed without scrolling its center into view.
+    await expect(container).toHaveCSS('height', '2400px');
+    await embedIframeBlock.click({ position: { x: 10, y: 10 } });
+    await expect(heightInput).toHaveValue('2400');
+
+    await heightInput.fill('50');
+    await heightInput.press('Tab');
+    await expect(heightInput).toHaveValue('2400');
+    await expect(iframe).toHaveAttribute('height', '2400');
+
+    await heightInput.fill('');
+    await heightInput.press('Tab');
+    await expect(iframe).toHaveAttribute('height', defaultHeight!);
+    await expect(container).toHaveCSS('max-height', 'none');
+    await page.reload();
+    await expect(iframe).toHaveAttribute('height', defaultHeight!);
+  });
+
   test.describe('conversions', () => {
     async function setupEmbedIframe(page: Page) {
       const { embedIframeBlock, input } = await addEmbedIframeBlock(page);

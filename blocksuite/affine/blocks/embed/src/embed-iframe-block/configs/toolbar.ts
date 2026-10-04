@@ -209,6 +209,47 @@ export const builtinToolbarConfig = {
     } satisfies ToolbarActionGroup<ToolbarAction>,
     captionAction('d.caption'),
     {
+      id: 'd.height',
+      when: ctx => {
+        const component = ctx.getCurrentBlockByType(EmbedIframeBlockComponent);
+        return !!component && !component.readonly && component.isSuccess$.value;
+      },
+      content(ctx) {
+        const model = ctx.getCurrentModelByType(EmbedIframeBlockModel);
+        if (!model) return null;
+
+        const onChange = (event: Event) => {
+          const input = event.target as HTMLInputElement;
+          const height = input.valueAsNumber;
+          if (!input.value) {
+            ctx.store.updateBlock(model, { height: undefined });
+          } else if (Number.isFinite(height) && height >= 100) {
+            ctx.store.updateBlock(model, { height: Math.round(height) });
+          } else {
+            input.value = String(model.props.height ?? '');
+          }
+        };
+
+        return html`<label
+          style="display:flex;align-items:center;gap:6px;font-size:12px;"
+        >
+          Height (px)
+          <input
+            type="number"
+            aria-label="Embed height in pixels"
+            min="100"
+            step="1"
+            placeholder="Auto"
+            .value=${String(model.props.height$.value ?? '')}
+            style="width:80px;"
+            @change=${onChange}
+            @keydown=${(event: KeyboardEvent) => event.stopPropagation()}
+            @pointerdown=${(event: PointerEvent) => event.stopPropagation()}
+          />
+        </label>`;
+      },
+    },
+    {
       id: 'e.convert-to-linked-doc',
       tooltip: 'Create Linked Doc',
       icon: LinkedPageIcon(),

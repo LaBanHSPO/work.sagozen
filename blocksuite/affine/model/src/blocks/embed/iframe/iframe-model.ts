@@ -13,6 +13,7 @@ export type EmbedIframeBlockProps = {
   url: string; // the original url that user input
   iframeUrl?: string; // the url that will be used to iframe src
   width?: number;
+  /** Custom iframe height in pixels in document mode; unset uses provider defaults. */
   height?: number;
   caption: string | null;
   title: string | null;

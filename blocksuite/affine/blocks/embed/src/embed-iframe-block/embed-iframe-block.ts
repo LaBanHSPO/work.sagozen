@@ -111,6 +111,16 @@ export class EmbedIframeBlockComponent extends CaptionedBlockComponent<EmbedIfra
     return matchModels(this.model.parent, [SurfaceBlockModel]);
   }
 
+  private get customHeight() {
+    const height = this.model.props.height$.value;
+    return !this.inSurface &&
+      typeof height === 'number' &&
+      Number.isFinite(height) &&
+      height >= 100
+      ? height
+      : undefined;
+  }
+
   get _horizontalCardHeight(): number {
     switch (this.status$.value) {
       case 'idle':
@@ -371,7 +381,8 @@ export class EmbedIframeBlockComponent extends CaptionedBlockComponent<EmbedIfra
     const width = `${widthPercent}%`;
     // if the block is in the surface, use 100% as the height
     // otherwise, use the heightInNote
-    const height = this.inSurface ? '100%' : heightInNote;
+    const customHeight = this.customHeight;
+    const height = this.inSurface ? '100%' : (customHeight ?? heightInNote);
     const sandboxValue =
       sandbox ??
       (this.currentConfigName === 'generic'
@@ -390,7 +401,11 @@ export class EmbedIframeBlockComponent extends CaptionedBlockComponent<EmbedIfra
         allow=${ifDefined(allow)}
         referrerpolicy=${ifDefined(referrerpolicy)}
         scrolling=${ifDefined(scrolling)}
-        style=${ifDefined(style)}
+        style=${ifDefined(
+          customHeight !== undefined
+            ? `${style ?? ''};height:${customHeight}px;min-height:0;max-height:none;`
+            : style
+        )}
       ></iframe>
       ${
         sourceHost
@@ -519,8 +534,15 @@ export class EmbedIframeBlockComponent extends CaptionedBlockComponent<EmbedIfra
       ...this.selectedStyle$?.value,
       'in-surface': this.inSurface,
     });
+    const fixedHeight =
+      this.isSuccess$.value && this.customHeight !== undefined
+        ? `${this.customHeight}px`
+        : undefined;
     const containerStyles = styleMap({
       borderRadius: `${this.selectedBorderRadius$.value}px`,
+      height: fixedHeight,
+      minHeight: fixedHeight,
+      maxHeight: fixedHeight,
     });
 
     const overlayClasses = classMap({
