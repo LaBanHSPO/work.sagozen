@@ -1,9 +1,6 @@
-import { FetchService } from '@affine/core/modules/cloud';
-import { WorkspaceService } from '@affine/core/modules/workspace';
 import {
   DatabaseBlockDataSource,
   ExternalGroupByConfigProvider,
-  ProtectedTableApiProvider,
 } from '@blocksuite/affine/blocks/database';
 import type { ExtensionType } from '@blocksuite/affine/store';
 import { CalendarExternalSourceProvider } from '@blocksuite/data-view/view-presets';
@@ -25,14 +22,6 @@ export function patchDatabaseBlockConfigService(
       });
       const source = createWorkspaceCalendarExternalSource(framework);
       di.addValue(CalendarExternalSourceProvider(source.id), source);
-      if (
-        framework &&
-        framework.get(WorkspaceService).workspace.flavour !== 'local'
-      ) {
-        di.addValue(ProtectedTableApiProvider, {
-          fetch: (path, init) => framework.get(FetchService).fetch(path, init),
-        });
-      }
     },
   };
 }

@@ -26,6 +26,23 @@ docker compose -f ./.docker/dev/compose.yml up
 
 > Starting from AFFiNE 0.20, compose.yml includes a breaking change: the default database image has switched from `postgres:16` to `pgvector/pgvector:pg16`. If you were previously using another major version of Postgres, please change the number after `pgvector/pgvector:pg` to the major version you are using.
 
+## Protected task table removal
+
+The server-backed protected task table introduced in commit `71705ad` has been
+removed, including its creation menus, REST endpoints, and row/column permission
+rules. Ordinary database views, saved views, and document/workspace authorization
+remain unchanged.
+
+The historical `20261002000000_protected_tables` SQL migration is retained. This
+removal does not drop tables or delete existing protected-table records. Their
+server-backed cells are no longer available in the editor and are not converted
+into ordinary document cells. Preserve the records for any future refactor; do
+not generate or apply a destructive schema-diff migration as part of this rollback.
+
+Rebuild the server and web assets before deploying; regenerate the Prisma client
+from the current schema. The removed implementation remains recoverable from
+commit `71705ad`.
+
 ## Build native packages (you need to setup rust toolchain first)
 
 Server also requires native packages to be built, you can build them by running the following command:

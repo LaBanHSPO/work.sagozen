@@ -2,7 +2,6 @@ import { CenterPeek } from './components/layout';
 import { DatabaseTitle } from './components/title';
 import { DatabaseBlockComponent } from './database-block';
 import { DatabaseDndPreviewBlockComponent } from './database-dnd-preview-block';
-import { ProtectedTableComponent } from './protected-table';
 import { BlockRenderer } from './detail-panel/block-renderer';
 import { NoteRenderer } from './detail-panel/note-renderer';
 import { CreatedTimeCell } from './properties/created-time/cell-renderer';
@@ -22,7 +21,6 @@ export function effects() {
   customElements.define('database-datasource-note-renderer', NoteRenderer);
   customElements.define('database-datasource-block-renderer', BlockRenderer);
   customElements.define('affine-database', DatabaseBlockComponent);
-  customElements.define('affine-protected-table', ProtectedTableComponent);
 
   customElements.define(
     'affine-dnd-preview-database',

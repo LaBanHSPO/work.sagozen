@@ -29,7 +29,6 @@ import { HistoryModel } from './history';
 import { MailDeliveryModel } from './mail-delivery';
 import { McpCredentialModel } from './mcp-credential';
 import { NotificationModel } from './notification';
-import { ProtectedTableModel } from './protected-table';
 import {
   DocAccessPolicyModel,
   DocGrantModel,
@@ -60,7 +59,6 @@ const MODELS = {
   docUser: DocUserModel,
   history: HistoryModel,
   notification: NotificationModel,
-  protectedTable: ProtectedTableModel,
   workspaceMember: WorkspaceMemberModel,
   workspaceInvitation: WorkspaceInvitationModel,
   workspaceAccessPolicy: WorkspaceAccessPolicyModel,

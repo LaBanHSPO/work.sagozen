@@ -16,7 +16,6 @@ import {
 } from './abuse';
 import { WorkspacesController } from './controller';
 import { WorkspaceEvents } from './event';
-import { ProtectedTableController } from './protected-table-controller';
 import { WorkspaceRealtimeModule } from './realtime.module';
 import {
   DocHistoryResolver,
@@ -50,7 +49,7 @@ class WorkspaceAbuseModule {}
     WorkspaceRealtimeModule,
     WorkspaceAbuseModule,
   ],
-  controllers: [WorkspacesController, ProtectedTableController],
+  controllers: [WorkspacesController],
   providers: [
     WorkspaceResolver,
     WorkspaceMemberResolver,

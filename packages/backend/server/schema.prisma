@@ -213,7 +213,6 @@ model Workspace {
   docGrants                  DocGrant[]
   mcpCredentials             McpCredential[]
   artifacts                  WorkspaceArtifact[]
-  protectedTables            ProtectedTable[]
   memberAuditLogs            WorkspaceMemberAuditLog[]
 
   @@index([lastCheckEmbeddings])
@@ -500,67 +499,6 @@ model WorkspaceDoc {
 
   @@id([workspaceId, docId])
   @@map("workspace_pages")
-}
-
-model ProtectedTable {
-  workspaceId String   @map("workspace_id") @db.VarChar
-  docId       String   @map("doc_id") @db.VarChar
-  blockId     String   @map("block_id") @db.VarChar
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
-
-  workspace Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  columns   ProtectedTableColumn[]
-  rows      ProtectedTableRow[]
-  grants    ProtectedTableGrant[]
-
-  @@id([workspaceId, docId, blockId])
-  @@map("protected_tables")
-}
-
-model ProtectedTableColumn {
-  workspaceId String @map("workspace_id") @db.VarChar
-  docId       String @map("doc_id") @db.VarChar
-  blockId     String @map("block_id") @db.VarChar
-  id          String @db.VarChar
-  name        String @db.VarChar
-  position    Int
-
-  table ProtectedTable @relation(fields: [workspaceId, docId, blockId], references: [workspaceId, docId, blockId], onDelete: Cascade)
-
-  @@id([workspaceId, docId, blockId, id])
-  @@map("protected_table_columns")
-}
-
-model ProtectedTableRow {
-  workspaceId String @map("workspace_id") @db.VarChar
-  docId       String @map("doc_id") @db.VarChar
-  blockId     String @map("block_id") @db.VarChar
-  id          String @db.VarChar
-  position    Int
-  values      Json   @db.JsonB
-
-  table ProtectedTable @relation(fields: [workspaceId, docId, blockId], references: [workspaceId, docId, blockId], onDelete: Cascade)
-
-  @@id([workspaceId, docId, blockId, id])
-  @@map("protected_table_rows")
-}
-
-model ProtectedTableGrant {
-  workspaceId String  @map("workspace_id") @db.VarChar
-  docId       String  @map("doc_id") @db.VarChar
-  blockId     String  @map("block_id") @db.VarChar
-  scope       String  @db.VarChar
-  resourceId  String  @map("resource_id") @db.VarChar
-  userId      String  @map("user_id") @db.VarChar
-  canRead     Boolean @default(false) @map("can_read")
-  canWrite    Boolean @default(false) @map("can_write")
-
-  table ProtectedTable @relation(fields: [workspaceId, docId, blockId], references: [workspaceId, docId, blockId], onDelete: Cascade)
-
-  @@id([workspaceId, docId, blockId, scope, resourceId, userId])
-  @@index([workspaceId, docId, blockId, userId])
-  @@map("protected_table_grants")
 }
 
 enum WorkspaceMemberStatus {

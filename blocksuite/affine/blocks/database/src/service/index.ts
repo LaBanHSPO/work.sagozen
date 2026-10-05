@@ -9,10 +9,3 @@ export const DatabaseBlockConfigService =
   createIdentifier<DatabaseBlockConfigService>(
     'AffineDatabaseBlockConfigService'
   );
-
-export interface ProtectedTableApiService {
-  fetch: (path: string, init?: RequestInit) => Promise<Response>;
-}
-
-export const ProtectedTableApiProvider =
-  createIdentifier<ProtectedTableApiService>('ProtectedTableApiService');

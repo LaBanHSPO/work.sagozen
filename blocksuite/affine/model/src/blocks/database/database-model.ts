@@ -14,7 +14,6 @@ import type {
 export type DatabaseBlockProps = {
   views: ViewBasicDataType[];
   defaultViewId?: string;
-  protectedTable?: boolean;
   title: Text;
   cells: SerializedCells;
   columns: Array<ColumnDataType>;
@@ -28,7 +27,6 @@ export const DatabaseBlockSchema = defineBlockSchema({
   props: (internal): DatabaseBlockProps => ({
     views: [],
     defaultViewId: undefined,
-    protectedTable: false,
     title: internal.Text(),
     cells: Object.create(null),
     columns: [],
