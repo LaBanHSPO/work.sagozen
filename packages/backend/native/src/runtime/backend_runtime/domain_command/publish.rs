@@ -215,6 +215,16 @@ mod tests {
       .execute(&pool)
       .await
       .unwrap();
+    // Publishing still requires Manager; the member baseline is now Reader.
+    sqlx::query(
+      "INSERT INTO doc_grants(workspace_id,doc_id,principal_type,principal_id,role) VALUES($1,$2,'user',$3,'manager')",
+    )
+    .bind(&workspace_id)
+    .bind(&doc_id)
+    .bind(&admin_id)
+    .execute(&pool)
+    .await
+    .unwrap();
     let authorizer = PermissionAuthorizer::new(pool.clone(), Deployment::Cloud);
     let mut transaction = pool.begin().await.unwrap();
     set_published(

@@ -18,7 +18,7 @@ export class MockDocMeta extends Mocker<MockDocMetaInput, MockedDocMeta> {
   override async create(input: MockDocMetaInput) {
     const {
       public: isPublic = false,
-      defaultRole = DocRole.Manager,
+      defaultRole = DocRole.Reader,
       ...meta
     } = input;
     const publishedAt = isPublic ? (meta.publishedAt ?? new Date()) : null;

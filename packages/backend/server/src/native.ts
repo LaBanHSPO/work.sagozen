@@ -383,6 +383,20 @@ export type PermissionEvaluationOutputV1 = {
   }>;
 };
 
+export type DocMemberPermissionRulesV1 = {
+  defaultRole: 'none' | 'reader' | 'commenter' | 'editor' | 'manager';
+  members: {
+    userId: string;
+    role: 'reader' | 'commenter' | 'editor' | 'manager';
+  }[];
+};
+
+export type DocMemberPermissionsOutputV1 = {
+  rules: DocMemberPermissionRulesV1;
+  revision: string;
+  canEdit: boolean;
+};
+
 export type DomainCommandInputV1 =
   | {
       command: 'create_comment';
@@ -487,6 +501,20 @@ export type DomainCommandInputV1 =
       workspaceId: string;
       docId: string;
       newRole: 'none' | 'reader' | 'commenter' | 'editor' | 'manager';
+    }
+  | {
+      command: 'get_doc_member_permissions';
+      actorUserId: string;
+      workspaceId: string;
+      docId: string;
+    }
+  | {
+      command: 'set_doc_member_permissions';
+      actorUserId: string;
+      workspaceId: string;
+      docId: string;
+      expectedRevision: string;
+      rules: DocMemberPermissionRulesV1;
     }
   | {
       command: 'revoke_workspace_member';

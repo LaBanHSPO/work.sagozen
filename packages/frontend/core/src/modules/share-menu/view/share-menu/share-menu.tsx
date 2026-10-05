@@ -1,6 +1,6 @@
 import { Tabs, Tooltip, useConfirmModal } from '@affine/component';
 import { Button } from '@affine/component/ui/button';
-import { Menu } from '@affine/component/ui/menu';
+import { Menu, type MenuRef } from '@affine/component/ui/menu';
 import { ServerService } from '@affine/core/modules/cloud';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { WorkspacePermissionService } from '@affine/core/modules/permissions';
@@ -19,12 +19,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import * as styles from './index.css';
 import { InviteMemberEditor } from './invite-member-editor/invite-member-editor';
 import { MemberManagement } from './member-management';
+import { MemberPermissionsModal } from './member-permissions';
 import { ShareExport } from './share-export';
 import { SharePage } from './share-page';
 
@@ -37,6 +39,7 @@ export interface ShareMenuProps extends PropsWithChildren {
   hittingPaywall?: boolean;
   disabled?: boolean;
   disabledReason?: string;
+  onEditMemberPermissions?: () => void;
 }
 
 export enum ShareMenuTab {
@@ -271,6 +274,13 @@ const LocalShareMenu = (props: ShareMenuProps) => {
 };
 
 const CloudShareMenu = (props: ShareMenuProps) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<MenuRef>(null);
+  const [memberPermissionsOpen, setMemberPermissionsOpen] = useState(false);
+  const openMemberPermissions = useCallback(() => {
+    menuRef.current?.changeOpen(false);
+    setMemberPermissionsOpen(true);
+  }, []);
   if (props.disabled) {
     return (
       <div data-testid="cloud-share-menu-button">
@@ -279,22 +289,39 @@ const CloudShareMenu = (props: ShareMenuProps) => {
     );
   }
   return (
-    <Menu
-      items={<ShareMenuContent {...props} />}
-      contentOptions={{
-        className: styles.menuStyle,
-        ['data-testid' as string]: 'cloud-share-menu',
-        align: 'end',
-      }}
-      rootOptions={{
-        modal: false,
-        onOpenChange: props.onOpenShareModal,
-      }}
-    >
-      <div data-testid="cloud-share-menu-button">
-        {props.children || <DefaultShareButton />}
-      </div>
-    </Menu>
+    <>
+      <Menu
+        ref={menuRef}
+        items={
+          <ShareMenuContent
+            {...props}
+            onEditMemberPermissions={openMemberPermissions}
+          />
+        }
+        contentOptions={{
+          className: styles.menuStyle,
+          ['data-testid' as string]: 'cloud-share-menu',
+          align: 'end',
+        }}
+        rootOptions={{
+          modal: false,
+          open: menuOpen,
+          onOpenChange: open => {
+            setMenuOpen(open);
+            props.onOpenShareModal?.(open);
+          },
+        }}
+      >
+        <div data-testid="cloud-share-menu-button">
+          {props.children || <DefaultShareButton />}
+        </div>
+      </Menu>
+      <MemberPermissionsModal
+        docId={props.currentPage.id}
+        open={memberPermissionsOpen}
+        onOpenChange={setMemberPermissionsOpen}
+      />
+    </>
   );
 };
 

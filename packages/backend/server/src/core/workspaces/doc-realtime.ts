@@ -5,8 +5,9 @@ import type {
 import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { z } from 'zod';
 
-import { OnEvent, PaginationInput } from '../../base';
+import { EventBus, OnEvent, PaginationInput } from '../../base';
 import { DocRole, Models, PublicDocMode } from '../../models';
+import { BackendRuntimeProvider } from '../backend-runtime';
 import { PermissionAccess } from '../permission';
 import { registerRealtimeLiveQuery } from '../realtime/provider';
 import { RealtimePublisher } from '../realtime/publisher';
@@ -21,17 +22,80 @@ const docInput = z
   .object({ workspaceId: z.string(), docId: z.string() })
   .strict();
 
+const memberRole = z.enum(['reader', 'commenter', 'editor', 'manager']);
+const memberRules = z
+  .object({
+    defaultRole: z.enum(['none', 'reader', 'commenter', 'editor', 'manager']),
+    members: z.array(
+      z.object({ userId: z.string(), role: memberRole }).strict()
+    ),
+  })
+  .strict();
+const memberSnapshot = z
+  .object({
+    rules: memberRules,
+    revision: z.string(),
+    canEdit: z.boolean(),
+  })
+  .strict();
+
 @Injectable()
 export class DocShareRealtimeProvider implements OnModuleInit {
   constructor(
     private readonly ac: PermissionAccess,
     private readonly models: Models,
+    private readonly runtime: BackendRuntimeProvider,
+    private readonly event: EventBus,
     @Optional() private readonly registry?: RealtimeRegistry,
     @Optional() private readonly publisher?: RealtimePublisher
   ) {}
 
   onModuleInit() {
     if (!this.registry) return;
+
+    this.registry.registerRequest({
+      name: 'doc.member-permissions.get',
+      input: docInput,
+      handle: async (user, input) =>
+        memberSnapshot.parse(
+          await this.runtime.executeDomainCommandV1({
+            command: 'get_doc_member_permissions',
+            actorUserId: user.id,
+            workspaceId: input.workspaceId,
+            docId: input.docId,
+          })
+        ),
+    });
+    this.registry.registerRequest({
+      name: 'doc.member-permissions.set',
+      input: z
+        .object({
+          workspaceId: z.string(),
+          docId: z.string(),
+          expectedRevision: z.string(),
+          rules: memberRules,
+        })
+        .strict(),
+      handle: async (user, input) => {
+        const snapshot = memberSnapshot.parse(
+          await this.runtime.executeDomainCommandV1({
+            command: 'set_doc_member_permissions',
+            actorUserId: user.id,
+            workspaceId: input.workspaceId,
+            docId: input.docId,
+            expectedRevision: input.expectedRevision,
+            rules: input.rules,
+          })
+        );
+        const resource = {
+          workspaceId: input.workspaceId,
+          docId: input.docId,
+        };
+        this.event.emit('doc.grants.changed', resource);
+        this.event.emit('doc.default_role.changed', resource);
+        return snapshot;
+      },
+    });
 
     registerRealtimeLiveQuery(this.registry, {
       request: {

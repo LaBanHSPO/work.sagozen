@@ -1,6 +1,7 @@
 import { type Doc, DocsService } from '@affine/core/modules/doc';
 import type { Editor } from '@affine/core/modules/editor';
 import { EditorsService } from '@affine/core/modules/editor';
+import { RestrictedDocMemberPermissions } from '@affine/core/modules/share-menu/view/share-menu/member-permissions';
 import { ViewService } from '@affine/core/modules/workbench/services/view';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { FrameworkScope, useLiveData, useService } from '@toeverything/infra';
@@ -76,20 +77,30 @@ export const DetailPageWrapper = ({
   canAccess?: boolean;
 }>) => {
   const { doc, editor, docListReady } = useLoadDoc(pageId);
-  // if sync engine has been synced and the page is null, show 404 page.
+  let content: ReactNode;
+  // Access administration remains available without granting content access.
   if (docListReady && !doc) {
-    return notFound;
-  }
-
-  if (canAccess === undefined || !doc || !editor) {
-    return skeleton;
+    content = notFound;
+  } else if (canAccess === undefined || !doc || !editor) {
+    content = skeleton;
   } else if (!canAccess) {
-    return notFound;
+    content = notFound;
+  } else {
+    content = (
+      <FrameworkScope scope={doc.scope}>
+        <FrameworkScope scope={editor.scope}>{children}</FrameworkScope>
+      </FrameworkScope>
+    );
   }
 
   return (
-    <FrameworkScope scope={doc.scope}>
-      <FrameworkScope scope={editor.scope}>{children}</FrameworkScope>
-    </FrameworkScope>
+    <>
+      {content}
+      <RestrictedDocMemberPermissions
+        key={pageId}
+        docId={pageId}
+        showTrigger={!doc || !editor || canAccess !== true}
+      />
+    </>
   );
 };

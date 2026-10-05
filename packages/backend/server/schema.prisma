@@ -381,7 +381,7 @@ model WorkspaceAccessPolicy {
   visibility           String   @default("private") @db.Text
   sharingEnabled       Boolean  @default(true) @map("sharing_enabled")
   urlPreviewEnabled    Boolean  @default(false) @map("url_preview_enabled")
-  memberDefaultDocRole String   @default("manager") @map("member_default_doc_role") @db.Text
+  memberDefaultDocRole String   @default("reader") @map("member_default_doc_role") @db.Text
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

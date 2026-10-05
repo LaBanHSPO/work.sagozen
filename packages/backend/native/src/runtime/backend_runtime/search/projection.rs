@@ -35,7 +35,7 @@ pub(super) async fn project_document(
     r#"SELECT snapshot.created_at,snapshot.updated_at,snapshot.created_by,snapshot.updated_by,
        coalesce(doc_policy.visibility,'private') AS visibility,
        doc_policy.public_role,
-       coalesce(doc_policy.member_default_role,workspace_policy.member_default_doc_role,'manager') AS member_default_role
+       coalesce(doc_policy.member_default_role,workspace_policy.member_default_doc_role,'reader') AS member_default_role
        FROM snapshots snapshot
        LEFT JOIN workspace_access_policies workspace_policy ON workspace_policy.workspace_id=snapshot.workspace_id
        LEFT JOIN doc_access_policies doc_policy

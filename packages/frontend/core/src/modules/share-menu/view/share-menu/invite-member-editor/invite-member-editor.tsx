@@ -7,13 +7,16 @@ import {
   notify,
   RowInput,
 } from '@affine/component';
+import { useGuard } from '@affine/core/components/guard';
 import { useAsyncCallback } from '@affine/core/components/hooks/affine-async-hooks';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
+import { DocService } from '@affine/core/modules/doc';
 import {
   DocGrantedUsersService,
   type Member,
   MemberSearchService,
 } from '@affine/core/modules/permissions';
+import { WorkspaceShareSettingService } from '@affine/core/modules/share-setting';
 import { UserFriendlyError } from '@affine/error';
 import { DocRole, WorkspaceMemberStatus } from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
@@ -63,6 +66,11 @@ export const InviteMemberEditor = ({
   const t = useI18n();
   const [selectedMembers, setSelectedMembers] = useState<Member[]>([]);
   const docGrantedUsersService = useService(DocGrantedUsersService);
+  const docService = useService(DocService);
+  const canManageUsers = useGuard('Doc_Users_Manage', docService.doc.id);
+  const shareSetting = useService(WorkspaceShareSettingService).sharePreview;
+  const enableSharing = useLiveData(shareSetting.enableSharing$);
+  const canInvite = canManageUsers && enableSharing === true;
   const [inviteDocRoleType, setInviteDocRoleType] = useState<DocRole>(
     DocRole.Manager
   );
@@ -74,6 +82,9 @@ export const InviteMemberEditor = ({
     memberSearchService.reset();
     memberSearchService.loadMore();
   }, [memberSearchService]);
+  useEffect(() => {
+    shareSetting.revalidate();
+  }, [shareSetting]);
 
   const debouncedSearch = useMemo(
     () => debounce((value: string) => memberSearchService.search(value), 300),
@@ -97,6 +108,7 @@ export const InviteMemberEditor = ({
   const workspaceDialogService = useService(WorkspaceDialogService);
 
   const onInvite = useAsyncCallback(async () => {
+    if (!canInvite) return;
     const selectedMemberIds = selectedMembers.map(member => member.id);
     track.$.sharePanel.$.inviteUserDocRole({
       control: 'member list',
@@ -119,6 +131,7 @@ export const InviteMemberEditor = ({
       });
     }
   }, [
+    canInvite,
     docGrantedUsersService,
     inviteDocRoleType,
     onClickCancel,
@@ -255,7 +268,7 @@ export const InviteMemberEditor = ({
           <Button
             className={styles.button}
             variant="primary"
-            disabled={!selectedMembers.length}
+            disabled={!canInvite || !selectedMembers.length}
             onClick={onInvite}
           >
             {t['com.affine.share-menu.invite-editor.invite']()}

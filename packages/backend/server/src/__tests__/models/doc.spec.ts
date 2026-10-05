@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
+import { PrismaClient } from '@prisma/client';
 import ava, { TestFn } from 'ava';
 
 import { Config } from '../../base/config';
-import { HistoryModel, PublicDocMode } from '../../models';
+import { DocRole, HistoryModel, PublicDocMode } from '../../models';
 import { DocModel } from '../../models/doc';
 import { type User, UserModel } from '../../models/user';
 import { type Workspace, WorkspaceModel } from '../../models/workspace';
@@ -453,7 +454,129 @@ test('should create doc meta with default mode and public false', async t => {
   t.is(meta.docId, docId);
   t.is(meta.mode, PublicDocMode.Page);
   t.is(meta.public, false);
+  t.is(meta.defaultRole, DocRole.Reader);
+  const policy = await t.context.module
+    .get(PrismaClient)
+    .workspaceAccessPolicy.findUniqueOrThrow({
+      where: { workspaceId: workspace.id },
+    });
+  t.is(policy.memberDefaultDocRole, 'reader');
 });
+
+for (const workspaceRole of [
+  undefined,
+  'none',
+  'reader',
+  'commenter',
+  'editor',
+  'manager',
+] as const) {
+  test(`doc displays inherit ${workspaceRole ?? 'missing workspace policy'} without overriding explicit roles`, async t => {
+    const db = t.context.module.get(PrismaClient);
+    const { doc } = t.context;
+    if (workspaceRole === undefined) {
+      await db.workspaceAccessPolicy.deleteMany({
+        where: { workspaceId: workspace.id },
+      });
+    } else {
+      await db.workspaceAccessPolicy.upsert({
+        where: { workspaceId: workspace.id },
+        create: {
+          workspaceId: workspace.id,
+          memberDefaultDocRole: workspaceRole,
+        },
+        update: { memberDefaultDocRole: workspaceRole },
+      });
+    }
+    const roles = {
+      none: DocRole.None,
+      reader: DocRole.Reader,
+      commenter: DocRole.Commenter,
+      editor: DocRole.Editor,
+      manager: DocRole.Manager,
+    };
+    const inheritedRole =
+      workspaceRole === undefined ? DocRole.Reader : roles[workspaceRole];
+    const cases = [
+      { policy: undefined, role: inheritedRole },
+      { policy: null, role: inheritedRole },
+      { policy: 'none', role: DocRole.None },
+      { policy: 'reader', role: DocRole.Reader },
+      { policy: 'commenter', role: DocRole.Commenter },
+      { policy: 'editor', role: DocRole.Editor },
+      { policy: 'manager', role: DocRole.Manager },
+    ] as const;
+    const docIds: string[] = [];
+    for (const [index, item] of cases.entries()) {
+      const docId = randomUUID();
+      docIds.push(docId);
+      if (item.policy !== undefined) {
+        await db.docAccessPolicy.create({
+          data: {
+            workspaceId: workspace.id,
+            docId,
+            memberDefaultRole: item.policy,
+            visibility: 'public',
+            publicRole: 'external',
+          },
+        });
+      }
+      const meta = await doc.upsertMeta(workspace.id, docId);
+      t.is(meta.defaultRole, item.role);
+      t.is((await doc.getMeta(workspace.id, docId))?.defaultRole, item.role);
+      await doc.upsert({
+        spaceId: workspace.id,
+        docId,
+        blob: Buffer.from('snapshot'),
+        timestamp: Date.now() + index,
+        editorId: user.id,
+      });
+      t.is((await doc.getDocInfo(workspace.id, docId))?.defaultRole, item.role);
+    }
+    t.deepEqual(
+      await doc.findDefaultRoles(workspace.id, docIds),
+      cases.map(item => ({
+        external: item.policy === undefined ? null : DocRole.External,
+        workspace: item.role,
+      }))
+    );
+    t.deepEqual(await doc.findDefaultRoles(workspace.id, []), []);
+    const expected = new Map(
+      docIds.map((docId, index) => [docId, cases[index].role])
+    );
+    for (const rows of [
+      (await doc.paginateDocInfo(workspace.id, { first: 20, offset: 0 }))[1],
+      (
+        await doc.paginateDocInfoByUpdatedAt(workspace.id, {
+          first: 20,
+          offset: 0,
+        })
+      )[1],
+    ]) {
+      t.is(rows.length, cases.length);
+      for (const row of rows) {
+        t.is(row.defaultRole, expected.get(row.docId)!);
+      }
+    }
+    const publicDocs = await doc.findPublics(workspace.id);
+    t.is(publicDocs.length, cases.length - 1);
+    for (const row of publicDocs) {
+      t.is(row.defaultRole, expected.get(row.docId)!);
+    }
+    // Displaying an inherited default must not materialize a document override.
+    const policies = await db.docAccessPolicy.findMany({
+      where: { workspaceId: workspace.id },
+    });
+    t.is(policies.length, cases.length - 1);
+    for (const [index, item] of cases.entries()) {
+      t.is(
+        policies.find(policy => policy.docId === docIds[index])
+          ?.memberDefaultRole,
+        item.policy
+      );
+    }
+  });
+}
 
 test('should update doc meta', async t => {
   const docId = randomUUID();

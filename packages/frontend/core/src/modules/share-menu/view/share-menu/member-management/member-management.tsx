@@ -5,6 +5,7 @@ import {
   DocGrantedUsersService,
   type GrantedUser,
 } from '@affine/core/modules/permissions';
+import { WorkspaceShareSettingService } from '@affine/core/modules/share-setting';
 import { useI18n } from '@affine/i18n';
 import { ArrowLeftBigIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
@@ -33,6 +34,8 @@ export const MemberManagement = ({
     docGrantedUsersService.grantedUserCount$
   );
   const docService = useService(DocService);
+  const shareSetting = useService(WorkspaceShareSettingService).sharePreview;
+  const enableSharing = useLiveData(shareSetting.enableSharing$);
 
   const canManageUsers = useGuard('Doc_Users_Manage', docService.doc.id);
 
@@ -43,6 +46,9 @@ export const MemberManagement = ({
     docGrantedUsersService.reset();
     docGrantedUsersService.loadMore();
   }, [docGrantedUsersService]);
+  useEffect(() => {
+    shareSetting.revalidate();
+  }, [shareSetting]);
 
   const loadMore = useCallback(() => {
     docGrantedUsersService.loadMore();
@@ -69,7 +75,7 @@ export const MemberManagement = ({
         <Skeleton className={styles.scrollableRootStyle} />
       )}
       <div className={styles.footerStyle}>
-        {canManageUsers ? (
+        {canManageUsers && enableSharing === true ? (
           <span
             className={styles.addCollaboratorsStyle}
             onClick={onClickInvite}

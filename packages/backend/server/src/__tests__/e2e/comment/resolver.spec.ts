@@ -101,6 +101,12 @@ e2e('should create comment work', async t => {
   t.false(result.createComment.resolved);
   t.is(result.createComment.replies.length, 0);
 
+  await app.create(Mockers.DocUser, {
+    workspaceId: workspace.id,
+    docId,
+    userId: member.id,
+    type: DocRole.Commenter,
+  });
   await app.login(member);
   const result2 = await app.gql({
     query: createCommentMutation,
@@ -454,6 +460,12 @@ e2e('should resolve comment work', async t => {
   t.truthy(result2.resolveComment);
 
   // resolve by doc editor
+  await app.create(Mockers.DocUser, {
+    workspaceId: workspace.id,
+    docId,
+    userId: member.id,
+    type: DocRole.Editor,
+  });
   await app.login(member);
   const result3 = await app.gql({
     query: resolveCommentMutation,
@@ -765,6 +777,12 @@ e2e(
       docId,
       userId: owner.id,
       type: DocRole.Owner,
+    });
+    await app.create(Mockers.DocUser, {
+      workspaceId: teamWorkspace.id,
+      docId,
+      userId: member.id,
+      type: DocRole.Commenter,
     });
 
     await app.login(member);
@@ -1561,6 +1579,12 @@ e2e('should list comments and changes work', async t => {
     },
   });
 
+  await app.create(Mockers.DocUser, {
+    workspaceId: workspace.id,
+    docId,
+    userId: member.id,
+    type: DocRole.Commenter,
+  });
   await app.login(member);
 
   const createResult2 = await app.gql({

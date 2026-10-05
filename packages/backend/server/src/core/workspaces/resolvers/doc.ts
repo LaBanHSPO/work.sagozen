@@ -418,15 +418,20 @@ export class WorkspaceDocResolver {
     }
 
     await this.tryFixDocOwner(workspace.id, docId);
+    await this.ac.user(me.id).doc(workspace.id, docId).assert('Doc.Read');
 
     const isPublic = await this.models.doc.isPublic(workspace.id, docId);
+    const [defaultRoles] = await this.models.doc.findDefaultRoles(
+      workspace.id,
+      [docId]
+    );
 
     return {
       docId,
       workspaceId: workspace.id,
       mode: PublicDocMode.Page,
       public: isPublic,
-      defaultRole: DocRole.Manager,
+      defaultRole: defaultRoles?.workspace ?? DocRole.Reader,
     };
   }
 

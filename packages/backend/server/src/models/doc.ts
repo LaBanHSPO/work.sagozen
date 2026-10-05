@@ -66,9 +66,18 @@ export class DocModel extends BaseModel {
       case 'owner':
         return DocRole.Owner;
       case 'manager':
-      default:
         return DocRole.Manager;
+      default:
+        return DocRole.Reader;
     }
+  }
+
+  private async getWorkspaceDefaultRole(workspaceId: string) {
+    const policy = await this.db.workspaceAccessPolicy.findUnique({
+      where: { workspaceId },
+      select: { memberDefaultDocRole: true },
+    });
+    return policy?.memberDefaultDocRole;
   }
 
   // #region Update
@@ -432,7 +441,10 @@ export class DocModel extends BaseModel {
     return {
       ...doc,
       public: policy?.visibility === 'public',
-      defaultRole: this.docRoleFromPolicy(policy?.memberDefaultRole),
+      defaultRole: this.docRoleFromPolicy(
+        policy?.memberDefaultRole ??
+          (await this.getWorkspaceDefaultRole(workspaceId))
+      ),
     };
   }
 
@@ -473,7 +485,10 @@ export class DocModel extends BaseModel {
     return {
       ...doc,
       public: policy?.visibility === 'public',
-      defaultRole: this.docRoleFromPolicy(policy?.memberDefaultRole),
+      defaultRole: this.docRoleFromPolicy(
+        policy?.memberDefaultRole ??
+          (await this.getWorkspaceDefaultRole(workspaceId))
+      ),
     };
   }
 
@@ -488,11 +503,15 @@ export class DocModel extends BaseModel {
       where: { workspaceId, docId: { in: docIds } },
     });
     const byDocId = new Map(policies.map(policy => [policy.docId, policy]));
+    const workspaceDefaultRole =
+      await this.getWorkspaceDefaultRole(workspaceId);
 
     return docIds.map(docId => ({
       external:
         byDocId.get(docId)?.publicRole === 'external' ? DocRole.External : null,
-      workspace: this.docRoleFromPolicy(byDocId.get(docId)?.memberDefaultRole),
+      workspace: this.docRoleFromPolicy(
+        byDocId.get(docId)?.memberDefaultRole ?? workspaceDefaultRole
+      ),
     }));
   }
 
@@ -562,11 +581,13 @@ export class DocModel extends BaseModel {
       where: { workspaceId, docId: { in: [...byDocId.keys()] } },
       orderBy: { publishedAt: order },
     });
+    const workspaceDefaultRole =
+      await this.getWorkspaceDefaultRole(workspaceId);
     return metas.map(meta => ({
       ...meta,
       public: true,
       defaultRole: this.docRoleFromPolicy(
-        byDocId.get(meta.docId)?.memberDefaultRole
+        byDocId.get(meta.docId)?.memberDefaultRole ?? workspaceDefaultRole
       ),
     }));
   }
@@ -650,7 +671,7 @@ export class DocModel extends BaseModel {
        dap.visibility = 'public' AND dap.public_role = 'external',
        false
      ) as "public",
-     COALESCE(dap.member_default_role, 'manager') as "defaultRolePolicy",
+     COALESCE(dap.member_default_role, wap.member_default_doc_role, 'reader') as "defaultRolePolicy",
      "workspace_pages"."title" as "title",
      "workspace_pages"."summary" as "summary",
      "snapshots"."created_at" as "createdAt",
@@ -664,6 +685,8 @@ export class DocModel extends BaseModel {
     LEFT JOIN "doc_access_policies" dap
     ON "workspace_pages"."workspace_id" = dap.workspace_id
     AND "workspace_pages"."page_id" = dap.doc_id
+    LEFT JOIN "workspace_access_policies" wap
+    ON "workspace_pages"."workspace_id" = wap.workspace_id
     WHERE
       "workspace_pages"."workspace_id" = ${workspaceId}
       AND "workspace_pages"."page_id" = ${docId}
@@ -713,7 +736,7 @@ export class DocModel extends BaseModel {
          dap.visibility = 'public' AND dap.public_role = 'external',
          false
        ) as "public",
-       COALESCE(dap.member_default_role, 'manager') as "defaultRolePolicy",
+       COALESCE(dap.member_default_role, wap.member_default_doc_role, 'reader') as "defaultRolePolicy",
        "snapshots"."created_at" as "createdAt",
        "snapshots"."updated_at" as "updatedAt",
        "snapshots"."created_by" as "creatorId",
@@ -725,6 +748,8 @@ export class DocModel extends BaseModel {
       LEFT JOIN "doc_access_policies" dap
       ON "workspace_pages"."workspace_id" = dap.workspace_id
       AND "workspace_pages"."page_id" = dap.doc_id
+      LEFT JOIN "workspace_access_policies" wap
+      ON "workspace_pages"."workspace_id" = wap.workspace_id
       WHERE
         "workspace_pages"."workspace_id" = ${workspaceId}
         ${after}
@@ -783,7 +808,7 @@ export class DocModel extends BaseModel {
          dap.visibility = 'public' AND dap.public_role = 'external',
          false
        ) as "public",
-       COALESCE(dap.member_default_role, 'manager') as "defaultRolePolicy",
+       COALESCE(dap.member_default_role, wap.member_default_doc_role, 'reader') as "defaultRolePolicy",
        "workspace_pages"."title" as "title",
        "snapshots"."created_at" as "createdAt",
        "snapshots"."updated_at" as "updatedAt",
@@ -796,6 +821,8 @@ export class DocModel extends BaseModel {
       LEFT JOIN "doc_access_policies" dap
       ON "workspace_pages"."workspace_id" = dap.workspace_id
       AND "workspace_pages"."page_id" = dap.doc_id
+      LEFT JOIN "workspace_access_policies" wap
+      ON "workspace_pages"."workspace_id" = wap.workspace_id
       WHERE
         "workspace_pages"."workspace_id" = ${workspaceId}
         AND ${readablePredicate}

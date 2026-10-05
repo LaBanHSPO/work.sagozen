@@ -41,6 +41,19 @@ export interface RealtimeRequestMap {
     input: { workspaceId: string; docId: string };
     output: { state: DocShareStateSnapshot | null };
   };
+  'doc.member-permissions.get': {
+    input: { workspaceId: string; docId: string };
+    output: DocMemberPermissionsSnapshot;
+  };
+  'doc.member-permissions.set': {
+    input: {
+      workspaceId: string;
+      docId: string;
+      expectedRevision: string;
+      rules: DocMemberPermissionRules;
+    };
+    output: DocMemberPermissionsSnapshot;
+  };
   'doc.grants.get': {
     input: { workspaceId: string; docId: string; pagination: PaginationInput };
     output: PaginatedDocGrantedUsersSnapshot;
@@ -152,6 +165,20 @@ export interface DocShareStateSnapshot {
   public: boolean;
   mode: PublicDocModeSnapshot;
   defaultRole: DocRoleSnapshot;
+}
+
+export type DocMemberGrantRole = 'reader' | 'commenter' | 'editor' | 'manager';
+export type DocMemberDefaultRole = DocMemberGrantRole | 'none';
+
+export interface DocMemberPermissionRules {
+  defaultRole: DocMemberDefaultRole;
+  members: { userId: string; role: DocMemberGrantRole }[];
+}
+
+export interface DocMemberPermissionsSnapshot {
+  rules: DocMemberPermissionRules;
+  revision: string;
+  canEdit: boolean;
 }
 
 export interface PaginationInput {

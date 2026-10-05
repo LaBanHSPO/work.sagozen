@@ -172,7 +172,7 @@ impl PermissionStore {
         'visibility', policy.visibility,
         'sharingEnabled', coalesce(policy.sharing_enabled, true),
         'urlPreviewEnabled', coalesce(policy.url_preview_enabled, false),
-        'memberDefaultDocRole', coalesce(policy.member_default_doc_role, 'manager'),
+        'memberDefaultDocRole', coalesce(policy.member_default_doc_role, 'reader'),
         'decisionAt', statement_timestamp(),
         'role', member.role,
         'memberState', member.state,
@@ -184,7 +184,7 @@ impl PermissionStore {
               SELECT 1 FROM workspace_pages page
               WHERE page.workspace_id=workspace.id AND page.page_id=candidate.doc_id AND page.published_at IS NOT NULL
             ) THEN doc_policy.public_role ELSE NULL END,
-            'memberDefaultRole', coalesce(doc_policy.member_default_role, policy.member_default_doc_role, 'manager'),
+            'memberDefaultRole', coalesce(doc_policy.member_default_role, policy.member_default_doc_role, 'reader'),
             'explicitUserRole', doc_grant.role,
             'urlPreviewEnabled', coalesce(doc_policy.url_preview_enabled, false)
           ) ORDER BY candidate.ordinality)

@@ -344,7 +344,7 @@ pub(super) async fn set_doc_default_role(
   }))
 }
 
-async fn load_doc_default_role(
+pub(super) async fn load_doc_default_role(
   transaction: &mut Transaction<'_, Postgres>,
   workspace_id: &str,
   doc_id: &str,
@@ -353,7 +353,7 @@ async fn load_doc_default_role(
     r#"SELECT COALESCE(
          (SELECT member_default_role FROM doc_access_policies WHERE workspace_id=$1 AND doc_id=$2),
          (SELECT member_default_doc_role FROM workspace_access_policies WHERE workspace_id=$1),
-         'manager'
+         'reader'
        )"#,
   )
   .bind(workspace_id)
@@ -660,6 +660,14 @@ mod tests {
     transaction.rollback().await.unwrap();
 
     let doc_id = format!("domain-role-doc-{suffix}");
+    // This fixture intentionally exercises Manager -> Reader contraction,
+    // rather than relying on the deployment's Reader baseline.
+    sqlx::query("INSERT INTO doc_access_policies(workspace_id,doc_id,member_default_role) VALUES($1,$2,'manager')")
+      .bind(&workspace_id)
+      .bind(&doc_id)
+      .execute(&pool)
+      .await
+      .unwrap();
     sqlx::query(
       "INSERT INTO doc_grants(workspace_id,doc_id,principal_type,principal_id,role,granted_by) \
        VALUES($1,$2,'user',$3,'editor',$4)",

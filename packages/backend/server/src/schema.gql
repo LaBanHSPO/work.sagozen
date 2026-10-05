@@ -871,6 +871,18 @@ type DocPermissions {
   Doc_Users_Read: Boolean!
 }
 
+type DocPublishedNotificationBodyType {
+  """
+  The user who created the notification, maybe null when user is deleted or sent by system
+  """
+  createdByUser: PublicUserType
+  doc: MentionDocType!
+
+  """The type of the notification"""
+  type: NotificationType!
+  workspace: NotificationWorkspaceType
+}
+
 """User permission in doc"""
 enum DocRole {
   Commenter
@@ -1359,17 +1371,6 @@ type InviteUserType {
   status: WorkspaceMemberStatus!
 }
 
-type WorkspaceMemberAuditLogType {
-  id: ID!
-  action: String!
-  actorName: String!
-  actorEmail: String
-  targetName: String
-  targetEmail: String
-  detail: String
-  createdAt: DateTime!
-}
-
 enum InvoiceStatus {
   Draft
   Open
@@ -1535,18 +1536,6 @@ input MentionInput {
   doc: MentionDocInput!
   userId: String!
   workspaceId: String!
-}
-
-type DocPublishedNotificationBodyType {
-  """
-  The user who created the notification, maybe null when user is deleted or sent by system
-  """
-  createdByUser: PublicUserType
-  doc: MentionDocType!
-
-  """The type of the notification"""
-  type: NotificationType!
-  workspace: NotificationWorkspaceType
 }
 
 type MentionNotificationBodyType {
@@ -2026,7 +2015,7 @@ type Query {
   workspace(id: String!): WorkspaceType!
 
   """Recent member management activity in a workspace"""
-  workspaceMemberAuditLogs(workspaceId: String!, skip: Int! = 0, take: Int! = 20): [WorkspaceMemberAuditLogType!]!
+  workspaceMemberAuditLogs(skip: Int! = 0, take: Int! = 20, workspaceId: String!): [WorkspaceMemberAuditLogType!]!
 
   """Get workspace role permissions"""
   workspaceRolePermissions(id: String!): WorkspaceRolePermissions! @deprecated(reason: "use WorkspaceType[permissions] instead")
@@ -2872,6 +2861,17 @@ enum WorkspaceInviteLinkExpireTime {
   OneMonth
   OneWeek
   ThreeDays
+}
+
+type WorkspaceMemberAuditLogType {
+  action: String!
+  actorEmail: String
+  actorName: String!
+  createdAt: DateTime!
+  detail: String
+  id: ID!
+  targetEmail: String
+  targetName: String
 }
 
 """Member invite status in workspace"""

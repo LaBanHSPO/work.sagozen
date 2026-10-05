@@ -4,6 +4,7 @@ import { useGuard } from '@affine/core/components/guard';
 import { ServerService } from '@affine/core/modules/cloud';
 import { DocService } from '@affine/core/modules/doc';
 import { ShareInfoService } from '@affine/core/modules/share-doc';
+import { WorkspaceShareSettingService } from '@affine/core/modules/share-setting';
 import { useI18n } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
 import { Suspense, useEffect } from 'react';
@@ -15,6 +16,7 @@ import { MembersPermission, PublicDoc } from './general-access';
 import * as styles from './index.css';
 import { InviteInput } from './invite-member-editor';
 import { MembersRow } from './member-management';
+import { MemberPermissionsButton } from './member-permissions';
 import type { ShareMenuProps } from './share-menu';
 
 export const LocalSharePage = (props: ShareMenuProps) => {
@@ -51,7 +53,7 @@ export const LocalSharePage = (props: ShareMenuProps) => {
   );
 };
 
-export const AFFiNESharePage = (
+const ShareAccessContent = (
   props: ShareMenuProps & {
     onClickInvite: () => void;
     onClickMembers: () => void;
@@ -65,6 +67,8 @@ export const AFFiNESharePage = (
   const serverService = useService(ServerService);
   const docService = useService(DocService);
 
+  const shareSetting = useService(WorkspaceShareSettingService).sharePreview;
+  const enableSharing = useLiveData(shareSetting.enableSharing$);
   const canManageUsers = useGuard('Doc_Users_Manage', docService.doc.id);
 
   const canPublish = useGuard('Doc_Publish', docService.doc.id);
@@ -72,6 +76,9 @@ export const AFFiNESharePage = (
   useEffect(() => {
     shareInfoService.shareInfo.revalidate();
   }, [shareInfoService]);
+  useEffect(() => {
+    shareSetting.revalidate();
+  }, [shareSetting]);
 
   const isSharedPage = useLiveData(shareInfoService.shareInfo.isShared$);
   const sharedMode = useLiveData(shareInfoService.shareInfo.sharedMode$);
@@ -93,7 +100,9 @@ export const AFFiNESharePage = (
     <div className={styles.content}>
       <div className={styles.columnContainerStyle}>
         <div className={styles.memberRowsStyle}>
-          {canManageUsers && <InviteInput onFocus={props.onClickInvite} />}
+          {canManageUsers && enableSharing === true && (
+            <InviteInput onFocus={props.onClickInvite} />
+          )}
           <MembersRow onClick={props.onClickMembers} />
         </div>
 
@@ -105,11 +114,34 @@ export const AFFiNESharePage = (
           hittingPaywall={!!props.hittingPaywall}
           disabled={!canManageUsers}
         />
-        <PublicDoc disabled={!canPublish} />
+        <PublicDoc disabled={!canPublish || enableSharing !== true} />
       </div>
       <Divider className={styles.divider} />
       <CopyLinkButton workspaceId={workspaceId} />
     </div>
+  );
+};
+
+export const AFFiNESharePage = (
+  props: ShareMenuProps & {
+    onClickInvite: () => void;
+    onClickMembers: () => void;
+  }
+) => {
+  return (
+    <>
+      {props.onEditMemberPermissions && (
+        <MemberPermissionsButton
+          docId={props.currentPage.id}
+          onClick={props.onEditMemberPermissions}
+        />
+      )}
+      <ErrorBoundary fallback={null}>
+        <Suspense>
+          <ShareAccessContent {...props} />
+        </Suspense>
+      </ErrorBoundary>
+    </>
   );
 };
 
@@ -122,13 +154,6 @@ export const SharePage = (
   if (props.workspaceMetadata.flavour === 'local') {
     return <LocalSharePage {...props} />;
   } else {
-    return (
-      // TODO(@eyhn): refactor this part
-      <ErrorBoundary fallback={null}>
-        <Suspense>
-          <AFFiNESharePage {...props} />
-        </Suspense>
-      </ErrorBoundary>
-    );
+    return <AFFiNESharePage {...props} />;
   }
 };

@@ -265,6 +265,51 @@ team workspaces do not count toward this creation limit. Deleting the owned
 personal workspace permits creating a replacement. The server serializes creation
 per owner so concurrent requests cannot bypass the limit.
 
+### Document member permissions
+
+Workspace members inherit **Reader** access to documents: they can read, but
+cannot edit unless an individual grant or a document rule allows it. Existing
+individual grants still take precedence over the member default.
+
+Open a document's **Share** panel and select **Edit member permissions JSON**.
+Workspace owners, active workspace admins, and document owners can use this
+editor. Admins do not need a commercial entitlement for this operation; existing
+quota checks and unrelated entitlement restrictions still apply. Member rules
+remain configurable when public sharing is disabled.
+
+```json
+{
+  "defaultRole": "reader",
+  "members": [
+    { "userId": "workspace-member-id", "role": "editor" }
+  ]
+}
+```
+
+Use the workspace member's user ID, not an email address. `defaultRole` accepts
+`none`, `reader`, `commenter`, `editor`, or `manager`. Individual member roles
+accept `reader`, `commenter`, `editor`, or `manager`; `none` is not an individual
+deny rule. A `none` default removes inherited member access, but does not override
+ownership or individual grants, or change the document's public-link settings.
+
+The JSON contains all active-member grants except ownership. Saving removes
+omitted active non-owner grants, so those members inherit `defaultRole`. Ownership,
+guest and inactive-member grants, group grants, and public-link settings are
+preserved. Ownership transfers remain a separate operation.
+
+Saves are atomic. Malformed rules, unauthorized edits, and stale workspace
+permission revisions are rejected without partial changes. Failed saves keep the
+draft; **Reload from server** explicitly discards it and loads the current rules.
+An admin opening a restricted document can use the permission editor without
+receiving ordinary document read access.
+
+Before deployment, back up the database and apply
+`20261005120000_reader_member_defaults`. This migration deliberately resets
+**all existing workspace and document member defaults to Reader**, including
+previous `none`, Editor, and Manager defaults. It preserves individual grants,
+ownership, public sharing, and other policy fields. Deploy the updated native
+module, server, and frontend together; the JSON requests require all three.
+
 ## Missing document updates during sync
 
 Workspace sync acknowledges and discards updates when the document writer reports

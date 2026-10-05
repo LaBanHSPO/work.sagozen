@@ -113,6 +113,38 @@ impl PermissionAuthorizer {
     )
   }
 
+  /// The JSON editor is narrower than Users.Manage: document managers cannot edit it.
+  /// This feature explicitly exempts active administrators from the commercial cap.
+  pub(in crate::runtime::backend_runtime) async fn doc_member_permissions_can_edit_in(
+    &self,
+    transaction: &mut Transaction<'_, Postgres>,
+    workspace_id: &str,
+    actor_user_id: &str,
+    doc_id: &str,
+  ) -> RuntimeResult<bool> {
+    let mut snapshot = self
+      .store
+      .typed_permission_snapshot_in(
+        transaction,
+        workspace_id,
+        Some(actor_user_id),
+        doc_actions_request(doc_id, &[DocAction::Read]),
+      )
+      .await?;
+    member_rules_admin_access(&mut snapshot);
+    let decision = self.evaluate_typed(snapshot)?;
+    let doc = decision.docs.first().expect("document read has a decision");
+    if !doc.decisions.first().is_some_and(|decision| decision.allowed) {
+      return Err(RuntimeError::invalid_input("permission_denied:Doc.Read"));
+    }
+    Ok(
+      matches!(
+        decision.effective_workspace_role,
+        Some(WorkspaceRole::Owner | WorkspaceRole::Admin)
+      ) || doc.effective_role == Some(affine_core::access_control::DocRole::Owner),
+    )
+  }
+
   pub(in crate::runtime::backend_runtime) async fn authorize_doc_action_in(
     &self,
     transaction: &mut Transaction<'_, Postgres>,
@@ -212,6 +244,41 @@ impl PermissionAuthorizer {
     Ok(permission.decision)
   }
 
+  pub(in crate::runtime::backend_runtime) async fn authorize_member_rules_command_in(
+    &self,
+    transaction: &mut Transaction<'_, Postgres>,
+    actor_user_id: &str,
+    workspace_id: &str,
+    doc_id: &str,
+    command: &DomainCommand,
+    quota: Option<CommandQuotaFacts<'_>>,
+  ) -> RuntimeResult<CommandAuthorizationDecision> {
+    // No other command can reach the administrator exemption, and quota keeps
+    // its ORIGINAL grant. Only the transaction-local ACL context is adjusted.
+    if !matches!(
+      command,
+      DomainCommand::SetDocDefaultRole { .. } | DomainCommand::TransitionDocRole { .. }
+    ) {
+      return Err(RuntimeError::invalid_input("invalid_member_rules_command"));
+    }
+    let mut snapshot = self
+      .store
+      .command_snapshot_in(transaction, workspace_id, actor_user_id, Some(doc_id))
+      .await?;
+    member_rules_admin_access(&mut snapshot);
+    command_decision_result(
+      authorize_command(
+        command,
+        CommandFacts {
+          acl: &snapshot.facts,
+          access_grant: &snapshot.grant,
+          quota,
+        },
+      ),
+      command,
+    )
+  }
+
   pub(in crate::runtime::backend_runtime) async fn authorize_command_in(
     &self,
     transaction: &mut Transaction<'_, Postgres>,
@@ -233,37 +300,7 @@ impl PermissionAuthorizer {
         quota,
       },
     );
-    if decision.allowed {
-      Ok(decision)
-    } else {
-      Err(RuntimeError::invalid_input(match (decision.denial_reason, command) {
-        (Some(CommandDenialReason::WorkspaceOwnerCannotLeave), _) => "workspace_owner_cannot_leave".to_string(),
-        (Some(CommandDenialReason::CannotRevokeSelf), _) => "cannot_revoke_self".to_string(),
-        (Some(CommandDenialReason::OwnerMustTransfer), DomainCommand::TransitionDocRole { .. }) => {
-          "doc_owner_must_transfer".to_string()
-        }
-        (Some(CommandDenialReason::OwnerMustTransfer), _) => "workspace_owner_must_transfer".to_string(),
-        (Some(CommandDenialReason::TargetMemberMustBeActive), _) => "target_member_not_active".to_string(),
-        (Some(CommandDenialReason::ActiveMemberRequired), _) => "active_member_required".to_string(),
-        (Some(CommandDenialReason::WorkspaceNotFound), _) => "workspace_not_found".to_string(),
-        (Some(CommandDenialReason::WorkspaceReadonly), _) => "workspace_readonly".to_string(),
-        (Some(CommandDenialReason::QuotaFactsUnavailable), _) => "command_quota_unavailable".to_string(),
-        (
-          Some(CommandDenialReason::Permission(_)),
-          DomainCommand::MutateComment { .. } | DomainCommand::MutateReply { .. },
-        ) => "comment_mutation_denied".to_string(),
-        (Some(CommandDenialReason::Permission(permission)), _) => {
-          format!(
-            "domain_permission_denied:{}",
-            match permission {
-              CommandPermission::Workspace(action) => action.as_str(),
-              CommandPermission::Doc(action) => action.as_str(),
-            }
-          )
-        }
-        (None, _) => "domain_permission_denied".to_string(),
-      }))
-    }
+    command_decision_result(decision, command)
   }
 
   pub(in crate::runtime::backend_runtime) async fn authorize_search(
@@ -373,4 +410,49 @@ fn doc_decisions(decision: AuthorizationDecision) -> BTreeMap<String, Decision> 
     .into_iter()
     .map(|mut doc| (doc.doc_id, doc.decisions.pop().expect("document action has a decision")))
     .collect()
+}
+
+/// Product policy for the JSON member-rules surface only. This grant is never
+/// persisted, exposed to other requests, or used to evaluate quota.
+fn member_rules_admin_access(snapshot: &mut PermissionSnapshot) {
+  if snapshot.facts.active_member && snapshot.facts.assigned_workspace_role == Some(WorkspaceRole::Admin) {
+    snapshot.grant.rights.commercial = true;
+  }
+}
+
+fn command_decision_result(
+  decision: CommandAuthorizationDecision,
+  command: &DomainCommand,
+) -> RuntimeResult<CommandAuthorizationDecision> {
+  if decision.allowed {
+    Ok(decision)
+  } else {
+    Err(RuntimeError::invalid_input(match (decision.denial_reason, command) {
+      (Some(CommandDenialReason::WorkspaceOwnerCannotLeave), _) => "workspace_owner_cannot_leave".to_string(),
+      (Some(CommandDenialReason::CannotRevokeSelf), _) => "cannot_revoke_self".to_string(),
+      (Some(CommandDenialReason::OwnerMustTransfer), DomainCommand::TransitionDocRole { .. }) => {
+        "doc_owner_must_transfer".to_string()
+      }
+      (Some(CommandDenialReason::OwnerMustTransfer), _) => "workspace_owner_must_transfer".to_string(),
+      (Some(CommandDenialReason::TargetMemberMustBeActive), _) => "target_member_not_active".to_string(),
+      (Some(CommandDenialReason::ActiveMemberRequired), _) => "active_member_required".to_string(),
+      (Some(CommandDenialReason::WorkspaceNotFound), _) => "workspace_not_found".to_string(),
+      (Some(CommandDenialReason::WorkspaceReadonly), _) => "workspace_readonly".to_string(),
+      (Some(CommandDenialReason::QuotaFactsUnavailable), _) => "command_quota_unavailable".to_string(),
+      (
+        Some(CommandDenialReason::Permission(_)),
+        DomainCommand::MutateComment { .. } | DomainCommand::MutateReply { .. },
+      ) => "comment_mutation_denied".to_string(),
+      (Some(CommandDenialReason::Permission(permission)), _) => {
+        format!(
+          "domain_permission_denied:{}",
+          match permission {
+            CommandPermission::Workspace(action) => action.as_str(),
+            CommandPermission::Doc(action) => action.as_str(),
+          }
+        )
+      }
+      (None, _) => "domain_permission_denied".to_string(),
+    }))
+  }
 }

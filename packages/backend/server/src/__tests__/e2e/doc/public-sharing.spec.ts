@@ -7,12 +7,12 @@ import {
 } from '@affine/graphql';
 
 import { NotificationService } from '../../../core/notification/service';
-import { WorkspaceRole } from '../../../models';
+import { DocRole, WorkspaceRole } from '../../../models';
 import { Mockers } from '../../mocks';
 import { app, e2e } from '../test';
 
 e2e(
-  'public sharing by a member notifies managers and records activity',
+  'public sharing by an explicitly granted doc manager notifies workspace managers and records activity',
   async t => {
     const owner = await app.create(Mockers.User);
     const admin = await app.create(Mockers.User);
@@ -39,6 +39,12 @@ e2e(
       workspaceId: workspace.id,
       docId: snapshot.id,
       title: 'Shared document',
+    });
+    await app.create(Mockers.DocUser, {
+      workspaceId: workspace.id,
+      docId: snapshot.id,
+      userId: member.id,
+      type: DocRole.Manager,
     });
     await app.login(member);
     const variables = { workspaceId: workspace.id, pageId: snapshot.id };

@@ -3,6 +3,7 @@ export {
   DocGrantedUsersService,
   type GrantedUser,
 } from './services/doc-granted-users';
+export { DocMemberPermissionsService } from './services/doc-member-permissions';
 export { GuardService } from './services/guard';
 export { MemberSearchService } from './services/member-search';
 export { WorkspaceMembersService } from './services/members';
@@ -15,7 +16,7 @@ export {
 import { type Framework } from '@toeverything/infra';
 
 import { WorkspaceServerService } from '../cloud/services/workspace-server';
-import { DocScope, DocService } from '../doc';
+import { DocScope, DocService, DocsService } from '../doc';
 import { NbstoreService } from '../storage';
 import {
   WorkspaceLocalState,
@@ -26,6 +27,7 @@ import {
 import { WorkspaceMembers } from './entities/members';
 import { WorkspacePermission } from './entities/permission';
 import { DocGrantedUsersService } from './services/doc-granted-users';
+import { DocMemberPermissionsService } from './services/doc-member-permissions';
 import { GuardService } from './services/guard';
 import { MemberSearchService } from './services/member-search';
 import { WorkspaceMembersService } from './services/members';
@@ -64,6 +66,13 @@ export function configurePermissionsModule(framework: Framework) {
       WorkspaceService,
       WorkspaceServerService,
       NbstoreService,
+    ])
+    .store(DocGrantedUsersStore, [WorkspaceServerService, NbstoreService])
+    .service(DocMemberPermissionsService, [
+      DocGrantedUsersStore,
+      WorkspaceService,
+      DocsService,
+      GuardService,
     ]);
 
   framework
@@ -73,6 +82,5 @@ export function configurePermissionsModule(framework: Framework) {
       DocGrantedUsersStore,
       WorkspaceService,
       DocService,
-    ])
-    .store(DocGrantedUsersStore, [WorkspaceServerService, NbstoreService]);
+    ]);
 }

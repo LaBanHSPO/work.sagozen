@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  DocRole as GraphQLDocRole,
   getRecentlyUpdatedDocsQuery,
   getWorkspacePageByIdQuery,
   type GraphQLQuery,
   publishPageMutation,
 } from '@affine/graphql';
+import { PrismaClient } from '@prisma/client';
 
+import { PermissionAccess } from '../../../core/permission';
 import { DocRole, WorkspaceRole } from '../../../models';
 import { Mockers } from '../../mocks';
 import { app, e2e } from '../test';
@@ -347,3 +350,130 @@ e2e('should require Doc.Read to query doc histories', async t => {
     })
   );
 });
+
+for (const missing of ['metadata', 'snapshot'] as const) {
+  e2e(
+    `missing ${missing} doc response inherits defaults and enforces canonical read`,
+    async t => {
+      const owner = await app.signup();
+      const member = await app.createUser();
+      await app.login(member);
+      await app.switchUser(owner);
+      const workspace = await app.create(Mockers.Workspace, { owner });
+      await app.create(Mockers.WorkspaceUser, {
+        workspaceId: workspace.id,
+        userId: member.id,
+        type: WorkspaceRole.Collaborator,
+      });
+      const docId = randomUUID();
+      const db = app.get(PrismaClient);
+      if (missing === 'metadata') {
+        await app.create(Mockers.DocSnapshot, {
+          workspaceId: workspace.id,
+          docId,
+          user: owner,
+        });
+      } else {
+        await db.workspaceDoc.create({
+          data: { workspaceId: workspace.id, docId },
+        });
+      }
+      const query = getWorkspacePageByIdQuery;
+      const request = {
+        query,
+        variables: { workspaceId: workspace.id, pageId: docId },
+      };
+      await app.switchUser(member);
+      const baseline = await app.gql(request);
+      t.is(baseline.workspace.doc.defaultRole, GraphQLDocRole.Reader);
+      t.false(baseline.workspace.doc.public);
+
+      await db.workspaceAccessPolicy.update({
+        where: { workspaceId: workspace.id },
+        data: { memberDefaultDocRole: 'commenter' },
+      });
+      const inherited = await app.gql(request);
+      t.is(inherited.workspace.doc.defaultRole, GraphQLDocRole.Commenter);
+      await db.docAccessPolicy.create({
+        data: {
+          workspaceId: workspace.id,
+          docId,
+          memberDefaultRole: 'none',
+        },
+      });
+      const ac = app.get(PermissionAccess);
+      t.false(
+        await ac.user(member.id).doc(workspace.id, docId).can('Doc.Read')
+      );
+      await t.throwsAsync(app.gql(request));
+      await app.switchUser(owner);
+      const ownerDoc = await app.gql(request);
+      t.is(ownerDoc.workspace.doc.defaultRole, GraphQLDocRole.None);
+
+      // The member baseline does not alter the public policy.
+      await db.docAccessPolicy.update({
+        where: { workspaceId_docId: { workspaceId: workspace.id, docId } },
+        data: { visibility: 'public', publicRole: 'external' },
+      });
+      const publicDoc = await app.gql(request);
+      t.true(publicDoc.workspace.doc.public);
+      t.is(publicDoc.workspace.doc.defaultRole, GraphQLDocRole.None);
+    }
+  );
+}
+
+e2e(
+  'Reader defaults retain workspace owners and explicit document owners and managers',
+  async t => {
+    const owner = await app.signup();
+    const docOwner = await app.createUser();
+    const manager = await app.createUser();
+    const reader = await app.createUser();
+    const workspace = await app.create(Mockers.Workspace, { owner });
+    for (const member of [docOwner, manager, reader]) {
+      await app.create(Mockers.WorkspaceUser, {
+        workspaceId: workspace.id,
+        userId: member.id,
+        type: WorkspaceRole.Collaborator,
+      });
+    }
+    const snapshot = await app.create(Mockers.DocSnapshot, {
+      workspaceId: workspace.id,
+      user: docOwner,
+    });
+    const meta = await app.create(Mockers.DocMeta, {
+      workspaceId: workspace.id,
+      docId: snapshot.id,
+    });
+    t.is(meta.defaultRole, DocRole.Reader);
+    for (const [member, type] of [
+      [docOwner, DocRole.Owner],
+      [manager, DocRole.Manager],
+    ] as const) {
+      await app.create(Mockers.DocUser, {
+        workspaceId: workspace.id,
+        docId: snapshot.id,
+        userId: member.id,
+        type,
+      });
+    }
+    const ac = app.get(PermissionAccess);
+    for (const [member, role] of [
+      [owner, DocRole.Owner],
+      [docOwner, DocRole.Owner],
+      [manager, DocRole.Manager],
+      [reader, DocRole.Reader],
+    ] as const) {
+      const result = await ac
+        .user(member.id)
+        .doc(workspace.id, snapshot.id)
+        .permissions();
+      t.is(result.role, role);
+      t.true(result.permissions['Doc.Read']);
+      t.is(result.permissions['Doc.Update'], role !== DocRole.Reader);
+      t.is(result.permissions['Doc.Publish'], role !== DocRole.Reader);
+      t.is(result.permissions['Doc.Users.Manage'], role !== DocRole.Reader);
+      t.is(result.permissions['Doc.TransferOwner'], role === DocRole.Owner);
+    }
+  }
+);

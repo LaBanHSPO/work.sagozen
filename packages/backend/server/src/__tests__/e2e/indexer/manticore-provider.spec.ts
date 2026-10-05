@@ -27,7 +27,7 @@ async function indexDocument(
   user: { id: string },
   docId: string,
   markdown: string,
-  defaultRole = DocRole.Manager
+  defaultRole = DocRole.Reader
 ) {
   await app.create(Mockers.DocMeta, { workspaceId, docId, defaultRole });
   await addDocumentToRoot(workspaceId, docId);

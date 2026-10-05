@@ -420,6 +420,8 @@ test('front and sync realtime gateway required handlers are registered by lightw
   new DocShareRealtimeProvider(
     {} as never,
     {} as never,
+    {} as never,
+    {} as never,
     registry
   ).onModuleInit();
   new DocGrantsRealtimeProvider(
@@ -702,7 +704,13 @@ test('doc realtime providers register share state and grants handlers', async t 
     }),
   };
 
-  new DocShareRealtimeProvider(ac, models as never, registry).onModuleInit();
+  new DocShareRealtimeProvider(
+    ac,
+    models as never,
+    {} as never,
+    {} as never,
+    registry
+  ).onModuleInit();
   new DocGrantsRealtimeProvider(
     ac,
     models as never,
@@ -854,6 +862,8 @@ test('new realtime providers publish changed events from domain events', t => {
   workspaceMembers.onInviteLinkCreated({ workspaceId: 'space' });
 
   const docShare = new DocShareRealtimeProvider(
+    {} as never,
+    {} as never,
     {} as never,
     {} as never,
     undefined,

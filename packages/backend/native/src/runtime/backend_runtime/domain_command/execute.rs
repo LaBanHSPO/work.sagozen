@@ -3,8 +3,8 @@ use serde_json::Value;
 use sqlx::PgPool;
 
 use super::{
-  DomainCommandInputV1, InvalidationHintV1, SourceIdentity, comments, history, lifecycle, members, publish, replies,
-  roles,
+  DomainCommandInputV1, InvalidationHintV1, SourceIdentity, comments, history, lifecycle, member_permissions, members,
+  publish, replies, roles,
 };
 use crate::runtime::{
   Deployment, RuntimeError, RuntimeResult,
@@ -318,6 +318,12 @@ pub(in crate::runtime::backend_runtime) async fn execute(
         new_role,
       )
       .await?
+    }
+    DomainCommandInputV1::GetDocMemberPermissions(input) => {
+      member_permissions::get(&authorizer, &mut transaction, input).await?
+    }
+    DomainCommandInputV1::SetDocMemberPermissions(input) => {
+      member_permissions::set(&authorizer, &mut transaction, input).await?
     }
     DomainCommandInputV1::RevokeWorkspaceMember {
       actor_user_id,

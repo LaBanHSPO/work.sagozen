@@ -28,6 +28,8 @@ const getRoleName = (t: ReturnType<typeof useI18n>, role?: DocRole) => {
       return t['com.affine.share-menu.option.permission.can-edit']();
     case DocRole.Reader:
       return t['com.affine.share-menu.option.permission.can-read']();
+    case DocRole.Commenter:
+      return 'Can comment';
     case DocRole.None:
       return t['com.affine.share-menu.option.permission.no-access']();
     default:

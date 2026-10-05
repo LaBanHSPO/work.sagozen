@@ -2,6 +2,9 @@ mod comments;
 mod execute;
 mod history;
 mod lifecycle;
+mod member_permissions;
+#[cfg(test)]
+mod member_permissions_tests;
 mod members;
 mod publish;
 mod replies;
@@ -125,6 +128,8 @@ pub(super) enum DomainCommandInputV1 {
     doc_id: String,
     new_role: String,
   },
+  GetDocMemberPermissions(member_permissions::GetInput),
+  SetDocMemberPermissions(member_permissions::SetInput),
   RevokeWorkspaceMember {
     actor_user_id: String,
     workspace_id: String,
@@ -268,7 +273,7 @@ pub(super) async fn next_workspace_doc_update_timestamp(
   .map_err(|error| RuntimeError::database("load workspace document update clock", error))
 }
 
-async fn lock_permission_facts(
+pub(super) async fn lock_permission_facts(
   transaction: &mut Transaction<'_, Postgres>,
   actor_user_id: &str,
   workspace_id: &str,

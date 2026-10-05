@@ -8,6 +8,7 @@ import {
   updateDocDefaultRoleMutation,
   updateDocUserRoleMutation,
 } from '@affine/graphql';
+import type { DocMemberPermissionRules } from '@affine/realtime';
 import { Store } from '@toeverything/infra';
 
 import type { NbstoreService } from '../../storage';
@@ -54,6 +55,31 @@ export class DocGrantedUsersStore extends Store {
       workspaceId,
       docId,
     });
+  }
+
+  fetchMemberPermissions(
+    workspaceId: string,
+    docId: string,
+    signal?: AbortSignal
+  ) {
+    return this.nbstoreService.realtime.request(
+      'doc.member-permissions.get',
+      { workspaceId, docId },
+      { signal, timeoutMs: 10000 }
+    );
+  }
+
+  setMemberPermissions(
+    workspaceId: string,
+    docId: string,
+    expectedRevision: string,
+    rules: DocMemberPermissionRules
+  ) {
+    return this.nbstoreService.realtime.request(
+      'doc.member-permissions.set',
+      { workspaceId, docId, expectedRevision, rules },
+      { timeoutMs: 10000 }
+    );
   }
 
   async grantDocUserRoles(input: GrantDocUserRolesInput) {
