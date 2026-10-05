@@ -16,7 +16,6 @@ import {
   DeleteIcon,
   OpenInNewIcon,
   ResetIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
 import { memo, useCallback, useContext } from 'react';
@@ -98,39 +97,6 @@ export const QuickTab = memo(function QuickTab({
   );
 });
 
-export const QuickSplit = memo(function QuickSplit({
-  doc,
-  onClick,
-  ...iconButtonProps
-}: QuickActionProps) {
-  const contextValue = useContext(DocExplorerContext);
-  const quickSplit = useLiveData(contextValue.quickSplit$);
-  const workbench = useService(WorkbenchService).workbench;
-
-  const onOpenInSplitView = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>) => {
-      onClick?.(e);
-      e.stopPropagation();
-      e.preventDefault();
-      track.allDocs.list.doc.openDoc();
-      track.allDocs.list.docMenu.openInSplitView();
-      workbench.openDoc(doc.id, { at: 'tail' });
-    },
-    [doc.id, onClick, workbench]
-  );
-
-  if (!quickSplit) {
-    return null;
-  }
-
-  return (
-    <IconButton
-      onClick={onOpenInSplitView}
-      icon={<SplitViewIcon />}
-      {...iconButtonProps}
-    />
-  );
-});
 
 export const QuickDelete = memo(function QuickDelete({
   doc,

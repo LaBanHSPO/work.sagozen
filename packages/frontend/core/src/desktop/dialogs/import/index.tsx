@@ -7,10 +7,7 @@ import {
   GlobalDialogService,
   type WORKSPACE_DIALOG_SCHEMA,
 } from '@affine/core/modules/dialogs';
-import {
-  type ImportRunContext,
-  ImportService,
-} from '@affine/core/modules/import';
+import { ImportService } from '@affine/core/modules/import';
 import { UrlService } from '@affine/core/modules/url';
 import {
   getAFFiNEWorkspaceSchema,
@@ -46,7 +43,6 @@ import {
   type SVGAttributes,
   useCallback,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 
@@ -56,7 +52,7 @@ const logger = new DebugLogger('import');
 
 function shouldSnapshotPickedFiles(type: ImportType, acceptType: AcceptType) {
   if (acceptType === 'Directory' || acceptType === 'Skip') return false;
-  return !['markdownZip', 'notion', 'bear', 'oneNote'].includes(type);
+  return !['markdownZip', 'notion', 'bear'].includes(type);
 }
 
 type ImportType =
@@ -65,7 +61,6 @@ type ImportType =
   | 'notion'
   | 'obsidian'
   | 'bear'
-  | 'oneNote'
   | 'snapshot'
   | 'html'
   | 'docx'
@@ -75,7 +70,6 @@ type AcceptType =
   | 'Zip'
   | 'Html'
   | 'Docx'
-  | 'OneNote'
   | 'Directory'
   | 'Skip'; // Skip is used for dotaffinefile
 type Status = 'idle' | 'importing' | 'success' | 'error';
@@ -102,7 +96,6 @@ type ImportFunctionArgs = {
   files: File[];
   importAffineFile: () => Promise<WorkspaceMetadata | undefined>;
   importService?: ImportService;
-  context: ImportRunContext;
 };
 
 function toImportErrorState(error: unknown): ImportErrorState {
@@ -143,7 +136,6 @@ function requireImportService(importService?: ImportService) {
 
 type ImportConfig = {
   fileOptions: { acceptType: AcceptType; multiple: boolean };
-  nativeOnly?: boolean;
   importFunction: (args: ImportFunctionArgs) => Promise<ImportResult>;
 };
 
@@ -229,19 +221,6 @@ const importOptions = [
     type: 'bear' as ImportType,
   },
   {
-    key: 'oneNote',
-    label: 'com.affine.import.onenote',
-    prefixIcon: (
-      <FileIcon color={cssVarV2('icon/primary')} width={20} height={20} />
-    ),
-    suffixIcon: (
-      <HelpIcon color={cssVarV2('icon/primary')} width={20} height={20} />
-    ),
-    suffixTooltip: 'com.affine.import.onenote.tooltip',
-    testId: 'editor-option-menu-import-onenote',
-    type: 'oneNote' as ImportType,
-  },
-  {
     key: 'docx',
     label: 'com.affine.import.docx',
     prefixIcon: <FileIcon color={cssVar('black')} width={20} height={20} />,
@@ -291,15 +270,12 @@ const importConfigs: Record<ImportType, ImportConfig> = {
   },
   markdownZip: {
     fileOptions: { acceptType: 'Zip', multiple: false },
-    importFunction: async ({ files, importService, context }) => {
+    importFunction: async ({ files, importService }) => {
       const file = files.length === 1 ? files[0] : null;
       if (!file) {
         throw new Error('Expected a single zip file for markdownZip import');
       }
-      return requireImportService(importService).importMarkdownZip(
-        file,
-        context
-      );
+      return requireImportService(importService).importMarkdownZip(file);
     },
   },
   html: {
@@ -325,45 +301,28 @@ const importConfigs: Record<ImportType, ImportConfig> = {
   },
   notion: {
     fileOptions: { acceptType: 'Zip', multiple: false },
-    importFunction: async ({ files, importService, context }) => {
+    importFunction: async ({ files, importService }) => {
       const file = files.length === 1 ? files[0] : null;
       if (!file) {
         throw new Error('Expected a single zip file for notion import');
       }
-      return requireImportService(importService).importNotionZip(file, context);
+      return requireImportService(importService).importNotionZip(file);
     },
   },
   obsidian: {
     fileOptions: { acceptType: 'Directory', multiple: false },
-    importFunction: async ({ files, importService, context }) => {
-      return requireImportService(importService).importObsidianVault(
-        files,
-        context
-      );
+    importFunction: async ({ files, importService }) => {
+      return requireImportService(importService).importObsidianVault(files);
     },
   },
   bear: {
     fileOptions: { acceptType: 'Zip', multiple: false },
-    importFunction: async ({ files, importService, context }) => {
+    importFunction: async ({ files, importService }) => {
       const file = files.length === 1 ? files[0] : null;
       if (!file) {
         throw new Error('Expected a single .bear2bk file for Bear import');
       }
-      return requireImportService(importService).importBearBackup(
-        file,
-        context
-      );
-    },
-  },
-  oneNote: {
-    fileOptions: { acceptType: 'OneNote', multiple: false },
-    nativeOnly: true,
-    importFunction: async ({ files, importService, context }) => {
-      const file = files.length === 1 ? files[0] : null;
-      if (!file) {
-        throw new Error('Expected a single OneNote file');
-      }
-      return requireImportService(importService).importOneNote(file, context);
+      return requireImportService(importService).importBearBackup(file);
     },
   },
   docx: {
@@ -425,7 +384,6 @@ const ImportOptionItem = ({
   suffixTooltip,
   type,
   onImport,
-  disabled,
   ...props
 }: {
   label: string;
@@ -434,14 +392,12 @@ const ImportOptionItem = ({
   suffixTooltip?: string;
   type: ImportType;
   onImport: (type: ImportType) => void;
-  disabled?: boolean;
 }) => {
   const t = useI18n();
   return (
     <div
-      className={disabled ? style.importItemDisabled : style.importItem}
+      className={style.importItem}
       onClick={() => onImport(type)}
-      aria-disabled={disabled}
       {...props}
     >
       {prefixIcon}
@@ -478,9 +434,6 @@ const ImportOptions = ({
             testId,
             type,
           }) => {
-            const disabled = Boolean(
-              importConfigs[type].nativeOnly && !BUILD_CONFIG.isElectron
-            );
             return (
               <ImportOptionItem
                 key={key}
@@ -490,7 +443,6 @@ const ImportOptions = ({
                 label={label}
                 type={type}
                 onImport={onImport}
-                disabled={disabled}
                 data-testid={testId}
               />
             );
@@ -513,18 +465,8 @@ const ImportOptions = ({
   );
 };
 
-const ImportingStatus = ({
-  progress,
-  onCancel,
-}: {
-  progress: { completed: number; total: number } | null;
-  onCancel: () => void;
-}) => {
+const ImportingStatus = () => {
   const t = useI18n();
-  const progressLabel =
-    progress && progress.total > 0
-      ? `${progress.completed}/${progress.total}`
-      : null;
   return (
     <>
       <div className={style.importModalTitle}>
@@ -533,14 +475,6 @@ const ImportingStatus = ({
       <p className={style.importStatusContent}>
         {t['com.affine.import.status.importing.message']()}
       </p>
-      {progressLabel ? (
-        <div className={style.importProgress}>{progressLabel}</div>
-      ) : null}
-      <div className={style.importModalButtonContainer}>
-        <Button onClick={onCancel} variant="secondary">
-          {t['Cancel']()}
-        </Button>
-      </div>
     </>
   );
 };
@@ -630,11 +564,6 @@ export const ImportDialog = ({
   const [status, setStatus] = useState<Status>('idle');
   const [importError, setImportError] = useState<ImportErrorState | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [importProgress, setImportProgress] = useState<{
-    completed: number;
-    total: number;
-  } | null>(null);
-  const importAbortControllerRef = useRef<AbortController | null>(null);
   const workspace = useService(WorkspaceService).workspace;
   const docCollection = workspace.docCollection;
   const importService = useService(ImportService);
@@ -691,12 +620,8 @@ export const ImportDialog = ({
   const handleImport = useAsyncCallback(
     async (type: ImportType) => {
       setImportError(null);
-      setImportProgress(null);
       try {
         const importConfig = importConfigs[type];
-        if (importConfig.nativeOnly && !BUILD_CONFIG.isElectron) {
-          throw new Error(t['com.affine.import.onenote.desktop-only']());
-        }
         const { acceptType, multiple } = importConfig.fileOptions;
 
         const files =
@@ -725,8 +650,6 @@ export const ImportDialog = ({
           });
         }
 
-        const abortController = new AbortController();
-        importAbortControllerRef.current = abortController;
         const {
           docIds,
           entryId,
@@ -739,14 +662,7 @@ export const ImportDialog = ({
           files,
           importAffineFile: handleImportAffineFile,
           importService,
-          context: {
-            signal: abortController.signal,
-            onProgress: progress => {
-              setImportProgress(progress);
-            },
-          },
         });
-        importAbortControllerRef.current = null;
 
         setImportResult({
           docIds,
@@ -768,7 +684,6 @@ export const ImportDialog = ({
           control: 'import',
         });
       } catch (error) {
-        importAbortControllerRef.current = null;
         const structuredError = toImportErrorState(error);
         setImportError(structuredError);
         setStatus('error');
@@ -803,19 +718,13 @@ export const ImportDialog = ({
   }, [finishImport]);
 
   const handleRetry = () => {
-    setImportProgress(null);
     setStatus('idle');
   };
 
-  const handleCancel = useCallback(() => {
-    importAbortControllerRef.current?.abort();
-  }, []);
 
   const statusComponents = {
     idle: <ImportOptions onImport={handleImport} />,
-    importing: (
-      <ImportingStatus progress={importProgress} onCancel={handleCancel} />
-    ),
+    importing: <ImportingStatus />,
     success: (
       <SuccessStatus
         warnings={(importResult?.warnings ?? []).map(warning =>

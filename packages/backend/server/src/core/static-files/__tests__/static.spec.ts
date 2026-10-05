@@ -19,8 +19,6 @@ function initStaticFixture(root: string) {
     ['index.html', 'web-index'],
     ['admin/index.html', 'admin-index'],
     ['assets/main.js', 'web-asset'],
-    ['mobile/index.html', 'mobile-index'],
-    ['mobile/assets/main.js', 'mobile-asset'],
   ];
 
   for (const [file, content] of files) {
@@ -140,49 +138,45 @@ test.serial(
   }
 );
 
-test.serial('uses mobile root only in dev namespace for mobile UA', async t => {
+test.serial('serves the web app for every browser in every namespace', async t => {
   const fixtureRoot = mkdtempSync(join(tmpdir(), 'affine-static-files-'));
   initStaticFixture(fixtureRoot);
 
   const prevProjectRoot = env.projectRoot;
   const prevNamespace = env.NAMESPACE;
+  const browserHeaders: Record<string, string>[] = [
+    { 'user-agent': mobileUA },
+    { 'sec-ch-ua-mobile': '?1' },
+    { 'sec-ch-ua-platform': '"Android"' },
+    { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+  ];
 
   try {
     // @ts-expect-error test override
     env.projectRoot = fixtureRoot;
-    // @ts-expect-error test override
-    env.NAMESPACE = Namespace.Dev;
 
-    const app = await createApp();
+    for (const namespace of [Namespace.Dev, Namespace.Production]) {
+      // @ts-expect-error test override
+      env.NAMESPACE = namespace;
 
-    const mobileAssetRes = await request(app)
-      .get('/assets/main.js')
-      .set('user-agent', mobileUA)
-      .expect(200);
-    t.is(mobileAssetRes.text, 'mobile-asset');
+      for (const basePath of ['', '/affine']) {
+        const app = await createApp(basePath);
 
-    const webAssetRes = await request(app).get('/assets/main.js').expect(200);
-    t.is(webAssetRes.text, 'web-asset');
+        for (const headers of browserHeaders) {
+          const asset = await request(app)
+            .get(`${basePath}/assets/main.js`)
+            .set(headers)
+            .expect(200);
+          t.is(asset.text, 'web-asset');
 
-    const mobileFromHint = await request(app)
-      .get('/assets/main.js')
-      .set('user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
-      .set('sec-ch-ua-mobile', '?1')
-      .expect(200);
-    t.is(mobileFromHint.text, 'mobile-asset');
-
-    const desktopFromHint = await request(app)
-      .get('/assets/main.js')
-      .set('user-agent', mobileUA)
-      .set('sec-ch-ua-mobile', '?0')
-      .expect(200);
-    t.is(desktopFromHint.text, 'web-asset');
-
-    const mobileFromPlatformHint = await request(app)
-      .get('/assets/main.js')
-      .set('sec-ch-ua-platform', '"Android"')
-      .expect(200);
-    t.is(mobileFromPlatformHint.text, 'mobile-asset');
+          const page = await request(app)
+            .get(`${basePath}/workspace/path`)
+            .set(headers)
+            .expect(200);
+          t.is(page.text, 'web-index');
+        }
+      }
+    }
   } finally {
     // @ts-expect-error test override
     env.projectRoot = prevProjectRoot;

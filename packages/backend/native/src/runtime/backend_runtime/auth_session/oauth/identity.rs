@@ -106,8 +106,8 @@ pub(in super::super) async fn bind_and_issue(
     .map_err(|error| RuntimeError::database("bind OAuth account", error))?;
     (user_id, created)
   };
-  let user = lock_user(&mut tx, &user_id).await?;
-  let result = issuance::issue(&mut tx, runtime, &user_id, &user, issue, now, Some(created)).await?;
+  lock_user(&mut tx, &user_id).await?;
+  let result = issuance::issue(&mut tx, runtime, &user_id, issue, now, Some(created)).await?;
   tx.commit()
     .await
     .map_err(|error| RuntimeError::database("commit OAuth identity binding", error))?;

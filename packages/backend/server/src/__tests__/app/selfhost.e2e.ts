@@ -27,8 +27,6 @@ function initTestStaticFiles(staticPath: string) {
     'main.a.js': `const name = 'affine'`,
     'admin/selfhost.html': `<!DOCTYPE html><html><body>AFFiNE Admin</body><script src="/admin/main.b.js"/></html>`,
     'admin/main.b.js': `const name = 'affine-admin'`,
-    'mobile/selfhost.html': `<!DOCTYPE html><html><body>AFFiNE mobile</body><script src="/mobile/main.c.js"/></html>`,
-    'mobile/main.c.js': `const name = 'affine-mobile'`,
   };
 
   for (const [filename, content] of Object.entries(files)) {
@@ -91,10 +89,6 @@ test('do not allow visit index.html directly', async t => {
     .expect(302);
 
   t.is(res.header.location, '/admin');
-
-  res = await request(t.context.app.getHttpServer())
-    .get('/mobile/index.html')
-    .expect(302);
 });
 
 test('should always return static asset files', async t => {
@@ -107,11 +101,6 @@ test('should always return static asset files', async t => {
     .get('/admin/main.b.js')
     .expect(200);
   t.is(res.text, "const name = 'affine-admin'");
-
-  res = await request(t.context.app.getHttpServer())
-    .get('/main.c.js')
-    .expect(200);
-  t.is(res.text, "const name = 'affine-mobile'");
 
   await t.context.db.user.create({
     data: {
@@ -130,10 +119,6 @@ test('should always return static asset files', async t => {
     .expect(200);
   t.is(res.text, "const name = 'affine-admin'");
 
-  res = await request(t.context.app.getHttpServer())
-    .get('/main.c.js')
-    .expect(200);
-  t.is(res.text, "const name = 'affine-mobile'");
 });
 
 test('should be able to call apis', async t => {
@@ -203,8 +188,7 @@ test('should redirect to admin if initialized', async t => {
   t.is(res.header.location, '/admin');
 });
 
-// TODO(@forehalo): return mobile when it's ready
-test.skip('should return web assets if visited by mobile', async t => {
+test('should return web assets if visited by mobile', async t => {
   await t.context.db.user.create({
     data: {
       name: 'test',
@@ -217,7 +201,7 @@ test.skip('should return web assets if visited by mobile', async t => {
     .set('user-agent', mobileUAString)
     .expect(200);
 
-  t.true(res.text.includes('AFFiNE mobile'));
+  t.true(res.text.includes('<script src="main.a.js"/>'));
 });
 
 test('should can send maximum size of body', async t => {

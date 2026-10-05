@@ -1,6 +1,5 @@
 import type { SettingTab } from '@affine/core/modules/dialogs/constant';
 import { toDocSearchParams } from '@affine/core/modules/navigation';
-import { getOpenUrlInDesktopAppLink } from '@affine/core/modules/open-in-app';
 import type { DocMode } from '@blocksuite/affine/model';
 import { nanoid } from 'nanoid';
 import { createContext, useCallback, useContext, useMemo } from 'react';
@@ -270,20 +269,6 @@ export function useNavigateHelper() {
     [navigateTo]
   );
 
-  const jumpToOpenInApp = useCallback(
-    (url: string, newTab = true) => {
-      const deeplink = getOpenUrlInDesktopAppLink(url, newTab);
-
-      if (!deeplink) {
-        return;
-      }
-
-      const encodedUrl = encodeURIComponent(deeplink);
-      return navigateTo(`/open-app/url?url=${encodedUrl}`);
-    },
-    [navigateTo]
-  );
-
   const jumpToImportTemplate = useCallback(
     (name: string, snapshotUrl: string) => {
       return navigateTo(
@@ -323,7 +308,6 @@ export function useNavigateHelper() {
       jumpToCollections,
       jumpToTags,
       jumpToTag,
-      jumpToOpenInApp,
       jumpToImportTemplate,
       jumpToWorkspaceSettings,
     }),
@@ -340,7 +324,6 @@ export function useNavigateHelper() {
       jumpToCollections,
       jumpToTags,
       jumpToTag,
-      jumpToOpenInApp,
       jumpToImportTemplate,
       jumpToWorkspaceSettings,
     ]

@@ -7,7 +7,6 @@ import {
   QuickFavorite,
   QuickRestore,
   QuickSelect,
-  QuickSplit,
   QuickTab,
 } from './docs-view/quick-actions';
 import type { ExplorerDisplayPreference } from './types';
@@ -35,11 +34,6 @@ const QUICK_ACTION_MAP: Record<QuickActionKey, QuickActionItem> = {
   quickTrash: {
     name: 'com.affine.all-docs.quick-action.trash',
     Component: QuickDelete,
-  },
-  quickSplit: {
-    name: 'com.affine.all-docs.quick-action.split',
-    Component: QuickSplit,
-    disabled: !BUILD_CONFIG.isElectron,
   },
   quickTab: {
     name: 'com.affine.all-docs.quick-action.tab',

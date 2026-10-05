@@ -1,7 +1,6 @@
 import { cssVarV2 } from '@toeverything/theme/v2';
 import { createVar, fallbackVar, keyframes, style } from '@vanilla-extract/css';
 
-const gap = createVar();
 const borderRadius = createVar();
 const resizeHandleWidth = createVar();
 export const size = createVar();
@@ -43,20 +42,13 @@ export const splitViewPanel = style({
     '[data-is-reordering="true"]&': {
       flexGrow: 1,
     },
-    '[data-client-border="false"] &[data-is-first="true"]': {
+    '&[data-is-first="true"]': {
       borderTopLeftRadius: borderRadius,
     },
-    '[data-client-border="false"] &:not([data-is-last="true"]):not([data-is-dragging="true"])':
+    '&:not([data-is-last="true"]):not([data-is-dragging="true"])':
       {
         borderRight: `0.5px solid ${cssVarV2('layer/insideBorder/border')}`,
       },
-    '[data-client-border="true"] &': {
-      border: `0.5px solid ${cssVarV2('layer/insideBorder/border')}`,
-      borderTopLeftRadius: borderRadius,
-      borderBottomLeftRadius: borderRadius,
-      borderTopRightRadius: borderRadius,
-      borderBottomRightRadius: borderRadius,
-    },
   },
 });
 
@@ -131,16 +123,13 @@ export const resizeHandle = style({
       right: 0,
       left: 'auto',
     },
-    '[data-client-border="false"] &[data-is-last="true"][data-edge="right"]::before, [data-client-border="false"] &[data-is-last="true"][data-edge="right"]::after':
+    '&[data-is-last="true"][data-edge="right"]::before, &[data-is-last="true"][data-edge="right"]::after':
       {
         transform: `translateX(calc(0.5 * ${resizeHandleWidth} - 1px))`,
       },
 
     '&[data-can-resize="true"]': {
       cursor: 'col-resize',
-    },
-    '[data-client-border="true"] &[data-edge="right"]': {
-      right: `calc(${resizeHandleWidth} * -0.5 - 0.5px - ${gap} / 2)`,
     },
     [`.${splitViewPanel}[data-is-dragging="true"] &`]: {
       display: 'none',
@@ -195,7 +184,6 @@ export const resizeHandle = style({
 
 export const splitViewRoot = style({
   vars: {
-    [gap]: '0px',
     [borderRadius]: '6px',
     [resizeHandleWidth]: '10px',
     [dropIndicatorWidth]: '2px',
@@ -206,16 +194,10 @@ export const splitViewRoot = style({
   flexDirection: 'row',
   position: 'relative',
   borderRadius,
-  gap,
   padding: '0 10px',
   margin: '0 -10px',
 
   selectors: {
-    '&[data-client-border="true"]': {
-      vars: {
-        [gap]: '8px',
-      },
-    },
     [`&:has(${resizeHandle}[data-dragging-over="true"])`]: {
       overflow: 'clip',
     },

@@ -18,13 +18,5 @@ export const workbenchSidebar = style({
   flexShrink: 0,
   height: '100%',
   right: 0,
-  selectors: {
-    [`&[data-client-border=true]`]: {
-      paddingLeft: 8,
-      borderRadius: 6,
-    },
-    [`&[data-client-border=false]`]: {
-      borderLeft: `0.5px solid ${cssVarV2.layer.insideBorder.border}`,
-    },
-  },
+  borderLeft: `0.5px solid ${cssVarV2.layer.insideBorder.border}`,
 });

@@ -178,8 +178,8 @@ const CustomConfirmButton = ({
   }, [account, checkAttempt, graphqlService, loginStatus, server]);
 
   const openSignInModal = useCallback(() => {
-    globalDialogService.open('sign-in', { server: server?.baseUrl });
-  }, [globalDialogService, server?.baseUrl]);
+    globalDialogService.open('sign-in', {});
+  }, [globalDialogService]);
 
   const handleConfirm = useAsyncCallback(async () => {
     if (

@@ -38,7 +38,7 @@ export const SidebarContainer = ({
             viewId={view.id}
             className={clsx(
               styles.sidebarBodyTarget,
-              !BUILD_CONFIG.isElectron && styles.borderTop
+              styles.borderTop
             )}
             data-testid={`sidebar-tab-content-${sidebar.id}`}
           />

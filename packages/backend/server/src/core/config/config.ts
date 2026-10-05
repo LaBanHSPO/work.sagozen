@@ -24,7 +24,7 @@ declare global {
 
 defineModuleConfig('server', {
   name: {
-    desc: 'A recognizable name for the server. Will be shown when connected with AFFiNE Desktop.',
+    desc: 'A recognizable name for the server.',
     default: undefined,
     shape: z.string().optional(),
   },

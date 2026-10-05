@@ -85,9 +85,6 @@ export const createDocExplorerContext = (
     quickSelect$: displayPreference$.selector(
       displayPreference => displayPreference.quickSelect
     ),
-    quickSplit$: displayPreference$.selector(
-      displayPreference => displayPreference.quickSplit
-    ),
     quickTrash$: displayPreference$.selector(
       displayPreference => displayPreference.quickTrash
     ),

@@ -172,7 +172,7 @@ const MobileTextValue = ({
   );
 };
 
-export const TextValue = BUILD_CONFIG.isMobileWeb
+export const TextValue = environment.isMobile
   ? MobileTextValue
   : DesktopTextValue;
 

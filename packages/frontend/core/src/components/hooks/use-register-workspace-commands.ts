@@ -1,5 +1,4 @@
 import { AppSidebarService } from '@affine/core/modules/app-sidebar';
-import { DesktopApiService } from '@affine/core/modules/desktop-api';
 import {
   GlobalDialogService,
   WorkspaceDialogService,
@@ -28,7 +27,6 @@ import {
   registerAffineLayoutCommands,
   registerAffineNavigationCommands,
   registerAffineSettingsCommands,
-  registerAffineUpdatesCommands,
 } from '../../commands';
 import { EditorSettingService } from '../../modules/editor-setting';
 import { CMDKQuickSearchService } from '../../modules/quicksearch/services/cmdk';
@@ -76,10 +74,8 @@ export function useRegisterWorkspaceCommands() {
 
   const i18n = i18nService.i18n;
 
-  const desktopApiService = useServiceOptional(DesktopApiService);
   const workbenchService = useServiceOptional(WorkbenchService);
 
-  const quitAndInstall = desktopApiService?.handler.updater.quitAndInstall;
 
   useEffect(() => {
     const unsub = registerCMDKCommand(cMDKQuickSearchService);
@@ -89,22 +85,6 @@ export function useRegisterWorkspaceCommands() {
     };
   }, [cMDKQuickSearchService]);
 
-  // register AffineUpdatesCommands
-  useEffect(() => {
-    if (!quitAndInstall) {
-      return;
-    }
-
-    const unsub = registerAffineUpdatesCommands({
-      store,
-      t,
-      quitAndInstall,
-    });
-
-    return () => {
-      unsub();
-    };
-  }, [quitAndInstall, store, t]);
 
   // register AffineNavigationCommands
   useEffect(() => {

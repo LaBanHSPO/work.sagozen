@@ -3,10 +3,6 @@ import type { Configuration as RspackDevServerConfiguration } from '@rspack/dev-
 export const RSPACK_SUPPORTED_PACKAGES = [
   '@affine/admin',
   '@affine/web',
-  '@affine/mobile',
-  '@affine/ios',
-  '@affine/android',
-  '@affine/electron-renderer',
   '@affine/server',
   '@affine/reader',
 ] as const;
@@ -38,8 +34,6 @@ export const DEFAULT_DEV_SERVER_CONFIG: RspackDevServerConfiguration = {
     overlay: process.env.DISABLE_DEV_OVERLAY === 'true' ? false : undefined,
     logging: process.env.CI ? 'none' : 'error',
     // see: https://webpack.js.org/configuration/dev-server/#websocketurl
-    // must be an explicit ws/wss URL because custom protocols (e.g. assets://)
-    // cannot be used to construct WebSocket endpoints in Electron
     webSocketURL: 'ws://0.0.0.0:8080/ws',
   },
   historyApiFallback: {

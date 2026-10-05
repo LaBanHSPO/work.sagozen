@@ -35,9 +35,9 @@ test.after.always(async t => {
   await t.context.app.close();
 });
 
-test('native access-token verifier returns the canonical principal', async t => {
+test('historical access-token verifier returns the canonical principal', async t => {
   const user = await t.context.app.createUser('access-token@affine.pro');
-  const issued = await t.context.app.createNativeAuthSession(user.id, {
+  const issued = await t.context.app.seedLegacyAuthSession(user.id, {
     installationId: 'access-installation',
     platform: 'android',
   });
@@ -55,7 +55,7 @@ test('native access-token verifier returns the canonical principal', async t => 
 
 test('retiring keys verify old tokens while session state remains authoritative', async t => {
   const user = await t.context.app.createUser('rotated-token@affine.pro');
-  const issued = await t.context.app.createNativeAuthSession(user.id);
+  const issued = await t.context.app.seedLegacyAuthSession(user.id);
   const active = (await t.context.keys.metadata()).find(
     key => key.status === 'active'
   );
@@ -71,9 +71,9 @@ test('retiring keys verify old tokens while session state remains authoritative'
   t.is((error as SessionAccessTokenError).code, 'AUTH_SESSION_REVOKED');
 });
 
-test('expired parent cookie lifetime invalidates native access tokens', async t => {
+test('expired parent cookie lifetime invalidates historical access tokens', async t => {
   const user = await t.context.app.createUser('expired-token@affine.pro');
-  const issued = await t.context.app.createNativeAuthSession(user.id);
+  const issued = await t.context.app.seedLegacyAuthSession(user.id);
   await t.context.db.userSession.updateMany({
     where: { userId: user.id },
     data: { expiresAt: new Date(0) },

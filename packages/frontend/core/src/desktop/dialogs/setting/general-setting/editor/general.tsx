@@ -1,14 +1,10 @@
 import {
-  Loading,
   Menu,
   MenuItem,
   type MenuProps,
-  MenuSeparator,
   MenuTrigger,
   RadioGroup,
   type RadioItem,
-  RowInput,
-  Scrollable,
   Slider,
   Switch,
   useConfirmModal,
@@ -17,9 +13,7 @@ import {
   SettingRow,
   SettingWrapper,
 } from '@affine/component/setting-components';
-import { useAsyncCallback } from '@affine/core/components/hooks/affine-async-hooks';
 import { ServerService } from '@affine/core/modules/cloud';
-import { DesktopApiService } from '@affine/core/modules/desktop-api';
 import {
   type EditorSettingSchema,
   EditorSettingService,
@@ -28,26 +22,14 @@ import {
   type NewDocDateTitleFormat,
   newDocDateTitleFormatOptions,
 } from '@affine/core/modules/editor-setting';
-import { SpellCheckSettingService } from '@affine/core/modules/editor-setting/services/spell-check-setting';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
-import {
-  type FontData,
-  SystemFontFamilyService,
-} from '@affine/core/modules/system-font-family';
-import { Trans, useI18n } from '@affine/i18n';
-import { DoneIcon, SearchIcon } from '@blocksuite/icons/rc';
+import { useI18n } from '@affine/i18n';
 import { useLiveData, useService, useServices } from '@toeverything/infra';
-import clsx from 'clsx';
 import {
-  forwardRef,
-  type HTMLAttributes,
-  type PropsWithChildren,
   useCallback,
   useEffect,
   useMemo,
-  useState,
 } from 'react';
-import { Virtuoso } from 'react-virtuoso';
 
 import * as styles from './style.css';
 
@@ -92,26 +74,7 @@ const FontFamilySettings = () => {
   const { editorSettingService } = useServices({ EditorSettingService });
   const settings = useLiveData(editorSettingService.editorSetting.settings$);
 
-  const radioItems = useMemo(() => {
-    const items = getBaseFontStyleOptions(t);
-    if (!BUILD_CONFIG.isElectron) return items;
-
-    // resolve custom fonts
-    const customOption = fontStyleOptions.find(opt => opt.key === 'Custom');
-    if (customOption) {
-      const fontFamily = settings.customFontFamily
-        ? `${settings.customFontFamily}, ${customOption.value}`
-        : customOption.value;
-      items.push({
-        value: customOption.key,
-        label: getLabel(customOption.key, t),
-        testId: 'system-font-style-trigger',
-        style: { fontFamily },
-      });
-    }
-
-    return items;
-  }, [settings.customFontFamily, t]);
+  const radioItems = useMemo(() => getBaseFontStyleOptions(t), [t]);
 
   const handleFontFamilyChange = useCallback(
     (value: FontFamily) => {
@@ -132,181 +95,6 @@ const FontFamilySettings = () => {
         className={styles.settingWrapper}
         onChange={handleFontFamilyChange}
       />
-    </SettingRow>
-  );
-};
-
-const getFontFamily = (font: string) => `${font}, ${fontStyleOptions[0].value}`;
-
-const Scroller = forwardRef<
-  HTMLDivElement,
-  PropsWithChildren<HTMLAttributes<HTMLDivElement>>
->(({ children, ...props }, ref) => {
-  return (
-    <Scrollable.Root>
-      <Scrollable.Viewport {...props} ref={ref}>
-        {children}
-      </Scrollable.Viewport>
-      <Scrollable.Scrollbar />
-    </Scrollable.Root>
-  );
-});
-
-Scroller.displayName = 'Scroller';
-
-const FontMenuItems = ({ onSelect }: { onSelect: (font: string) => void }) => {
-  const { systemFontFamilyService, editorSettingService } = useServices({
-    SystemFontFamilyService,
-    EditorSettingService,
-  });
-  const systemFontFamily = systemFontFamilyService.systemFontFamily;
-
-  const currentCustomFont = useLiveData(
-    editorSettingService.editorSetting.settings$
-  ).customFontFamily;
-  useEffect(() => {
-    if (systemFontFamily.fontList$.value.length === 0) {
-      systemFontFamily.loadFontList();
-    }
-    systemFontFamily.clearSearch();
-  }, [systemFontFamily]);
-
-  const isLoading = useLiveData(systemFontFamily.isLoading$);
-  const result = useLiveData(systemFontFamily.result$);
-  const searchText = useLiveData(systemFontFamily.searchText$);
-
-  const onInputChange = useCallback(
-    (value: string) => {
-      systemFontFamily.search(value);
-    },
-    [systemFontFamily]
-  );
-  const onInputKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      e.stopPropagation(); // avoid typeahead search built-in in the menu
-    },
-    []
-  );
-
-  return (
-    <div>
-      <div className={styles.InputContainer}>
-        <SearchIcon className={styles.searchIcon} />
-        <RowInput
-          value={searchText ?? ''}
-          onChange={onInputChange}
-          onKeyDown={onInputKeyDown}
-          autoFocus
-          className={styles.searchInput}
-          placeholder="Fonts"
-        />
-      </div>
-      <MenuSeparator />
-      {isLoading ? (
-        <Loading />
-      ) : (
-        <Scrollable.Root style={{ height: '330px' }}>
-          <Scrollable.Viewport>
-            {result.length > 0 ? (
-              <Virtuoso
-                totalCount={result.length}
-                components={{
-                  Scroller: Scroller,
-                }}
-                itemContent={index => (
-                  <FontMenuItem
-                    key={result[index].fullName}
-                    font={result[index]}
-                    onSelect={onSelect}
-                    currentFont={currentCustomFont}
-                  />
-                )}
-              />
-            ) : (
-              <div className={styles.notFound}>No results found.</div>
-            )}
-          </Scrollable.Viewport>
-          <Scrollable.Scrollbar />
-        </Scrollable.Root>
-      )}
-    </div>
-  );
-};
-
-const FontMenuItem = ({
-  font,
-  currentFont,
-  onSelect,
-}: {
-  font: FontData;
-  currentFont: string;
-  onSelect: (font: string) => void;
-}) => {
-  const handleFontSelect = useCallback(
-    () => onSelect(font.family),
-    [font, onSelect]
-  );
-  const fontFamily = getFontFamily(font.family);
-  const selected = currentFont === font.fullName;
-
-  return (
-    <div style={{ marginTop: '4px' }}>
-      <MenuItem key={font.fullName} onSelect={handleFontSelect}>
-        <div className={styles.fontItemContainer}>
-          <div className={styles.fontItem}>
-            <div className={styles.fontLabel} style={{ fontFamily }}>
-              {font.fullName}
-            </div>
-            <div className={clsx(styles.fontLabel, 'secondary')}>
-              {font.fullName}
-            </div>
-          </div>
-
-          {selected && (
-            <DoneIcon fontSize={20} className={styles.selectedIcon} />
-          )}
-        </div>
-      </MenuItem>
-    </div>
-  );
-};
-
-const CustomFontFamilySettings = () => {
-  const t = useI18n();
-  const { editorSettingService } = useServices({ EditorSettingService });
-  const settings = useLiveData(editorSettingService.editorSetting.settings$);
-
-  const fontFamily = getFontFamily(settings.customFontFamily);
-
-  const onCustomFontFamilyChange = useCallback(
-    (fontFamily: string) => {
-      editorSettingService.editorSetting.set('customFontFamily', fontFamily);
-    },
-    [editorSettingService.editorSetting]
-  );
-  if (settings.fontFamily !== 'Custom' || !BUILD_CONFIG.isElectron) {
-    return null;
-  }
-  return (
-    <SettingRow
-      name={t[
-        'com.affine.settings.editorSettings.general.font-family.custom.title'
-      ]()}
-      desc={t[
-        'com.affine.settings.editorSettings.general.font-family.custom.description'
-      ]()}
-    >
-      <Menu
-        items={<FontMenuItems onSelect={onCustomFontFamilyChange} />}
-        contentOptions={{
-          align: 'end',
-          style: { width: '250px', height: '380px' },
-        }}
-      >
-        <MenuTrigger className={styles.menuTrigger} style={{ fontFamily }}>
-          {settings.customFontFamily || 'Select a font'}
-        </MenuTrigger>
-      </Menu>
     </SettingRow>
   );
 };
@@ -597,56 +385,6 @@ const AISettings = () => {
   );
 };
 
-const SpellCheckSettings = () => {
-  const t = useI18n();
-  const spellCheckSetting = useService(SpellCheckSettingService);
-
-  const desktopApiService = useService(DesktopApiService);
-
-  const enabled = useLiveData(spellCheckSetting.enabled$)?.enabled;
-
-  const [requireRestart, setRequireRestart] = useState(false);
-
-  const onToggleSpellCheck = useCallback(
-    (checked: boolean) => {
-      spellCheckSetting.setEnabled(checked);
-      setRequireRestart(true);
-    },
-    [spellCheckSetting]
-  );
-
-  const onRestart = useAsyncCallback(async () => {
-    await desktopApiService.handler.ui.restartApp();
-  }, [desktopApiService]);
-
-  return (
-    <SettingRow
-      name={t['com.affine.settings.editorSettings.general.spell-check.title']()}
-      desc={
-        requireRestart ? (
-          <div className={styles.spellCheckSettingDescription}>
-            <Trans i18nKey="com.affine.settings.editorSettings.general.spell-check.restart-hint">
-              Settings changed; please restart the app.
-              <button
-                onClick={onRestart}
-                className={styles.spellCheckSettingDescriptionButton}
-              >
-                Restart
-              </button>
-            </Trans>
-          </div>
-        ) : (
-          t[
-            'com.affine.settings.editorSettings.general.spell-check.description'
-          ]()
-        )
-      }
-    >
-      <Switch checked={enabled} onChange={onToggleSpellCheck} />
-    </SettingRow>
-  );
-};
-
 const MiddleClickPasteSettings = () => {
   const t = useI18n();
   const editorSettingService = useService(EditorSettingService);
@@ -711,12 +449,10 @@ export const General = () => {
     <SettingWrapper title={t['com.affine.settings.editorSettings.general']()}>
       <AISettings />
       <FontFamilySettings />
-      <CustomFontFamilySettings />
       <FontSizeSettings />
       <NewDocDefaultModeSettings />
       <NewDocDateTitleSettings />
       <DefaultCodeBlockLineNumberSettings />
-      {BUILD_CONFIG.isElectron && <SpellCheckSettings />}
       {environment.isLinux && <MiddleClickPasteSettings />}
     </SettingWrapper>
   );

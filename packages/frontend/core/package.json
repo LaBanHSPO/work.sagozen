@@ -10,7 +10,6 @@
   "dependencies": {
     "@affine/component": "workspace:*",
     "@affine/debug": "workspace:*",
-    "@affine/electron-api": "workspace:*",
     "@affine/env": "workspace:*",
     "@affine/error": "workspace:*",
     "@affine/graphql": "workspace:*",

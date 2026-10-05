@@ -6,7 +6,6 @@
 >
 > **Note**
 > This guide covers building and developing the **web app**.
-> For the desktop client app, see [building-desktop-client-app.md](./building-desktop-client-app.md).
 > For running the server (cloud features) locally, see [developing-server.md](./developing-server.md).
 
 ## Table of Contents
@@ -37,7 +36,7 @@ If `license/cla` is still red after you signed:
 
 ## Prerequisites
 
-AFFiNE client has both **Node.js** & **Rust** toolchains.
+The browser apps need **Node.js** and **Yarn**. **Rust** is required only when building the server's native backend.
 
 ### Node.js
 
@@ -67,7 +66,7 @@ After this, `yarn` inside the repository automatically resolves to the pinned ve
 
 ### Rust
 
-Install the Rust toolchain via [rustup](https://rustup.rs/). The required version is pinned in [`rust-toolchain.toml`](../rust-toolchain.toml), and rustup installs it automatically the first time you build inside the repository.
+For the server backend, install the Rust toolchain via [rustup](https://rustup.rs/). The required version is pinned in [`rust-toolchain.toml`](../rust-toolchain.toml), and rustup installs it automatically the first time you build inside the repository.
 
 ## Setup Environment
 
@@ -103,16 +102,6 @@ yarn install
 
 This also initializes the workspace (`yarn affine init`) and installs the git hooks through the `postinstall` script.
 
-### Build Native Dependencies
-
-Run the following script. It will build the native module at [`packages/frontend/native`](../packages/frontend/native) and build Node.js binding using [NAPI.rs](https://napi.rs/). This could take a while if you build it for the first time.
-
-```sh
-yarn affine @affine/native build
-```
-
-> Note: use `strip` from system instead of `binutils` if you are running macOS. [See problem here](https://github.com/toeverything/AFFiNE/discussions/2840)
-
 ### Build Server Dependencies
 
 Only needed if you plan to run the local server (cloud features) or the cloud E2E suites:
@@ -135,7 +124,17 @@ You can skip the prompt with the `-p` (`--package`) flag:
 yarn dev -p @affine/web
 ```
 
-Other dev targets include `@affine/server`, `@affine/electron`, `@affine/mobile`, `@affine/admin`, `@affine/ios` and `@affine/android`.
+Build the browser distributions with:
+
+```sh
+yarn affine @affine/web build
+yarn affine @affine/admin build
+```
+
+The [web browser E2E suite](../tests/affine-local/e2e/open-affine.spec.ts) includes
+phone-browser smoke coverage using the same web server and editor.
+
+The other application dev targets are `@affine/server` and `@affine/admin`. Every browser, including phones and tablets, uses `@affine/web`; there is no separate mobile application or native shell.
 
 Running `@affine/web` alone is enough for most editor and UI work — workspaces are stored locally in the browser. To work on **cloud** features (accounts, sync, collaboration, AI), run the local server as well: follow [developing-server.md](./developing-server.md).
 
@@ -145,8 +144,7 @@ Web and mobile browser login use the self-hosted server at
 **https://work.computeruse.best/** with email and password. The login screen
 does not offer cloud OAuth, another server URL, or guest login. Opening login
 from another origin, including a local development server, navigates to that
-server's `/sign-in` page and preserves `redirect_uri`. Native app login flows
-retain their existing server choices.
+server's `/sign-in` page and preserves `redirect_uri`.
 
 ## Testing
 
@@ -175,9 +173,6 @@ The E2E suites live in [`tests`](../tests):
 | `affine-local`         | `yarn workspace @affine-test/affine-local e2e`         | Web app, no server needed                           |
 | `affine-cloud`         | `yarn workspace @affine-test/affine-cloud e2e`         | Requires the [local server](./developing-server.md) |
 | `affine-cloud-copilot` | `yarn workspace @affine-test/affine-cloud-copilot e2e` | Requires the local server                           |
-| `affine-desktop`       | `yarn workspace @affine-test/affine-desktop e2e`       | Desktop (Electron) app                              |
-| `affine-desktop-cloud` | `yarn workspace @affine-test/affine-desktop-cloud e2e` | Desktop + local server                              |
-| `affine-mobile`        | `yarn workspace @affine-test/affine-mobile e2e`        | Mobile UI                                           |
 
 There is also `@affine-test/blocksuite` (`yarn workspace @affine-test/blocksuite test`) for BlockSuite integration tests.
 
@@ -214,7 +209,7 @@ yarn typecheck
    ```
 
    - **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
-   - **Scopes** (optional; if present, must be one of): `admin`, `electron`, `server`, `core`, `web`, `mobile`, `ios`, `android`, `mobile-native`, `docs`, `component`, `env`, `graphql`, `hooks`, `i18n`, `native`, `templates`, `debug`, `nbstore`, `infra`, `editor`, `tools`, `y-octo`, `client`
+   - **Scopes** (optional; if present, must be one of): `admin`, `server`, `core`, `web`, `docs`, `component`, `env`, `graphql`, `hooks`, `i18n`, `native`, `templates`, `debug`, `nbstore`, `infra`, `editor`, `tools`, `y-octo`, `client`
 
 6. Your PR can be merged once:
    - the **`license/cla`** check is green — every committer has signed the CLA;
@@ -226,14 +221,13 @@ yarn typecheck
 - **`yarn install` fails or complains about the Node/Yarn version** — check that `node -v` matches [`.nvmrc`](../.nvmrc) (`fnm use` / `nvm use`) and that Corepack is enabled (`yarn -v` should print `4.x`, not `1.x`).
 - **Native module fails to build on macOS** — make sure `strip` is the system one, not the one from `binutils` ([details](https://github.com/toeverything/AFFiNE/discussions/2840)).
 - **`EPERM: operation not permitted, symlink` on Windows** — enable Developer Mode and symlinks before cloning; see [Windows](#windows).
-- **App fails to start after pulling the latest `canary`** — dependencies or Rust bindings may have changed: re-run `yarn install` and `yarn affine @affine/native build`.
+- **App fails to start after pulling the latest `canary`** — re-run `yarn install`. If the server's Rust bindings changed, rebuild `@affine/server-native` as described above.
 - **Playwright can't find browsers** — run `npx playwright install`.
 - **The `license/cla` check stays red** — see [Sign the CLA first](#sign-the-cla-first).
 
 ## Related Documents
 
 - [developing-server.md](./developing-server.md) — run the AFFiNE server locally (cloud features)
-- [building-desktop-client-app.md](./building-desktop-client-app.md) — build the desktop (Electron) client
 - [contributing/tutorial.md](./contributing/tutorial.md) — a walkthrough of the codebase
 - [types-of-contributions.md](./types-of-contributions.md) — ways to contribute beyond code
 - [issue-triaging.md](./issue-triaging.md) — how issues are triaged

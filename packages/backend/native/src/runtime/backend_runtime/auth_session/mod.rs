@@ -8,16 +8,14 @@ mod oauth;
 mod oauth_http;
 mod oauth_jwt;
 mod principal;
-mod refresh;
 mod security;
 mod security_challenge;
 mod session;
-mod successor;
 mod types;
 
 use serde_json::Value;
 use session::{decision_time, lock_refresh_tokens, lock_user};
-use types::{AuthSessionCommand, PrincipalInput, TokenPairSession};
+use types::{AuthSessionCommand, PrincipalInput};
 
 use super::{BackendRuntime, RuntimeError, RuntimeResult, to_napi_error};
 
@@ -52,32 +50,6 @@ async fn dispatch(
 ) -> RuntimeResult<Value> {
   match command {
     AuthSessionCommand::InitializeKeyring => keyring::initialize(pool, config).await.and_then(json_value),
-    AuthSessionCommand::Exchange {
-      code,
-      installation_id,
-      platform,
-      device_name,
-      app_version,
-    } => session::exchange(
-      pool,
-      config,
-      &code,
-      &installation_id,
-      &platform,
-      device_name.as_deref(),
-      app_version.as_deref(),
-    )
-    .await
-    .and_then(json_value),
-    AuthSessionCommand::Refresh {
-      refresh_token,
-      app_version,
-    } => refresh::refresh(pool, config, &refresh_token, app_version.as_deref())
-      .await
-      .and_then(json_value),
-    AuthSessionCommand::RevokeRefresh { refresh_token } => refresh::revoke_by_token(pool, &refresh_token)
-      .await
-      .and_then(json_value),
     AuthSessionCommand::RevokeSession {
       auth_session_id,
       user_id,
@@ -153,12 +125,6 @@ async fn dispatch(
       client_nonce,
       issue,
     } => login::complete_magic_link(pool, config, &email, &otp, client_nonce.as_deref(), issue)
-      .await
-      .and_then(json_value),
-    AuthSessionCommand::CreateOpenAppCode { user_id } => {
-      login::create_open_app_code(pool, &user_id).await.and_then(json_value)
-    }
-    AuthSessionCommand::CompleteOpenApp { code, issue } => login::complete_open_app(pool, config, &code, issue)
       .await
       .and_then(json_value),
     AuthSessionCommand::OAuthPreflight {

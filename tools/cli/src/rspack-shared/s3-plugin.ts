@@ -10,7 +10,6 @@ export const R2_BUCKET =
 
 const S3_UPLOAD_PACKAGE_NAMES = new Set([
   '@affine/web',
-  '@affine/mobile',
   '@affine/admin',
 ]);
 const MAX_UPLOAD_RETRIES = 3;

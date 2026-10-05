@@ -11,7 +11,7 @@ export function getBuildConfig(
   pkg: Package,
   buildFlags: BuildFlags
 ): BUILD_CONFIG_TYPE {
-  const distribution = PackageToDistribution.get(pkg.name);
+  const distribution = PackageToDistribution[pkg.name];
 
   if (!distribution) {
     throw new Error(`Distribution for ${pkg.name} is not found`);
@@ -22,21 +22,8 @@ export function getBuildConfig(
       return {
         debug: buildFlags.mode === 'development',
         distribution,
-        isDesktopEdition: (
-          ['web', 'desktop', 'admin'] as BUILD_CONFIG_TYPE['distribution'][]
-        ).includes(distribution),
-        isMobileEdition: (
-          ['mobile', 'ios', 'android'] as BUILD_CONFIG_TYPE['distribution'][]
-        ).includes(distribution),
-        isElectron: distribution === 'desktop',
+        isDesktopEdition: true,
         isWeb: distribution === 'web',
-        isMobileWeb: distribution === 'mobile',
-        isIOS: distribution === 'ios',
-        isAndroid: distribution === 'android',
-        isNative:
-          distribution === 'desktop' ||
-          distribution === 'ios' ||
-          distribution === 'android',
         isAdmin: distribution === 'admin',
 
         appBuildType: 'stable' as const,

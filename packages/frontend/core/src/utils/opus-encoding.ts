@@ -1,12 +1,10 @@
 import { DebugLogger } from '@affine/debug';
-import { apis } from '@affine/electron-api';
 import type {
   AudioSliceManifestItemInput,
   TranscriptionSourceAudioInput,
 } from '@affine/graphql';
 import { ArrayBufferTarget, Muxer } from 'mp4-muxer';
 
-import { isLink } from '../modules/navigation/utils';
 import { toArrayBuffer } from './array-buffer';
 
 interface AudioEncodingConfig {
@@ -27,7 +25,6 @@ interface EncodedAudioSlice {
 }
 
 const logger = new DebugLogger('opus-encoding');
-const LOCAL_FILE_ASSET_URL = 'assets://local-file';
 
 // Constants
 const DEFAULT_BITRATE = 64000;
@@ -55,39 +52,8 @@ async function blobToArrayBuffer(
   return toArrayBuffer(blob);
 }
 
-function getRecordingFileUrl(filepath: string): URL {
-  const base =
-    typeof location !== 'undefined' && location.protocol === 'assets:'
-      ? LOCAL_FILE_ASSET_URL
-      : typeof location !== 'undefined'
-        ? location.origin
-        : LOCAL_FILE_ASSET_URL;
-
-  // If filepath already contains a protocol, use it directly
-  const fileUrl = isLink(filepath)
-    ? new URL(filepath)
-    : new URL(filepath, base);
-
-  if (fileUrl.protocol === 'assets:') {
-    // Force requests to go through the local-file host so the protocol handler
-    // can validate paths correctly.
-    fileUrl.hostname = 'local-file';
-  }
-
-  return fileUrl;
-}
-
 async function readRecordingFileBuffer(filepath: string): Promise<ArrayBuffer> {
-  if (apis?.recording?.readRecordingFile) {
-    try {
-      const buffer = await apis.recording.readRecordingFile(filepath);
-      return toArrayBuffer(buffer);
-    } catch (error) {
-      logger.error('Failed to read recording file via IPC', error);
-    }
-  }
-
-  const response = await fetch(getRecordingFileUrl(filepath));
+  const response = await fetch(new URL(filepath, location.origin));
   if (!response.ok) {
     throw new Error(
       `Failed to fetch recording file: ${response.status} ${response.statusText}`

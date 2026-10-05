@@ -80,7 +80,7 @@ export const WorkspacePropertyIconSelector = ({
       items={
         <div
           style={{
-            padding: BUILD_CONFIG.isMobileEdition ? '0 20px' : undefined,
+            padding: environment.isMobile ? '0 20px' : undefined,
           }}
         >
           <IconsSelectorPanel

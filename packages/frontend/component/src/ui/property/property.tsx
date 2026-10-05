@@ -367,7 +367,7 @@ export const PropertyValue = forwardRef<
         data-readonly={readonly ? 'true' : 'false'}
         data-empty={isEmpty ? 'true' : 'false'}
         data-hoverable={
-          hoverable && !BUILD_CONFIG.isMobileEdition ? 'true' : 'false'
+          hoverable && !environment.isMobile ? 'true' : 'false'
         }
         data-property-value
         {...props}

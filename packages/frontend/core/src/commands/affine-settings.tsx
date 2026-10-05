@@ -144,31 +144,6 @@ export function registerAffineSettingsCommands({
     })
   );
 
-  // Layout Style
-  unsubs.push(
-    registerAffineCommand({
-      id: `affine:change-client-border-style`,
-      label: () => `${t['com.affine.cmdk.affine.client-border-style.to']()} ${t[
-        store.get(appSettingAtom).clientBorder
-          ? 'com.affine.cmdk.affine.switch-state.off'
-          : 'com.affine.cmdk.affine.switch-state.on'
-      ]()}
-        `,
-      category: 'affine:settings',
-      icon: <SettingsIcon />,
-      preconditionStrategy: () => BUILD_CONFIG.isElectron,
-      run() {
-        track.$.cmdk.settings.changeAppSetting({
-          key: 'clientBorder',
-          value: store.get(appSettingAtom).clientBorder ? 'off' : 'on',
-        });
-        store.set(appSettingAtom, prev => ({
-          ...prev,
-          clientBorder: !prev.clientBorder,
-        }));
-      },
-    })
-  );
 
   unsubs.push(
     registerAffineCommand({
@@ -204,7 +179,6 @@ export function registerAffineSettingsCommands({
         ]()}`,
       category: 'affine:settings',
       icon: <SettingsIcon />,
-      preconditionStrategy: () => BUILD_CONFIG.isElectron,
       run() {
         track.$.cmdk.settings.changeAppSetting({
           key: 'enableNoisyBackground',
@@ -219,31 +193,6 @@ export function registerAffineSettingsCommands({
     })
   );
 
-  unsubs.push(
-    registerAffineCommand({
-      id: `affine:change-translucent-ui-on-the-sidebar`,
-      label: () =>
-        `${t['com.affine.cmdk.affine.translucent-ui-on-the-sidebar.to']()} ${t[
-          store.get(appSettingAtom).enableBlurBackground
-            ? 'com.affine.cmdk.affine.switch-state.off'
-            : 'com.affine.cmdk.affine.switch-state.on'
-        ]()}`,
-      category: 'affine:settings',
-      icon: <SettingsIcon />,
-      preconditionStrategy: () =>
-        BUILD_CONFIG.isElectron && environment.isMacOs,
-      run() {
-        track.$.cmdk.settings.changeAppSetting({
-          key: 'enableBlurBackground',
-          value: store.get(appSettingAtom).enableBlurBackground ? 'off' : 'on',
-        });
-        store.set(appSettingAtom, prev => ({
-          ...prev,
-          enableBlurBackground: !prev.enableBlurBackground,
-        }));
-      },
-    })
-  );
 
   return () => {
     unsubs.forEach(unsub => unsub());

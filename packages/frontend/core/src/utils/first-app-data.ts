@@ -76,10 +76,7 @@ export function createFirstAppData(workspacesService: WorkspacesService) {
     return;
   }
 
-  if (
-    !BUILD_CONFIG.isMobileEdition &&
-    localStorage.getItem('is-first-open') !== null
-  ) {
+  if (localStorage.getItem('is-first-open') !== null) {
     return;
   }
 

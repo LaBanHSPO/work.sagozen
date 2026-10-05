@@ -1,6 +1,6 @@
 use affine_core::auth::{
-  AuthChallengePurpose, LoginMethodFacts, MAGIC_LINK_TTL_SECONDS, OPEN_APP_TTL_SECONDS, OtpAttemptDecision,
-  challenge_identity_matches, login_methods, otp_attempt_decision,
+  AuthChallengePurpose, LoginMethodFacts, MAGIC_LINK_TTL_SECONDS, OtpAttemptDecision, challenge_identity_matches,
+  login_methods, otp_attempt_decision,
 };
 use argon2::{Argon2, PasswordVerifier, password_hash::phc::PasswordHash};
 use chrono::{DateTime, Duration, Utc};
@@ -10,12 +10,11 @@ use subtle::ConstantTimeEq;
 
 use super::{
   RuntimeError, RuntimeResult, issuance, mail, methods,
-  session::{LockedUser, decision_time, lock_user},
+  session::decision_time,
   types::{LoginResult, SessionIssueInput},
 };
 
 pub(super) const MAGIC_PURPOSE: &str = AuthChallengePurpose::MagicLinkOtp.as_str();
-const OPEN_APP_PURPOSE: &str = AuthChallengePurpose::OpenAppSignIn.as_str();
 
 pub(super) async fn password(
   pool: &PgPool,
@@ -50,12 +49,8 @@ pub(super) async fn password(
     return Err(RuntimeError::invalid_state("wrong_sign_in_credentials"));
   }
   let user_id: String = rows[0].get("id");
-  let user = LockedUser {
-    disabled: false,
-    auth_epoch: rows[0].get("auth_epoch"),
-  };
   let now = decision_time(&mut tx).await?;
-  let result = issuance::issue(&mut tx, config, &user_id, &user, issue, now, None).await?;
+  let result = issuance::issue(&mut tx, config, &user_id, issue, now, None).await?;
   tx.commit()
     .await
     .map_err(|error| RuntimeError::database("commit password login", error))?;
@@ -273,92 +268,12 @@ pub(super) async fn complete_magic_link(
       "invalid_email_token"
     }));
   }
-  let (user_id, user, created) = fulfill_magic_user(&mut tx, &email, &payload, &users, now).await?;
+  let (user_id, created) = fulfill_magic_user(&mut tx, &email, &payload, &users, now).await?;
   consume_magic(&mut tx, &email, now).await?;
-  let result = issuance::issue(&mut tx, config, &user_id, &user, issue, now, Some(created)).await?;
+  let result = issuance::issue(&mut tx, config, &user_id, issue, now, Some(created)).await?;
   tx.commit()
     .await
     .map_err(|error| RuntimeError::database("commit magic link completion", error))?;
-  Ok(result)
-}
-
-pub(super) async fn create_open_app_code(pool: &PgPool, user_id: &str) -> RuntimeResult<String> {
-  let mut tx = pool
-    .begin()
-    .await
-    .map_err(|error| RuntimeError::database("begin open app code", error))?;
-  let user = lock_user(&mut tx, user_id).await?;
-  if user.disabled {
-    return Err(RuntimeError::invalid_state("invalid_auth_state"));
-  }
-  let now = decision_time(&mut tx).await?;
-  let code = uuid::Uuid::new_v4().to_string();
-  sqlx::query(
-    r#"INSERT INTO runtime_states(purpose,token_hash,payload,expires_at)
-       VALUES($1,$2,$3,$4)"#,
-  )
-  .bind(OPEN_APP_PURPOSE)
-  .bind(super::super::token_hash(&code))
-  .bind(serde_json::json!({ "userId": user_id, "authEpoch": user.auth_epoch }))
-  .bind(now + Duration::seconds(OPEN_APP_TTL_SECONDS))
-  .execute(&mut *tx)
-  .await
-  .map_err(|error| RuntimeError::database("create open app code", error))?;
-  tx.commit()
-    .await
-    .map_err(|error| RuntimeError::database("commit open app code", error))?;
-  Ok(code)
-}
-
-pub(super) async fn complete_open_app(
-  pool: &PgPool,
-  config: &super::super::BackendRuntimeConfig,
-  code: &str,
-  issue: SessionIssueInput,
-) -> RuntimeResult<LoginResult> {
-  let token_hash = super::super::token_hash(code);
-  let preview: Option<serde_json::Value> = sqlx::query_scalar(
-    "SELECT payload FROM runtime_states WHERE purpose=$1 AND token_hash=$2 AND consumed_at IS NULL AND \
-     expires_at>clock_timestamp()",
-  )
-  .bind(OPEN_APP_PURPOSE)
-  .bind(&token_hash)
-  .fetch_optional(pool)
-  .await
-  .map_err(|error| RuntimeError::database("load open app code", error))?;
-  let user_id = preview
-    .as_ref()
-    .and_then(|value| value.get("userId"))
-    .and_then(serde_json::Value::as_str)
-    .ok_or_else(|| RuntimeError::invalid_state("invalid_auth_state"))?
-    .to_string();
-  let mut tx = pool
-    .begin()
-    .await
-    .map_err(|error| RuntimeError::database("begin open app completion", error))?;
-  let user = lock_user(&mut tx, &user_id).await?;
-  let now = decision_time(&mut tx).await?;
-  let state: Option<serde_json::Value> = sqlx::query_scalar(
-    r#"UPDATE runtime_states SET consumed_at=$3,updated_at=$3
-       WHERE purpose=$1 AND token_hash=$2 AND consumed_at IS NULL AND expires_at>$3 RETURNING payload"#,
-  )
-  .bind(OPEN_APP_PURPOSE)
-  .bind(token_hash)
-  .bind(now)
-  .fetch_optional(&mut *tx)
-  .await
-  .map_err(|error| RuntimeError::database("consume open app code", error))?;
-  let valid = state.as_ref().is_some_and(|value| {
-    value.get("userId").and_then(serde_json::Value::as_str) == Some(user_id.as_str())
-      && value.get("authEpoch").and_then(serde_json::Value::as_i64) == Some(i64::from(user.auth_epoch))
-  });
-  if !valid || user.disabled {
-    return Err(RuntimeError::invalid_state("invalid_auth_state"));
-  }
-  let result = issuance::issue(&mut tx, config, &user_id, &user, issue, now, None).await?;
-  tx.commit()
-    .await
-    .map_err(|error| RuntimeError::database("commit open app completion", error))?;
   Ok(result)
 }
 
@@ -368,7 +283,7 @@ async fn fulfill_magic_user(
   payload: &serde_json::Value,
   users: &[sqlx::postgres::PgRow],
   now: DateTime<Utc>,
-) -> RuntimeResult<(String, LockedUser, bool)> {
+) -> RuntimeResult<(String, bool)> {
   if let Some(row) = users.first() {
     let user_id: String = row.get("id");
     if row.get::<bool, _>("disabled")
@@ -387,14 +302,7 @@ async fn fulfill_magic_user(
       .execute(&mut **tx)
       .await
       .map_err(|error| RuntimeError::database("complete magic link user", error))?;
-    return Ok((
-      user_id,
-      LockedUser {
-        disabled: false,
-        auth_epoch: row.get("auth_epoch"),
-      },
-      false,
-    ));
+    return Ok((user_id, false));
   }
   let user_id = uuid::Uuid::new_v4().to_string();
   let name = email.split('@').next().unwrap_or(email);
@@ -409,14 +317,7 @@ async fn fulfill_magic_user(
   .execute(&mut **tx)
   .await
   .map_err(|error| RuntimeError::database("create magic link user", error))?;
-  Ok((
-    user_id,
-    LockedUser {
-      disabled: false,
-      auth_epoch: 0,
-    },
-    true,
-  ))
+  Ok((user_id, true))
 }
 
 async fn consume_magic(tx: &mut Transaction<'_, Postgres>, email: &str, now: DateTime<Utc>) -> RuntimeResult<()> {

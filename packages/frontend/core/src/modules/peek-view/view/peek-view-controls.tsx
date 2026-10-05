@@ -9,7 +9,6 @@ import {
   InformationIcon,
   LinkIcon,
   OpenInNewIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useService } from '@toeverything/infra';
 import { clsx } from 'clsx';
@@ -146,16 +145,6 @@ export const DocPeekViewControls = ({
         enabled: true,
       },
       {
-        nameKey: 'split-view',
-        name: t['com.affine.peek-view-controls.open-doc-in-split-view'](),
-        icon: <SplitViewIcon />,
-        onClick: () => {
-          workbench.openDoc(docRef, { at: 'beside' });
-          peekView.close(false);
-        },
-        enabled: BUILD_CONFIG.isElectron,
-      },
-      {
         nameKey: 'copy-link',
         name: t['com.affine.peek-view-controls.copy-link'](),
         icon: <LinkIcon />,
@@ -258,20 +247,6 @@ export const AttachmentPeekViewControls = ({
           track.$.attachment.$.openAttachmentInNewTab({ type });
         },
         enabled: true,
-      },
-      {
-        nameKey: 'split-view',
-        name: t[
-          'com.affine.peek-view-controls.open-attachment-in-split-view'
-        ](),
-        icon: <SplitViewIcon />,
-        onClick: () => {
-          workbench.openAttachment(docId, blockId, { at: 'beside' });
-          peekView.close(false);
-
-          track.$.attachment.$.openAttachmentInSplitView({ type });
-        },
-        enabled: BUILD_CONFIG.isElectron,
       },
     ].filter(filterByEnabled);
   }, [t, peekView, workbench, docId, blockId, type]);

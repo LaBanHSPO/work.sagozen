@@ -120,7 +120,7 @@ test('set and change password', async t => {
   const u1Email = 'u1@affine.pro';
 
   const u1 = await app.signupV1(u1Email);
-  const authSession = await app.createNativeAuthSession(u1.id, {
+  const authSession = await app.seedLegacyAuthSession(u1.id, {
     installationId: 'password-change-device',
     platform: 'ios',
   });

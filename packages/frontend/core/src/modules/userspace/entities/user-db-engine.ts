@@ -3,7 +3,6 @@ import {
   IndexedDBDocStorage,
   IndexedDBDocSyncStorage,
 } from '@affine/nbstore/idb';
-import { SqliteDocStorage, SqliteDocSyncStorage } from '@affine/nbstore/sqlite';
 import type { StoreClient } from '@affine/nbstore/worker/client';
 import { Entity } from '@toeverything/infra';
 
@@ -17,14 +16,8 @@ export class UserDBEngine extends Entity<{
   private readonly userId = this.props.userId;
   readonly client: StoreClient;
 
-  DocStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteDocStorage
-      : IndexedDBDocStorage;
-  DocSyncStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteDocSyncStorage
-      : IndexedDBDocSyncStorage;
+  DocStorageType = IndexedDBDocStorage;
+  DocSyncStorageType = IndexedDBDocSyncStorage;
 
   canGracefulStop() {
     // TODO(@eyhn): Implement this

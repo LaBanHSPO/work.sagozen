@@ -9,7 +9,6 @@
   "references": [
     { "path": "../component" },
     { "path": "../../common/debug" },
-    { "path": "../electron-api" },
     { "path": "../../common/env" },
     { "path": "../../common/error" },
     { "path": "../../common/graphql" },

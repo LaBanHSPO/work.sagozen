@@ -6,7 +6,9 @@ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, Utc};
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use sqlx::{PgConnection, PgPool};
+#[cfg(test)]
+use sqlx::PgConnection;
+use sqlx::PgPool;
 
 use super::{RuntimeError, RuntimeResult};
 
@@ -88,6 +90,7 @@ async fn load_metadata(
   metadata_from_keys(parse(value, minimum_verify_seconds(config))?, Utc::now(), config)
 }
 
+#[cfg(test)]
 pub(super) async fn active(
   connection: &mut PgConnection,
   config: &super::super::BackendRuntimeConfig,
@@ -196,6 +199,7 @@ async fn initialize_if_missing(pool: &PgPool) -> RuntimeResult<()> {
   Ok(())
 }
 
+#[cfg(test)]
 async fn load(
   connection: &mut PgConnection,
   config: &super::super::BackendRuntimeConfig,

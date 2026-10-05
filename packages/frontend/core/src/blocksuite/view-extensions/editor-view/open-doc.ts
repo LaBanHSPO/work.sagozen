@@ -9,7 +9,6 @@ import {
   CenterPeekIcon,
   ExpandFullIcon,
   OpenInNewIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/lit';
 
 type OpenDocAction = OpenDocConfigItem & {
@@ -23,13 +22,6 @@ export const openDocActions: Array<OpenDocAction> = [
     label: I18n['com.affine.peek-view-controls.open-doc'](),
     icon: ExpandFullIcon(),
     enabled: true,
-  },
-  {
-    type: 'open-in-new-view',
-    label: I18n['com.affine.peek-view-controls.open-doc-in-split-view'](),
-    icon: SplitViewIcon(),
-    shortcut: '⌘ + ⌥ + click',
-    enabled: BUILD_CONFIG.isElectron,
   },
   {
     type: 'open-in-new-tab',

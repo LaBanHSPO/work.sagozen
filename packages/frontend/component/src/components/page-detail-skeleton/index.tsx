@@ -51,12 +51,12 @@ export const EditorLoading = ({
           <Button
             size="large"
             className={clsx(
-              BUILD_CONFIG.isMobileEdition
+              environment.isMobile
                 ? styles.mobileActionButton
                 : styles.actionButton
             )}
             contentClassName={clsx(
-              BUILD_CONFIG.isMobileEdition
+              environment.isMobile
                 ? styles.mobileActionContent
                 : styles.actionContent
             )}

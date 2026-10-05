@@ -17,7 +17,7 @@ import type { ModalProps } from './modal';
 import { Modal } from './modal';
 import { desktopStyles, mobileStyles } from './prompt-modal.css';
 
-const styles = BUILD_CONFIG.isMobileEdition ? mobileStyles : desktopStyles;
+const styles = environment.isMobile ? mobileStyles : desktopStyles;
 
 const getCssLength = (value: string | number) =>
   typeof value === 'number' ? `${value}px` : value;
@@ -92,13 +92,13 @@ export const PromptModal = ({
 
   return (
     <Modal
-      preserveEditingFocusOnAction={BUILD_CONFIG.isMobileEdition}
+      preserveEditingFocusOnAction={environment.isMobile}
       contentOptions={{
         ...contentOptions,
         className: clsx(styles.container, contentOptions?.className),
         style: {
           ...contentOptions?.style,
-          ...(BUILD_CONFIG.isMobileEdition
+          ...(environment.isMobile
             ? {
                 maxHeight: dynamicKeyboardHeight
                   ? `calc(100dvh - ${getCssLength(dynamicKeyboardHeight)} - 32px)`

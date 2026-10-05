@@ -1,15 +1,12 @@
 import { UserFeatureService } from '@affine/core/modules/cloud/services/user-feature';
 import type { SettingTab } from '@affine/core/modules/dialogs/constant';
 import { FeatureFlagService } from '@affine/core/modules/feature-flag';
-import { MeetingSettingsService } from '@affine/core/modules/media/services/meeting-settings';
 import { useI18n } from '@affine/i18n';
 import {
   AppearanceIcon,
   ExperimentIcon,
-  FolderIcon,
   InformationIcon,
   KeyboardIcon,
-  MeetingIcon,
   NotificationIcon,
   PenIcon,
 } from '@blocksuite/icons/rc';
@@ -20,12 +17,10 @@ import { AuthService, ServerService } from '../../../../modules/cloud';
 import type { SettingSidebarItem, SettingState } from '../types';
 import { AboutAffine } from './about';
 import { AppearanceSettings } from './appearance';
-import { BackupSettingPanel } from './backup';
 import { BillingSettings } from './billing';
 import { EditorSettings } from './editor';
 import { ExperimentalFeatures } from './experimental-features';
 import { PaymentIcon, UpgradeIcon } from './icons';
-import { MeetingsSettings } from './meetings';
 import { NotificationSettings } from './notifications';
 import { AFFiNEPricingPlans } from './plans';
 import { Shortcuts } from './shortcuts';
@@ -39,13 +34,11 @@ export const useGeneralSettingList = (): GeneralSettingList => {
     serverService,
     userFeatureService,
     featureFlagService,
-    meetingSettingsService,
   } = useServices({
     AuthService,
     ServerService,
     UserFeatureService,
     FeatureFlagService,
-    MeetingSettingsService,
   });
   const status = useLiveData(authService.session.status$);
   const loggedIn = status === 'authenticated';
@@ -59,8 +52,6 @@ export const useGeneralSettingList = (): GeneralSettingList => {
   useEffect(() => {
     userFeatureService.userFeature.revalidate();
   }, [userFeatureService]);
-
-  const meetingSettings = useLiveData(meetingSettingsService.settings$);
 
   return useMemo(() => {
     const settings: GeneralSettingList = [
@@ -95,19 +86,6 @@ export const useGeneralSettingList = (): GeneralSettingList => {
       });
     }
 
-    if (
-      (environment.isMacOs || environment.isWindows) &&
-      BUILD_CONFIG.isElectron
-    ) {
-      settings.push({
-        key: 'meetings',
-        title: t['com.affine.settings.meetings'](),
-        icon: <MeetingIcon />,
-        testId: 'meetings-panel-trigger',
-        beta: !meetingSettings?.enabled,
-      });
-    }
-
     if (hasPaymentFeature) {
       settings.splice(4, 0, {
         key: 'plans',
@@ -123,15 +101,6 @@ export const useGeneralSettingList = (): GeneralSettingList => {
           testId: 'billing-panel-trigger',
         });
       }
-    }
-
-    if (BUILD_CONFIG.isElectron) {
-      settings.push({
-        key: 'backup',
-        title: t['com.affine.settings.workspace.backup'](),
-        icon: <FolderIcon />,
-        testId: 'backup-panel-trigger',
-      });
     }
 
     settings.push(
@@ -153,7 +122,6 @@ export const useGeneralSettingList = (): GeneralSettingList => {
     t,
     loggedIn,
     enableEditorSettings,
-    meetingSettings?.enabled,
     hasPaymentFeature,
   ]);
 };
@@ -176,8 +144,6 @@ export const GeneralSetting = ({
       return <EditorSettings />;
     case 'appearance':
       return <AppearanceSettings />;
-    case 'meetings':
-      return <MeetingsSettings />;
     case 'about':
       return <AboutAffine />;
     case 'plans':
@@ -186,8 +152,6 @@ export const GeneralSetting = ({
       return <BillingSettings onChangeSettingState={onChangeSettingState} />;
     case 'experimental-features':
       return <ExperimentalFeatures />;
-    case 'backup':
-      return <BackupSettingPanel />;
     default:
       return null;
   }

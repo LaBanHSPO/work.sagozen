@@ -5,7 +5,6 @@ import {
   MenuItem,
   PropertyValue,
 } from '@affine/component';
-import { MobileJournalConflictList } from '@affine/core/mobile/pages/workspace/detail/menu/journal-conflicts';
 import type { FilterParams } from '@affine/core/modules/collection-rules';
 import { DocService } from '@affine/core/modules/doc';
 import { JournalService } from '@affine/core/modules/journal';
@@ -27,6 +26,7 @@ import type { DocListPropertyProps, GroupHeaderProps } from '../explorer/types';
 import { FilterValueMenu } from '../filter/filter-value-menu';
 import type { PropertyValueProps } from '../properties/types';
 import * as styles from './journal.css';
+import { MobileJournalConflictList } from './journal-conflicts';
 
 const stopPropagation = (e: React.MouseEvent) => e.stopPropagation();
 export const JournalValue = ({ readonly }: PropertyValueProps) => {
@@ -156,7 +156,7 @@ export const JournalValue = ({ readonly }: PropertyValueProps) => {
         ) : null}
 
         {checked && conflict ? (
-          BUILD_CONFIG.isMobileEdition ? (
+          environment.isMobile ? (
             <Menu items={<MobileJournalConflictList date={selectedDate} />}>
               <div
                 data-testid="conflict-tag"

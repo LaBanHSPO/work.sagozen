@@ -344,7 +344,6 @@ export class CopilotClient {
       actionVersion,
       runId,
       retry,
-      byokLeaseId,
     }: {
       sessionId: string;
       messageId?: string;
@@ -357,7 +356,6 @@ export class CopilotClient {
       actionVersion?: string;
       runId?: string;
       retry?: boolean;
-      byokLeaseId?: string;
     },
     endpoint = Endpoint.StreamObject
   ) {
@@ -376,7 +374,6 @@ export class CopilotClient {
       actionVersion,
       runId,
       retry,
-      byokLeaseId,
     });
     if (queryString) {
       url += `?${queryString}`;
@@ -389,14 +386,12 @@ export class CopilotClient {
     sessionId: string,
     messageId?: string,
     seed?: string,
-    endpoint = Endpoint.Images,
-    byokLeaseId?: string
+    endpoint = Endpoint.Images
   ) {
     let url = `/api/copilot/chat/${sessionId}/${endpoint}`;
     const queryString = this.paramsToQueryString({
       messageId,
       seed,
-      byokLeaseId,
     });
     if (queryString) {
       url += `?${queryString}`;

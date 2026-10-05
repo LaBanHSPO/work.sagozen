@@ -34,7 +34,6 @@ export const useSignOut = ({
   const signOut = useCallback(async () => {
     onConfirm?.()?.catch(console.error);
     const enableLocalWorkspace =
-      BUILD_CONFIG.isNative ||
       defaultServerService.server.config$.value.features.includes(
         ServerFeature.LocalWorkspace
       );

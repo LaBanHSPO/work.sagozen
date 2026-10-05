@@ -1,14 +1,5 @@
 // This file should has not side effect
 
-declare global {
-  // oxlint-disable-next-line no-var
-  var __appInfo: {
-    electron: boolean;
-    scheme: string;
-    windowName: string;
-  };
-}
-
 export const DEFAULT_WORKSPACE_NAME = 'Demo Workspace';
 export const UNTITLED_WORKSPACE_NAME = 'Untitled';
 

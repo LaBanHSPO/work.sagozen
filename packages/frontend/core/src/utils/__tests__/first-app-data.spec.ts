@@ -26,8 +26,6 @@ vi.mock('../../modules/workspace', () => ({
   getAFFiNEWorkspaceSchema: () => 'schema',
 }));
 
-const originalBuildConfig = globalThis.BUILD_CONFIG;
-
 beforeEach(() => {
   localStorage.clear();
   importDocs.mockReset();
@@ -35,10 +33,6 @@ beforeEach(() => {
     'fetch',
     vi.fn(async () => new Response(new Blob()))
   );
-  vi.stubGlobal('BUILD_CONFIG', {
-    ...originalBuildConfig,
-    isMobileEdition: false,
-  });
 });
 
 afterEach(() => {
@@ -133,7 +127,7 @@ function createWorkspacesService({
 }
 
 describe('createFirstAppData', () => {
-  test('does not create on desktop when the first-open marker exists', async () => {
+  test('does not create when the first-open marker exists', async () => {
     localStorage.setItem('is-first-open', 'false');
     const { createFirstAppData } = await import('../first-app-data');
     const { service, createMock } = createWorkspacesService();
@@ -142,12 +136,7 @@ describe('createFirstAppData', () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
-  test('creates on mobile when the first-open marker is stale and no workspace exists', async () => {
-    vi.stubGlobal('BUILD_CONFIG', {
-      ...originalBuildConfig,
-      isMobileEdition: true,
-    });
-    localStorage.setItem('is-first-open', 'false');
+  test('creates when no first-open marker or workspace exists', async () => {
     const { createFirstAppData } = await import('../first-app-data');
     const { service, createMock } = createWorkspacesService();
 
@@ -160,10 +149,6 @@ describe('createFirstAppData', () => {
   });
 
   test('does not create when any workspace already exists', async () => {
-    vi.stubGlobal('BUILD_CONFIG', {
-      ...originalBuildConfig,
-      isMobileEdition: true,
-    });
     const { createFirstAppData } = await import('../first-app-data');
     const { service, createMock } = createWorkspacesService({
       existing: [{ id: 'existing-workspace', flavour: 'local' }],
@@ -174,10 +159,6 @@ describe('createFirstAppData', () => {
   });
 
   test('coalesces concurrent creation attempts', async () => {
-    vi.stubGlobal('BUILD_CONFIG', {
-      ...originalBuildConfig,
-      isMobileEdition: true,
-    });
     const { createFirstAppData } = await import('../first-app-data');
     let resolveCreate:
       | ((meta: { id: string; flavour: string }) => void)
@@ -211,10 +192,6 @@ describe('createFirstAppData', () => {
   });
 
   test('does not persist the first-open marker when creation fails', async () => {
-    vi.stubGlobal('BUILD_CONFIG', {
-      ...originalBuildConfig,
-      isMobileEdition: true,
-    });
     const { createFirstAppData } = await import('../first-app-data');
     const error = new Error('create failed');
     const { service, createMock } = createWorkspacesService({

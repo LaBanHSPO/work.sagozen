@@ -87,6 +87,6 @@ const MobileProgressCell = ({
     </>
   );
 };
-export const ProgressCell = BUILD_CONFIG.isMobileEdition
+export const ProgressCell = environment.isMobile
   ? MobileProgressCell
   : DesktopProgressCell;

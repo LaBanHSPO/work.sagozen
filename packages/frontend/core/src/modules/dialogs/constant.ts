@@ -9,11 +9,9 @@ export type SettingTab =
   | 'about'
   | 'plans'
   | 'billing'
-  | 'backup' // electron only
   | 'experimental-features'
   | 'editor'
   | 'account'
-  | 'meetings'
   | `workspace:${'preference' | 'properties' | 'members' | 'storage' | 'billing' | 'license' | 'integrations' | 'embedding' | 'byok' | 'search'}`;
 
 export type GLOBAL_DIALOG_SCHEMA = {
@@ -29,7 +27,7 @@ export type GLOBAL_DIALOG_SCHEMA = {
     templateMode: DocMode;
     snapshotUrl: string;
   }) => void;
-  'sign-in': (props: { server?: string; step?: string }) => void;
+  'sign-in': (props: Record<string, never>) => void;
   'change-password': (props: {
     server?: string;
     hasPassword?: boolean;

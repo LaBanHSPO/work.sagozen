@@ -81,10 +81,8 @@ const Dialog = ({
   ]);
 
   const openSignIn = useCallback(() => {
-    globalDialogService.open('sign-in', {
-      server: selectedServer.baseUrl,
-    });
-  }, [globalDialogService, selectedServer.baseUrl]);
+    globalDialogService.open('sign-in', {});
+  }, [globalDialogService]);
 
   const signInOrEnableCloud = useAsyncCallback(async () => {
     // not logged in, open login modal

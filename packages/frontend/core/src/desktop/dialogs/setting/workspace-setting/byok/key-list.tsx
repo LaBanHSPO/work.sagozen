@@ -57,7 +57,7 @@ export const KeyList = ({
           <div className={styles.rowMain}>
             <div className={styles.rowTitle}>
               {providerLabels[key.provider]} / {key.name}
-              <span className={styles.tag}>{storageLabel(t, key.storage)}</span>
+              <span className={styles.tag}>{storageLabel(t)}</span>
               {!key.enabled ? (
                 <span className={`${styles.tag} ${styles.dangerTag}`}>
                   {byokT(t, 'status.disabled-after-failure')}

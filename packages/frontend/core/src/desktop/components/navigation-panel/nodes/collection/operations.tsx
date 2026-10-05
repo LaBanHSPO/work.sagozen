@@ -17,7 +17,6 @@ import {
   FilterIcon,
   OpenInNewIcon,
   PlusIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useServices } from '@toeverything/infra';
 import { useCallback, useMemo } from 'react';
@@ -85,12 +84,6 @@ export const useNavigationPanelCollectionNodeOperations = (
     });
   }, [createAndAddDocument, openConfirmModal, t]);
 
-  const handleOpenInSplitView = useCallback(() => {
-    workbenchService.workbench.openCollection(collectionId, { at: 'beside' });
-    track.$.navigationPanel.organize.openInSplitView({
-      type: 'collection',
-    });
-  }, [collectionId, workbenchService.workbench]);
 
   const handleOpenInNewTab = useCallback(() => {
     workbenchService.workbench.openCollection(collectionId, { at: 'new-tab' });
@@ -167,21 +160,6 @@ export const useNavigationPanelCollectionNodeOperations = (
           </MenuItem>
         ),
       },
-      ...(BUILD_CONFIG.isElectron
-        ? [
-            {
-              index: 99,
-              view: (
-                <MenuItem
-                  prefixIcon={<SplitViewIcon />}
-                  onClick={handleOpenInSplitView}
-                >
-                  {t['com.affine.workbench.split-view.page-menu-open']()}
-                </MenuItem>
-              ),
-            },
-          ]
-        : []),
       {
         index: 9999,
         view: <MenuSeparator key="menu-separator" />,
@@ -205,7 +183,6 @@ export const useNavigationPanelCollectionNodeOperations = (
       handleAddDocToCollection,
       handleDeleteCollection,
       handleOpenInNewTab,
-      handleOpenInSplitView,
       handleShowEdit,
       handleToggleFavoriteCollection,
       t,

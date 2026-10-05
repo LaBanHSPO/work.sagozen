@@ -28,12 +28,6 @@ export const topNav = style({
     },
   },
 });
-export const draggableHeader = style({
-  height: '52px',
-  width: '100%',
-  position: 'fixed',
-  ['WebkitAppRegion' as string]: 'drag',
-});
 export const topNavLinks = style({
   display: 'flex',
   columnGap: 4,
@@ -64,13 +58,6 @@ export const hideInWideScreen = style({
     'screen and (min-width: 1024px)': {
       display: 'none',
       position: 'absolute',
-    },
-  },
-});
-export const hideInSmallScreen = style({
-  '@media': {
-    'screen and (max-width: 1024px)': {
-      display: 'none',
     },
   },
 });

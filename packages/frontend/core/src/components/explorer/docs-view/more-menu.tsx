@@ -19,7 +19,6 @@ import {
   InformationIcon,
   MoreVerticalIcon,
   OpenInNewIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useCallback, useContext } from 'react';
@@ -98,25 +97,6 @@ const NewTab = ({ docId }: DocOperationProps) => {
   );
 };
 
-/**
- * Open in Split View Operation
- */
-const SplitView = ({ docId }: DocOperationProps) => {
-  const t = useI18n();
-  const workbench = useService(WorkbenchService).workbench;
-
-  const onOpenInSplitView = useCallback(() => {
-    track.allDocs.list.doc.openDoc();
-    track.allDocs.list.docMenu.openInSplitView();
-    workbench.openDoc(docId, { at: 'tail' });
-  }, [docId, workbench]);
-
-  return (
-    <MenuItem onClick={onOpenInSplitView} prefixIcon={<SplitViewIcon />}>
-      {t['com.affine.workbench.split-view.page-menu-open']()}
-    </MenuItem>
-  );
-};
 
 /**
  * Duplicate Operation
@@ -191,7 +171,6 @@ export const MoreMenuContent = (props: DocOperationProps) => {
       <ToggleFavorite {...props} />
       <DocInfo {...props} />
       <NewTab {...props} />
-      {BUILD_CONFIG.isElectron ? <SplitView {...props} /> : null}
       <Duplicate {...props} />
       <MoveToTrash {...props} />
     </>

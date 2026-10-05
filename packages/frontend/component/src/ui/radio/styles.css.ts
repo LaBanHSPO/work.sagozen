@@ -50,8 +50,6 @@ export const radioButtonGroup = style({
   padding: outerPadding,
   gap: itemGap,
 
-  // @ts-expect-error - fix electron drag
-  WebkitAppRegion: 'no-drag',
 });
 export const indicator = style({
   position: 'absolute',

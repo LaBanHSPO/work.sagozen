@@ -7,7 +7,7 @@ export function patchForAudioEmbedView(reactToLit: ReactToLit): ExtensionType {
   return {
     setup: di => {
       // do not show audio block on mobile
-      if (BUILD_CONFIG.isMobileEdition) {
+      if (environment.isMobile) {
         return;
       }
       di.override(AttachmentEmbedConfigIdentifier('audio'), () => ({

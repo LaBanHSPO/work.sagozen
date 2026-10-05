@@ -13,24 +13,19 @@ export { WorkbenchRoot } from './view/workbench-root';
 
 import { type Framework } from '@toeverything/infra';
 
-import { DesktopApiService } from '../desktop-api';
-import { PeekViewService } from '../peek-view';
-import { GlobalState, GlobalStateService } from '../storage';
+import { GlobalState } from '../storage';
 import { WorkspaceScope } from '../workspace';
 import { SidebarTab } from './entities/sidebar-tab';
 import { View } from './entities/view';
 import { Workbench } from './entities/workbench';
 import { ViewScope } from './scopes/view';
-import { DesktopStateSynchronizer } from './services/desktop-state-synchronizer';
 import { ViewService } from './services/view';
 import { WorkbenchService } from './services/workbench';
 import {
   BrowserWorkbenchNewTabHandler,
-  DesktopWorkbenchNewTabHandler,
   WorkbenchNewTabHandler,
 } from './services/workbench-new-tab-handler';
 import {
-  DesktopWorkbenchDefaultState,
   InMemoryWorkbenchDefaultState,
   WorkbenchDefaultState,
 } from './services/workbench-view-state';
@@ -58,20 +53,3 @@ export function configureBrowserWorkbenchModule(services: Framework) {
     .impl(WorkbenchNewTabHandler, () => BrowserWorkbenchNewTabHandler);
 }
 
-export function configureDesktopWorkbenchModule(services: Framework) {
-  configureWorkbenchCommonModule(services);
-  services
-    .scope(WorkspaceScope)
-    .impl(WorkbenchDefaultState, DesktopWorkbenchDefaultState, [
-      GlobalStateService,
-      DesktopApiService,
-    ])
-    .impl(WorkbenchNewTabHandler, DesktopWorkbenchNewTabHandler, [
-      DesktopApiService,
-    ])
-    .service(DesktopStateSynchronizer, [
-      WorkbenchService,
-      DesktopApiService,
-      PeekViewService,
-    ]);
-}

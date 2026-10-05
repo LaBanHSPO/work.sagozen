@@ -4,11 +4,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { UserFriendlyError } from '@affine/error';
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { GfxModel } from '@blocksuite/affine/std/gfx';
 import { BehaviorSubject, Subject } from 'rxjs';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import { DelegatedEditorHost } from '../frontend/delegated-editor-host';
 import { readNodes } from '../frontend/live-projection';
@@ -23,49 +22,11 @@ Object.defineProperty(globalThis, 'EventSource', {
   },
 });
 
-const electronApis = vi.hoisted(() => ({
-  byokStorage: undefined as
-    | {
-        isSupported: () => Promise<boolean>;
-        getWorkspaceLeaseProviders: (workspaceId: string) => Promise<
-          Array<{
-            provider: string;
-            name: string;
-            credential: string;
-            definition: {
-              version: number;
-              endpoint: { kind: string; url?: string | null };
-              models: unknown[];
-            };
-            description?: string | null;
-            sortOrder?: number | null;
-            enabled?: boolean | null;
-          }>
-        >;
-      }
-    | undefined,
-}));
-
-const createWorkspaceByokLocalLeaseMutation = vi.hoisted(() =>
-  Symbol('createWorkspaceByokLocalLeaseMutation')
-);
-
-vi.mock('@affine/electron-api', () => ({
-  apis: electronApis,
-}));
-
 vi.mock('@affine/graphql', () => ({
-  ByokProvider: {
-    openai: 'openai',
-    anthropic: 'anthropic',
-    gemini: 'gemini',
-    fal: 'fal',
-  },
   ContextCategories: {
     Tag: 'tag',
     Collection: 'collection',
   },
-  createWorkspaceByokLocalLeaseMutation,
 }));
 
 function createClosedEventSource(): EventSource {
@@ -80,7 +41,6 @@ function createClient(
   overrides: Partial<
     Pick<
       CopilotClient,
-      | 'gql'
       | 'createSession'
       | 'createMessage'
       | 'getSessions'
@@ -91,9 +51,6 @@ function createClient(
   > = {}
 ) {
   return {
-    gql: vi.fn().mockResolvedValue({
-      createWorkspaceByokLocalLease: { leaseId: 'lease-1' },
-    }),
     createSession: vi.fn().mockImplementation(async options => {
       return `session:${options.promptName}`;
     }),
@@ -120,43 +77,32 @@ async function drainActionResult(
   await drain(stream as AsyncIterable<unknown>);
 }
 
-describe('runtime request transport BYOK local lease handling', () => {
-  beforeEach(() => {
-    vi.stubGlobal('BUILD_CONFIG', { isElectron: true });
-    electronApis.byokStorage = {
-      isSupported: vi.fn().mockResolvedValue(true),
-      getWorkspaceLeaseProviders: vi.fn().mockResolvedValue([
-        {
-          provider: 'openai',
-          name: 'OpenAI',
-          credential: 'sk-local',
-          definition: {
-            endpoint: { kind: 'provider_default' },
-            models: [{ modelId: 'model-1', capabilities: [] }],
-          },
-        },
-      ]),
-    };
-  });
+describe('browser runtime request transport', () => {
+  test('opens the text stream using server-managed routing', async () => {
+    const client = createClient();
 
-  test('fails closed when local BYOK providers exist but lease creation fails', async () => {
-    const client = createClient({
-      gql: vi.fn().mockRejectedValue(new Error('mutation failed')),
-    });
-
-    const result = textToText({
+    await textToText({
       client,
       sessionId: 'session-1',
-      workspaceId: 'workspace-1',
       content: 'hello',
-    }) as Promise<string>;
+      profileId: 'profile-1',
+      modelId: 'model-1',
+      routeTargetId: 'route-1',
+    });
 
-    await expect(result).rejects.toThrow('mutation failed');
-    await expect(result).rejects.toBeInstanceOf(UserFriendlyError);
-    expect(client.chatTextStream).not.toHaveBeenCalled();
+    expect(client.chatTextStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        messageId: 'message-1',
+        profileId: 'profile-1',
+        modelId: 'model-1',
+        routeTargetId: 'route-1',
+      }),
+      Endpoint.StreamObject
+    );
   });
 
-  test('does not create stream local BYOK lease after cancellation', async () => {
+  test('does not open a text stream after cancellation', async () => {
     const controller = new AbortController();
     const client = createClient({
       createMessage: vi.fn().mockImplementation(async () => {
@@ -169,23 +115,21 @@ describe('runtime request transport BYOK local lease handling', () => {
       textToText({
         client,
         sessionId: 'session-1',
-        workspaceId: 'workspace-1',
         content: 'hello',
         stream: true,
         signal: controller.signal,
       }) as AsyncIterable<string>
     );
 
-    expect(client.gql).not.toHaveBeenCalled();
     expect(client.chatTextStream).not.toHaveBeenCalled();
   });
 
-  test('does not create image stream when cancelled while creating local BYOK lease', async () => {
+  test('does not open an image stream after cancellation', async () => {
     const controller = new AbortController();
     const client = createClient({
-      gql: vi.fn().mockImplementation(async () => {
+      createMessage: vi.fn().mockImplementation(async () => {
         controller.abort();
-        return { createWorkspaceByokLocalLease: { leaseId: 'lease-1' } };
+        return 'message-1';
       }),
     });
 
@@ -193,24 +137,17 @@ describe('runtime request transport BYOK local lease handling', () => {
       toImage({
         client,
         sessionId: 'session-1',
-        workspaceId: 'workspace-1',
         content: 'image',
         endpoint: Endpoint.Images,
         signal: controller.signal,
       }) as AsyncIterable<string>
     );
 
-    expect(client.gql).toHaveBeenCalled();
     expect(client.imagesStream).not.toHaveBeenCalled();
   });
 });
 
 describe('AIRequestService action definitions', () => {
-  beforeEach(() => {
-    vi.stubGlobal('BUILD_CONFIG', { isElectron: false });
-    electronApis.byokStorage = undefined;
-  });
-
   test('manages the active delegated editor and its live projection contract', async () => {
     const service = new AIRequestService(createClient());
     const started: string[] = [];

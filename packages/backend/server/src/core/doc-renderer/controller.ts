@@ -4,7 +4,6 @@ import { join } from 'node:path';
 
 import { Controller, Get, Logger, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import isMobile from 'is-mobile';
 
 import { Config, getRequestTrackerId, metrics } from '../../base';
 import { Models } from '../../models';
@@ -55,7 +54,6 @@ const markdownType = new Set([
 export class DocRendererController {
   private readonly logger = new Logger(DocRendererController.name);
   private readonly webAssets: HtmlAssets = defaultAssets;
-  private readonly mobileAssets: HtmlAssets = defaultAssets;
 
   constructor(
     private readonly doc: DocReader,
@@ -64,9 +62,6 @@ export class DocRendererController {
     private readonly permission: PermissionService
   ) {
     this.webAssets = this.readHtmlAssets(join(env.projectRoot, 'static'));
-    this.mobileAssets = this.readHtmlAssets(
-      join(env.projectRoot, 'static/mobile')
-    );
   }
 
   private buildVisitorId(req: Request, workspaceId: string, docId: string) {
@@ -79,13 +74,7 @@ export class DocRendererController {
   @Public()
   @Get('/*path')
   async render(@Req() req: Request, @Res() res: Response) {
-    const assets: HtmlAssets =
-      env.namespaces.canary &&
-      isMobile({
-        ua: req.headers['user-agent'] ?? undefined,
-      })
-        ? this.mobileAssets
-        : this.webAssets;
+    const assets = this.webAssets;
 
     let opts: RenderOptions | null = null;
     let previewExposure: DocPreviewExposure = 'denied';
@@ -248,7 +237,6 @@ export class DocRendererController {
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    ${env.selfhosted ? '' : '<meta name="apple-itunes-app" content="app-id=6736937980" />'}
 
     <title>${title}</title>
     <meta name="theme-color" content="#fafafa" />

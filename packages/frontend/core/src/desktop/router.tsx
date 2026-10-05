@@ -85,10 +85,6 @@ export const topLevelRoutes = [
         lazy: () => import('./pages/ai-upgrade-success'),
       },
       {
-        path: '/onboarding',
-        lazy: () => import('./pages/onboarding'),
-      },
-      {
         path: '/redirect-proxy',
         lazy: () => import('./pages/redirect'),
       },
@@ -165,23 +161,12 @@ export const topLevelRoutes = [
           import(/* webpackChunkName: "auth" */ './pages/auth/oauth-callback'),
       },
       // deprecated, keep for old client compatibility
-      // TODO(@forehalo): remove
-      {
-        path: '/desktop-signin',
-        lazy: () =>
-          import(/* webpackChunkName: "auth" */ './pages/auth/oauth-login'),
-      },
-      // deprecated, keep for old client compatibility
       // use '/sign-in'
       // TODO(@forehalo): remove
       {
         path: '/signIn',
         lazy: () =>
           import(/* webpackChunkName: "auth" */ './pages/auth/sign-in'),
-      },
-      {
-        path: '/open-app/:action',
-        lazy: () => import('./pages/open-app'),
       },
       {
         path: CATCH_ALL_ROUTE_PATH,

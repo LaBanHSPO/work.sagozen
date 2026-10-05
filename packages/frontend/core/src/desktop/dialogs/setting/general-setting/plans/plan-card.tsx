@@ -8,7 +8,6 @@ import {
   SubscriptionService,
 } from '@affine/core/modules/cloud';
 import { GlobalDialogService } from '@affine/core/modules/dialogs';
-import { UrlService } from '@affine/core/modules/url';
 import {
   type CreateCheckoutSessionInput,
   SubscriptionPlan,
@@ -234,25 +233,19 @@ const Downgrade = ({ disabled }: { disabled?: boolean }) => {
 const UpgradeToTeam = ({ recurring }: { recurring: SubscriptionRecurring }) => {
   const t = useI18n();
   const serverService = useService(ServerService);
-  const urlService = useService(UrlService);
   const url = `${serverService.server.baseUrl}/upgrade-to-team?recurring=${recurring}`;
-  const scheme = urlService.getClientScheme();
-  const urlParams = new URLSearchParams();
-  if (scheme) {
-    urlParams.set('client', scheme);
-  }
 
   return (
     <a
       className={styles.planAction}
-      href={`${url}${urlParams.toString() ? `&${urlParams.toString()}` : ''}`}
+      href={url}
       target="_blank"
       rel="noreferrer"
     >
       <Button
         className={styles.planAction}
         variant="primary"
-        data-event-args-url={`${url}${urlParams.toString() ? `&${urlParams.toString()}` : ''}`}
+        data-event-args-url={url}
       >
         {t['com.affine.payment.upgrade']()}
       </Button>
@@ -280,8 +273,6 @@ export const Upgrade = ({
 }) => {
   const t = useI18n();
   const authService = useService(AuthService);
-  const urlService = useService(UrlService);
-  const schema = urlService.getClientScheme();
 
   const handleBeforeCheckout = useCallback(() => {
     track.$.settingsPanel.plans.checkout({
@@ -301,8 +292,7 @@ export const Upgrade = ({
         authService.session.account$.value,
         plan,
         recurring,
-        workspaceId || '',
-        schema
+        workspaceId || ''
       ),
       ...checkoutInput,
     }),
@@ -311,7 +301,6 @@ export const Upgrade = ({
       checkoutInput,
       plan,
       recurring,
-      schema,
       workspaceId,
     ]
   );

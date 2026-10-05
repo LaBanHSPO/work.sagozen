@@ -113,14 +113,13 @@ const usePatchSpecs = (mode: DocMode, shared?: boolean) => {
       .database(framework)
       .linkedDoc(framework)
       .paragraph(enableAI)
-      .mobile(framework)
-      .electron(framework)
+      .mobile()
       .linkPreview(framework)
       .codeBlockPreview(framework)
       .iconPicker(framework)
       .comment(enableComment, framework).value;
 
-    if (BUILD_CONFIG.isMobileEdition) {
+    if (environment.isMobile) {
       if (mode === 'page') {
         return manager.get('mobile-page');
       } else {
@@ -256,7 +255,7 @@ export const BlocksuiteDocEditor = forwardRef<
   return (
     <>
       <div className={styles.affineDocViewport}>
-        {!BUILD_CONFIG.isMobileEdition ? (
+        {!environment.isMobile ? (
           <DocIconPicker docId={page.id} readonly={readonly || shared} />
         ) : null}
         {!isJournal ? (
@@ -287,7 +286,7 @@ export const BlocksuiteDocEditor = forwardRef<
           data-testid="page-editor-blank"
           onClick={onClickBlank}
         ></div>
-        {!readonly && !BUILD_CONFIG.isMobileEdition && (
+        {!readonly && !environment.isMobile && (
           <StarterBar doc={page} />
         )}
         {!shared && displayBiDirectionalLink ? (

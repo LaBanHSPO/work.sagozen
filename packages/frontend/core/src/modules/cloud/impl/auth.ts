@@ -86,13 +86,6 @@ export function configureDefaultAuthProvider(framework: Framework) {
         });
         return await res.json();
       },
-      async signInOpenAppSignInCode(code: string) {
-        await fetchService.fetch('/api/auth/open-app/sign-in', {
-          method: 'POST',
-          body: JSON.stringify({ code }),
-          headers: { 'content-type': 'application/json' },
-        });
-      },
       async signOut() {
         const csrfToken = getCookieValue(CSRF_COOKIE_NAME);
         await fetchService.fetch('/api/auth/sign-out', {
@@ -100,7 +93,6 @@ export function configureDefaultAuthProvider(framework: Framework) {
           headers: csrfToken ? { 'x-affine-csrf-token': csrfToken } : undefined,
         });
       },
-      async clearSession() {},
     };
   });
 }

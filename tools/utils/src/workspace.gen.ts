@@ -1191,84 +1191,6 @@ export const PackageList = [
     ],
   },
   {
-    location: 'packages/frontend/apps/android',
-    name: '@affine/android',
-    workspaceDependencies: [
-      'packages/frontend/component',
-      'packages/frontend/core',
-      'packages/common/env',
-      'packages/frontend/i18n',
-      'packages/frontend/apps/mobile-shared',
-      'packages/common/nbstore',
-      'packages/frontend/track',
-      'blocksuite/affine/all',
-      'packages/common/infra',
-    ],
-  },
-  {
-    location: 'packages/frontend/apps/electron',
-    name: '@affine/electron',
-    workspaceDependencies: [
-      'tools/utils',
-      'packages/common/auth',
-      'packages/frontend/i18n',
-      'packages/frontend/native',
-      'packages/common/nbstore',
-      'packages/common/infra',
-    ],
-  },
-  {
-    location: 'packages/frontend/apps/electron-renderer',
-    name: '@affine/electron-renderer',
-    workspaceDependencies: [
-      'packages/frontend/component',
-      'packages/frontend/core',
-      'packages/common/debug',
-      'packages/frontend/electron-api',
-      'packages/frontend/i18n',
-      'packages/common/nbstore',
-      'packages/frontend/track',
-      'blocksuite/affine/all',
-      'packages/common/infra',
-    ],
-  },
-  {
-    location: 'packages/frontend/apps/ios',
-    name: '@affine/ios',
-    workspaceDependencies: [
-      'packages/frontend/component',
-      'packages/frontend/core',
-      'packages/common/env',
-      'packages/common/graphql',
-      'packages/frontend/i18n',
-      'packages/frontend/apps/mobile-shared',
-      'packages/common/nbstore',
-      'packages/frontend/track',
-      'blocksuite/affine/all',
-      'packages/common/infra',
-      'tools/cli',
-      'tools/utils',
-    ],
-  },
-  {
-    location: 'packages/frontend/apps/mobile',
-    name: '@affine/mobile',
-    workspaceDependencies: [
-      'packages/frontend/component',
-      'packages/frontend/core',
-      'packages/common/env',
-      'packages/common/nbstore',
-      'packages/frontend/track',
-      'blocksuite/affine/all',
-      'packages/common/infra',
-    ],
-  },
-  {
-    location: 'packages/frontend/apps/mobile-shared',
-    name: '@affine/mobile-shared',
-    workspaceDependencies: ['packages/frontend/core'],
-  },
-  {
     location: 'packages/frontend/apps/web',
     name: '@affine/web',
     workspaceDependencies: [
@@ -1285,6 +1207,7 @@ export const PackageList = [
     name: '@affine/component',
     workspaceDependencies: [
       'packages/common/debug',
+      'packages/common/env',
       'packages/common/error',
       'packages/common/graphql',
       'packages/frontend/i18n',
@@ -1297,7 +1220,6 @@ export const PackageList = [
     workspaceDependencies: [
       'packages/frontend/component',
       'packages/common/debug',
-      'packages/frontend/electron-api',
       'packages/common/env',
       'packages/common/error',
       'packages/common/graphql',
@@ -1318,11 +1240,6 @@ export const PackageList = [
     ],
   },
   {
-    location: 'packages/frontend/electron-api',
-    name: '@affine/electron-api',
-    workspaceDependencies: ['packages/frontend/apps/electron'],
-  },
-  {
     location: 'packages/frontend/i18n',
     name: '@affine/i18n',
     workspaceDependencies: [
@@ -1330,11 +1247,6 @@ export const PackageList = [
       'tools/cli',
       'tools/utils',
     ],
-  },
-  {
-    location: 'packages/frontend/native',
-    name: '@affine/native',
-    workspaceDependencies: [],
   },
   {
     location: 'packages/frontend/routes',
@@ -1362,23 +1274,8 @@ export const PackageList = [
     workspaceDependencies: ['tests/kit'],
   },
   {
-    location: 'tests/affine-desktop',
-    name: '@affine-test/affine-desktop',
-    workspaceDependencies: ['tests/kit', 'packages/frontend/electron-api'],
-  },
-  {
-    location: 'tests/affine-desktop-cloud',
-    name: '@affine-test/affine-desktop-cloud',
-    workspaceDependencies: ['tests/kit'],
-  },
-  {
     location: 'tests/affine-local',
     name: '@affine-test/affine-local',
-    workspaceDependencies: ['tests/kit'],
-  },
-  {
-    location: 'tests/affine-mobile',
-    name: '@affine-test/affine-mobile',
     workspaceDependencies: ['tests/kit'],
   },
   {
@@ -1438,11 +1335,6 @@ export const PackageList = [
     location: 'tools/doc-diff',
     name: '@affine/doc-diff',
     workspaceDependencies: ['tools/cli'],
-  },
-  {
-    location: 'tools/playstore-auto-bump',
-    name: '@affine/playstore-auto-bump',
-    workspaceDependencies: ['tools/cli', 'tools/utils'],
   },
   {
     location: 'tools/revert-update',
@@ -1545,27 +1437,16 @@ export type PackageName =
   | '@affine/realtime'
   | '@affine/s3-compat'
   | '@affine/admin'
-  | '@affine/android'
-  | '@affine/electron'
-  | '@affine/electron-renderer'
-  | '@affine/ios'
-  | '@affine/mobile'
-  | '@affine/mobile-shared'
   | '@affine/web'
   | '@affine/component'
   | '@affine/core'
-  | '@affine/electron-api'
   | '@affine/i18n'
-  | '@affine/native'
   | '@affine/routes'
   | '@affine/templates'
   | '@affine/track'
   | '@affine-test/affine-cloud'
   | '@affine-test/affine-cloud-copilot'
-  | '@affine-test/affine-desktop'
-  | '@affine-test/affine-desktop-cloud'
   | '@affine-test/affine-local'
-  | '@affine-test/affine-mobile'
   | '@affine-test/blocksuite'
   | '@affine-test/kit'
   | '@types/assets'
@@ -1576,6 +1457,5 @@ export type PackageName =
   | '@affine/commitlint-config'
   | '@affine/copilot-result'
   | '@affine/doc-diff'
-  | '@affine/playstore-auto-bump'
   | '@affine/revert-update'
   | '@affine-tools/utils';

@@ -18,7 +18,6 @@ import type { Request, Response } from 'express';
 import {
   ActionForbidden,
   EmailTokenNotFound,
-  getClientVersionFromRequest,
   getRequestCookie,
   InvalidAuthState,
   InvalidEmail,
@@ -32,19 +31,13 @@ import { AuthSessionService } from './auth-session';
 import { Public } from './guard';
 import {
   AuthPreflightBodySchema,
-  AuthSessionExchangeBodySchema,
-  AuthSessionRefreshBodySchema,
-  isNativeClientRequest,
   MagicLinkBodySchema,
-  OpenAppSignInBodySchema,
   SessionIdSchema,
   SignInBodySchema,
 } from './input';
 import { MagicLinkAuthService } from './magic-link';
-import { OpenAppAuthService } from './open-app';
 import { AuthService } from './service';
 import { AuthSessionPrincipal, CurrentUser, Session } from './session';
-import { SessionExchangeService } from './session-exchange';
 import { SessionIssuer } from './session-issuer';
 
 interface PreflightResponse {
@@ -57,10 +50,6 @@ interface PreflightResponse {
   };
 }
 
-type SignInResponse = CurrentUser & {
-  exchangeCode?: string;
-};
-
 @Throttle('strict')
 @Controller('/api/auth')
 export class AuthController {
@@ -68,9 +57,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly sessionIssuer: SessionIssuer,
     private readonly magicLink: MagicLinkAuthService,
-    private readonly openApp: OpenAppAuthService,
     private readonly runtime: BackendRuntimeProvider,
-    private readonly sessionExchange: SessionExchangeService,
     private readonly authSessions: AuthSessionService
   ) {
     if (env.dev) {
@@ -161,10 +148,7 @@ export class AuthController {
       this.sessionIssuer.target(req)
     );
     this.sessionIssuer.apply(res, result);
-    res.status(HttpStatus.OK).send({
-      ...result.user,
-      exchangeCode: result.exchangeCode,
-    } satisfies SignInResponse);
+    res.status(HttpStatus.OK).send(result.user);
   }
 
   async sendMagicLink(
@@ -219,77 +203,6 @@ export class AuthController {
     await this.auth.refreshCookies(res, session.sessionId);
 
     res.status(HttpStatus.OK).send({});
-  }
-
-  @Public()
-  @UseNamedGuard('version')
-  @Post('/open-app/sign-in-code')
-  async openAppSignInCode(@CurrentUser() user?: CurrentUser) {
-    if (!user) throw new ActionForbidden();
-    const code = await this.openApp.createSignInCode(user);
-    return { code };
-  }
-
-  @Public()
-  @UseNamedGuard('version')
-  @Post('/open-app/sign-in')
-  async openAppSignIn(
-    @Req() req: Request,
-    @Res() res: Response,
-    @Body() body?: unknown
-  ) {
-    const credential = OpenAppSignInBodySchema.safeParse(body);
-    if (!credential.success) throw new InvalidAuthState();
-    const result = await this.openApp.complete(
-      credential.data.code,
-      this.sessionIssuer.target(req)
-    );
-    this.sessionIssuer.apply(res, result);
-    res.send({ id: result.user.id, exchangeCode: result.exchangeCode });
-  }
-
-  @Public()
-  @UseNamedGuard('version')
-  @Post('/session/exchange')
-  @Header('Cache-Control', 'no-store')
-  @Header('Pragma', 'no-cache')
-  async exchangeSession(@Req() req: Request, @Body() body?: unknown) {
-    const input = AuthSessionExchangeBodySchema.parse(body);
-    return await this.sessionExchange.exchange(req, input.code, {
-      installationId: input.installationId,
-      platform: input.platform,
-      deviceName: input.deviceName,
-      appVersion: getClientVersionFromRequest(req) ?? undefined,
-    });
-  }
-
-  @Public()
-  @UseNamedGuard('version')
-  @Throttle('default', { limit: 120, ttl: 60_000 })
-  @Post('/session/refresh')
-  @Header('Cache-Control', 'no-store')
-  @Header('Pragma', 'no-cache')
-  async refreshAuthSession(@Req() req: Request, @Body() body?: unknown) {
-    const input = AuthSessionRefreshBodySchema.parse(body);
-    return await this.sessionExchange.refresh(
-      req,
-      input.refreshToken,
-      getClientVersionFromRequest(req) ?? undefined
-    );
-  }
-
-  @Public()
-  @UseNamedGuard('version')
-  @Post('/session/revoke')
-  @Header('Cache-Control', 'no-store')
-  @Header('Pragma', 'no-cache')
-  async revokeCurrentAuthSession(@Req() req: Request, @Body() body?: unknown) {
-    if (!isNativeClientRequest(req)) {
-      throw new ActionForbidden();
-    }
-    const input = AuthSessionRefreshBodySchema.parse(body);
-    await this.authSessions.revokeWithRefreshToken(input.refreshToken);
-    return {};
   }
 
   @Get('/sessions')
@@ -360,7 +273,7 @@ export class AuthController {
       this.sessionIssuer.target(req)
     );
     this.sessionIssuer.apply(res, result);
-    res.send({ id: result.user.id, exchangeCode: result.exchangeCode });
+    res.send({ id: result.user.id });
   }
 
   @UseNamedGuard('version')

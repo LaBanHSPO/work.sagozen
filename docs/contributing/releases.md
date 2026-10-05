@@ -28,21 +28,18 @@ git commit -m "v0.5.4-canary.5"
 git push origin canary
 ```
 
-### 3. Create a Release Action
+### 3. Build and Deploy the Self-hosted Release
 
-Trigger a release action in the [Release Desktop App](https://github.com/toeverything/AFFiNE/actions/workflows/release-desktop-app.yml).
+Build the shared server/migration image from the release commit:
 
-![img.png](assets/release-action.png)
+```shell
+docker compose -f .docker/selfhost/compose.yml build
+```
 
-Select the appropriate branch, complete the form, and click `Run workflow`.
+Follow [the self-hosted deployment guide](../developing-server.md) for environment
+configuration, migrations, native binding exports, and deployment. The image
+contains the server and the web/admin browser apps; every browser uses the same
+web shell. No desktop installers or mobile store releases are produced.
 
-### 4. Publish the Release
-
-Once the release action is complete, a draft release will appear on the [Releases page](https://github.com/toeverything/AFFiNE/releases).
-
-Edit the release notes if necessary, then publish the release.
-
-Ensure that:
-
-- The release tag and title match the version in `package.json`.
-- The release targets the commit you just pushed.
+Before publishing release notes, ensure the release tag and title match the
+version in `package.json` and point to the deployed commit.

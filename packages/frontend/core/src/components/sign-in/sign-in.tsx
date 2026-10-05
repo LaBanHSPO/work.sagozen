@@ -2,42 +2,30 @@ import { Button, notify } from '@affine/component';
 import {
   AuthContainer,
   AuthContent,
-  AuthFooter,
   AuthHeader,
   AuthInput,
 } from '@affine/component/auth-components';
-import { OAuth } from '@affine/core/components/affine/auth/oauth';
 import { useAsyncCallback } from '@affine/core/components/hooks/affine-async-hooks';
 import {
   AuthService,
-  getSelfHostedServerName,
   ServerService,
 } from '@affine/core/modules/cloud';
 import type { AuthSessionStatus } from '@affine/core/modules/cloud/entities/session';
-import {
-  isFixedSelfHostedSignIn,
-  SELF_HOSTED_SERVER_URL,
-} from '@affine/core/modules/cloud/self-hosted-sign-in';
+import { SELF_HOSTED_SERVER_URL } from '@affine/core/modules/cloud/self-hosted-sign-in';
 import { ServerDeploymentType } from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
-import {
-  ArrowRightBigIcon,
-  LocalWorkspaceIcon,
-  PublishIcon,
-} from '@blocksuite/icons/rc';
+import { ArrowRightBigIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
 import { cssVar } from '@toeverything/theme';
 import {
   type Dispatch,
   type SetStateAction,
-  useCallback,
   useEffect,
   useState,
 } from 'react';
 
 import { useSelfhostLoginVersionGuard } from '../hooks/affine/use-selfhost-login-version-guard';
 import type { SignInState } from '.';
-import { Back } from './back';
 import * as style from './style.css';
 
 const emailRegex =
@@ -48,33 +36,21 @@ function validateEmail(email: string) {
 }
 
 export const SignInStep = ({
-  state,
   changeState,
-  onSkip,
   onAuthenticated,
 }: {
-  state: SignInState;
   changeState: Dispatch<SetStateAction<SignInState>>;
-  onSkip: () => void;
   onAuthenticated?: (status: AuthSessionStatus) => void;
 }) => {
   const t = useI18n();
-  const selfHostedOnly = isFixedSelfHostedSignIn();
   const serverService = useService(ServerService);
-  const serverName = useLiveData(
-    serverService.server.config$.selector(c => c.serverName)
-  );
   const versionError = useSelfhostLoginVersionGuard(serverService.server);
   const isSelfhosted = useLiveData(
     serverService.server.config$.selector(
       c => c.type === ServerDeploymentType.Selfhosted
     )
   );
-  const signInServerName = selfHostedOnly
-    ? SELF_HOSTED_SERVER_URL
-    : isSelfhosted
-      ? getSelfHostedServerName(serverName)
-      : serverName;
+  const signInServerName = SELF_HOSTED_SERVER_URL;
   const authService = useService(AuthService);
   const [isMutating, setIsMutating] = useState(false);
 
@@ -104,51 +80,25 @@ export const SignInStep = ({
     setIsMutating(true);
 
     try {
-      const { methods } = await authService.checkUserByEmail(email);
-      const hasPassword = methods.password.available;
-      const canUseMagicLink = methods.magicLink.available;
+      await authService.checkUserByEmail(email);
 
-      // Self-hosted email login stays on the password form. The mailed
-      // 6-digit code is only the cloud sign-in path.
-      if (selfHostedOnly || isSelfhosted || hasPassword) {
-        changeState(prev => ({
-          ...prev,
-          email,
-          step: 'signInWithPassword',
-          hasPassword,
-        }));
-      } else if (canUseMagicLink) {
-        changeState(prev => ({
-          ...prev,
-          email,
-          step: 'signInWithEmail',
-          hasPassword: false,
-        }));
-      } else {
-        notify.error({
-          title: 'Failed to sign in',
-          message: 'This email is not available for sign in.',
-        });
-      }
-    } catch (err: any) {
+      changeState(prev => ({
+        ...prev,
+        email,
+        step: 'signInWithPassword',
+      }));
+    } catch (err) {
       console.error(err);
 
-      // TODO(@eyhn): better error handling
       notify.error({
         title: 'Failed to sign in',
-        message: err.message,
+        message: err instanceof Error ? err.message : String(err),
       });
     }
 
     setIsMutating(false);
-  }, [authService, changeState, email, isSelfhosted, selfHostedOnly]);
+  }, [authService, changeState, email]);
 
-  const onAddSelfhosted = useCallback(() => {
-    changeState(prev => ({
-      ...prev,
-      step: 'addSelfhosted',
-    }));
-  }, [changeState]);
 
   if (versionError && isSelfhosted) {
     return (
@@ -172,7 +122,6 @@ export const SignInStep = ({
       />
 
       <AuthContent>
-        {!selfHostedOnly && <OAuth redirectUrl={state.redirectUrl} />}
 
         <form
           onSubmit={event => {
@@ -210,52 +159,7 @@ export const SignInStep = ({
           </Button>
         </form>
 
-        {!selfHostedOnly && !isSelfhosted && (
-          <>
-            <div className={style.authMessage}>
-              {/*prettier-ignore*/}
-              By clicking &quot;Continue with Google/Email&quot; above, you
-              agree to your company&apos;s terms and privacy policy.
-            </div>
-            <div className={style.skipDivider}>
-              <div className={style.skipDividerLine} />
-              <span className={style.skipDividerText}>or</span>
-              <div className={style.skipDividerLine} />
-            </div>
-            <div className={style.skipSection}>
-              {BUILD_CONFIG.isNative ? (
-                <Button
-                  variant="plain"
-                  className={style.addSelfhostedButton}
-                  prefix={
-                    <PublishIcon className={style.addSelfhostedButtonPrefix} />
-                  }
-                  onClick={onAddSelfhosted}
-                >
-                  {t['com.affine.auth.sign.add-selfhosted']()}
-                </Button>
-              ) : (
-                <div className={style.skipText}>
-                  {t['com.affine.mobile.sign-in.skip.hint']()}
-                </div>
-              )}
-              <Button
-                variant="plain"
-                onClick={onSkip}
-                className={style.skipLink}
-                prefix={<LocalWorkspaceIcon className={style.skipLinkIcon} />}
-              >
-                {t['com.affine.mobile.sign-in.skip.link']()}
-              </Button>
-            </div>
-          </>
-        )}
       </AuthContent>
-      {!selfHostedOnly && isSelfhosted && (
-        <AuthFooter>
-          <Back changeState={changeState} />
-        </AuthFooter>
-      )}
     </AuthContainer>
   );
 };

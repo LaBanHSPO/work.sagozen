@@ -300,7 +300,7 @@ input {
   outline: none;
 }
 
-/* Math font may not being loaded in Electron */
+/* Provide fallback math fonts when the browser has no dedicated math font. */
 math {
   font-family:
     'Cambria Math' /* windows */,

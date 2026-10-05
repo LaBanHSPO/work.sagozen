@@ -9,11 +9,6 @@ import {
 
 import { AuthService } from '../../../modules/cloud';
 import {
-  buildAuthenticationDeepLink,
-  buildOpenAppUrlRoute,
-} from '../../../modules/open-in-app';
-import { supportedClient } from './common';
-import {
   type OAuthFlowMode,
   parseOAuthCallbackState,
   resolveOAuthRedirect,
@@ -52,23 +47,11 @@ export const loader: LoaderFunction = async ({ request }) => {
       provider,
     };
 
-    if (!client || client === 'web') {
-      return payload;
-    }
-
-    const clientCheckResult = supportedClient.safeParse(client);
-    if (!clientCheckResult.success) {
+    if (client && client !== 'web') {
       return redirect('/sign-in?error=Invalid oauth callback parameters');
     }
 
-    const urlToOpen = buildAuthenticationDeepLink({
-      scheme: clientCheckResult.data,
-      method: 'oauth',
-      payload,
-      server: location.origin,
-    });
-
-    return redirect(buildOpenAppUrlRoute(urlToOpen));
+    return payload;
   } catch {
     return redirect('/sign-in?error=Invalid oauth callback parameters');
   }

@@ -22,7 +22,7 @@ export function inferOpenMode(event?: React.MouseEvent | MouseEvent) {
   if (isNewTabTrigger(event)) {
     return 'new-tab';
   } else if (isNewViewTrigger(event)) {
-    return BUILD_CONFIG.isElectron ? 'tail' : 'new-tab';
+    return 'new-tab';
   }
   return 'active';
 }

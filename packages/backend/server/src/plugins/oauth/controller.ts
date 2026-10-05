@@ -98,32 +98,12 @@ export class OAuthController {
       clientNonce: input.data.client_nonce,
       issue: this.sessionIssuer.target(req),
     });
-    if (result.type === 'handoff') {
-      const clientUrl = new URL(`${result.client}://authentication`);
-      clientUrl.searchParams.set('method', 'oauth');
-      clientUrl.searchParams.set(
-        'payload',
-        JSON.stringify({
-          state: result.stateToken,
-          code: result.code,
-          provider: result.provider,
-        })
-      );
-      clientUrl.searchParams.set('server', this.url.requestOrigin);
-      return res.redirect(
-        this.url.link('/open-app/url?', { url: clientUrl.toString() })
-      );
-    }
     this.sessionIssuer.apply(res, result);
-    if (
-      result.provider === OAuthProviderName.Apple &&
-      (!result.client || result.client === 'web')
-    ) {
+    if (result.provider === OAuthProviderName.Apple) {
       return this.url.safeRedirect(res, result.redirectUri ?? '/');
     }
     res.send({
       id: result.user.id,
-      exchangeCode: result.exchangeCode,
       redirectUri: result.redirectUri,
     });
   }

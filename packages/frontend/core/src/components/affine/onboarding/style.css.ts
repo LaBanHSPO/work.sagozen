@@ -1,5 +1,5 @@
 import { cssVar } from '@toeverything/theme';
-import { globalStyle, keyframes, style } from '@vanilla-extract/css';
+import { globalStyle, style } from '@vanilla-extract/css';
 
 // in case that we need to support dark mode later
 export const onboardingVars = {
@@ -61,14 +61,6 @@ export const onboardingVars = {
     nextButtonShowUpDelay: '20s',
   },
 };
-export const fadeIn = keyframes({
-  from: {
-    opacity: 0,
-  },
-  to: {
-    opacity: 1,
-  },
-});
 export const onboarding = style({
   width: '100vw',
   height: '100vh',
@@ -89,15 +81,6 @@ export const onboarding = style({
       background: onboardingVars.web.bg,
       transform: 'translateZ(-1000px) scale(2)',
       transition: 'opacity 0.3s ease',
-    },
-    '&[data-is-desktop="true"]::after': {
-      animation: `${fadeIn} 0.8s linear`,
-      // content: 'unset',
-      background:
-        'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 99.58%)',
-    },
-    '&[data-is-window="true"][data-is-desktop="true"]::after': {
-      opacity: 0,
     },
   },
 });

@@ -41,8 +41,7 @@ export const useAISpecs = () => {
       .database(framework)
       .linkedDoc(framework)
       .paragraph(enableAI)
-      .mobile(framework)
-      .electron(framework)
+      .mobile()
       .linkPreview(framework)
       .iconPicker(framework)
       .codeBlockPreview(framework).value;

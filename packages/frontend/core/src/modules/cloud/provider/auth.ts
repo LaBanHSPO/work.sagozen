@@ -30,11 +30,7 @@ export interface AuthProvider {
     challenge?: string;
   }): Promise<SignInUserInfo | void>;
 
-  signInOpenAppSignInCode(code: string): Promise<void>;
-
   signOut(): Promise<void>;
-
-  clearSession(): Promise<void>;
 }
 
 export const AuthProvider = createIdentifier<AuthProvider>('AuthProvider');

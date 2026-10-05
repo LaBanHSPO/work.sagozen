@@ -260,65 +260,9 @@ export const sectionTitle = style({
   color: cssVarV2('text/primary'),
 });
 
-export const storageOptions = style({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 8,
-});
-
-export const storageOption = style({
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'flex-start',
-  minHeight: 76,
-  boxSizing: 'border-box',
-  padding: 12,
-  border: `1px solid ${cssVarV2('layer/insideBorder/border')}`,
-  borderRadius: 8,
-  color: cssVarV2('text/primary'),
-  fontSize: cssVar('fontSm'),
-  cursor: 'pointer',
-  selectors: {
-    '&:has(input:checked)': {
-      borderColor: cssVarV2('button/primary'),
-      background: cssVarV2('layer/background/secondary'),
-    },
-    '&:has(input:focus-visible)': {
-      boxShadow: '0px 0px 0px 2px rgba(30, 150, 235, 0.30)',
-    },
-    '&[data-disabled="true"]': {
-      cursor: 'not-allowed',
-      color: cssVarV2('text/disable'),
-      background: cssVarV2('layer/background/secondary'),
-    },
-  },
-});
-
-export const storageRadio = style({
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  margin: 0,
-  opacity: 0,
-  pointerEvents: 'none',
-});
-
-export const storageCopy = style({
-  display: 'flex',
-  minWidth: 0,
-  flexDirection: 'column',
-  gap: 2,
-  lineHeight: '20px',
-});
-
 export const storageDescription = style({
   color: cssVarV2('text/secondary'),
   fontSize: cssVar('fontXs'),
-  selectors: {
-    [`${storageOption}[data-disabled="true"] &`]: {
-      color: cssVarV2('text/disable'),
-    },
-  },
 });
 
 export const checkboxRow = style({

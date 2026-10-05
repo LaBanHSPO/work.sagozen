@@ -2,19 +2,16 @@ import { ResizePanel } from '@affine/component/resize-panel';
 import { AffineErrorComponent } from '@affine/core/components/affine/affine-error-boundary/affine-error-fallback';
 import { workbenchRoutes } from '@affine/core/desktop/workbench-router';
 import {
-  appSettingAtom,
   FrameworkScope,
   useLiveData,
   useService,
 } from '@toeverything/infra';
-import { useAtomValue } from 'jotai';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { type RouteObject, useLocation } from 'react-router-dom';
 
 import type { View } from '../entities/view';
 import { WorkbenchService } from '../services/workbench';
 import { useBindWorkbenchToBrowserRouter } from './browser-adapter';
-import { useBindWorkbenchToDesktopRouter } from './desktop-adapter';
 import { RouteContainer } from './route-container';
 import { SidebarContainer } from './sidebar/sidebar-container';
 import { SplitView } from './split-view/split-view';
@@ -22,9 +19,6 @@ import { ViewIslandRegistryProvider } from './view-islands';
 import { ViewRoot } from './view-root';
 import * as styles from './workbench-root.css';
 
-const useAdapter = BUILD_CONFIG.isElectron
-  ? useBindWorkbenchToDesktopRouter
-  : useBindWorkbenchToBrowserRouter;
 
 const routes: RouteObject[] = [
   {
@@ -37,15 +31,13 @@ const routes: RouteObject[] = [
 export const WorkbenchRoot = memo(() => {
   const workbench = useService(WorkbenchService).workbench;
 
-  // for debugging
-  (window as any).workbench = workbench;
 
   const views = useLiveData(workbench.views$);
 
   const location = useLocation();
   const basename = location.pathname.match(/\/workspace\/[^/]+/g)?.[0] ?? '/';
 
-  useAdapter(workbench, basename);
+  useBindWorkbenchToBrowserRouter(workbench, basename);
 
   const panelRenderer = useCallback((view: View) => {
     return <WorkbenchView view={view} />;
@@ -112,7 +104,6 @@ const MIN_SIDEBAR_WIDTH = 320;
 const MAX_SIDEBAR_WIDTH = 1400;
 
 const WorkbenchSidebar = () => {
-  const { clientBorder } = useAtomValue(appSettingAtom);
 
   const [resizing, setResizing] = useState(false);
 
@@ -162,12 +153,11 @@ const WorkbenchSidebar = () => {
     <ResizePanel
       floating={floating}
       resizeHandlePos="left"
-      resizeHandleOffset={clientBorder && sidebarOpen ? 3 : 0}
+      resizeHandleOffset={0}
       width={width}
       resizing={resizing}
       onResizing={setResizing}
       className={styles.workbenchSidebar}
-      data-client-border={clientBorder && sidebarOpen}
       open={sidebarOpen ?? false}
       onOpen={handleOpenChange}
       onWidthChange={setWidth}

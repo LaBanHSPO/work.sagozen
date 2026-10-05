@@ -12,7 +12,6 @@ import {
   DeleteIcon,
   OpenInNewIcon,
   PlusIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useServices } from '@toeverything/infra';
 import { useCallback, useMemo } from 'react';
@@ -61,12 +60,6 @@ export const useNavigationPanelTagNodeOperations = (
     toast(t['com.affine.tags.delete-tags.toast']());
   }, [t, tagId, tagService.tagList]);
 
-  const handleOpenInSplitView = useCallback(() => {
-    workbenchService.workbench.openTag(tagId, {
-      at: 'beside',
-    });
-    track.$.navigationPanel.organize.openInSplitView({ type: 'tag' });
-  }, [tagId, workbenchService]);
 
   const handleToggleFavoriteTag = useCallback(() => {
     favoriteService.favoriteList.toggle('tag', tagId);
@@ -106,21 +99,6 @@ export const useNavigationPanelTagNodeOperations = (
           </MenuItem>
         ),
       },
-      ...(BUILD_CONFIG.isElectron
-        ? [
-            {
-              index: 100,
-              view: (
-                <MenuItem
-                  prefixIcon={<SplitViewIcon />}
-                  onClick={handleOpenInSplitView}
-                >
-                  {t['com.affine.workbench.split-view.page-menu-open']()}
-                </MenuItem>
-              ),
-            },
-          ]
-        : []),
       {
         index: 199,
         view: (
@@ -157,7 +135,6 @@ export const useNavigationPanelTagNodeOperations = (
       handleMoveToTrash,
       handleNewDoc,
       handleOpenInNewTab,
-      handleOpenInSplitView,
       handleToggleFavoriteTag,
       t,
     ]

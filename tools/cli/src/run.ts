@@ -25,11 +25,9 @@ const ignoreLoaderScripts = [
   'vite',
   'tsx',
   'prisma',
-  'cap',
   'tsc',
   'typedoc',
   /^r$/,
-  /electron(?!-)/,
 ];
 
 export class RunCommand extends PackageCommand {

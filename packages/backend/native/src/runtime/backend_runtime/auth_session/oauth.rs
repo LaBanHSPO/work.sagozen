@@ -171,19 +171,14 @@ pub(super) async fn callback(
   let (state_token, envelope) = parse_state(raw_state)?;
   let token_hash = super::super::token_hash(&state_token);
   let state = read_state(pool, &token_hash).await?;
+  if state.client != "web" {
+    return Err(RuntimeError::invalid_state("invalid_oauth_callback_state"));
+  }
   if envelope
     .as_ref()
     .is_some_and(|envelope| envelope.provider != state.provider_label || envelope.client != state.client)
   {
     return Err(RuntimeError::invalid_state("invalid_oauth_callback_state"));
-  }
-  if state.provider == "apple" && state.client != "web" && envelope.is_some() {
-    return Ok(OAuthCallbackResult::Handoff {
-      code: code.to_string(),
-      provider: state.provider_label,
-      state_token,
-      client: state.client,
-    });
   }
   if state.provider != "apple" && client_nonce != Some(state.client_nonce.as_str()) {
     return Err(RuntimeError::invalid_state("invalid_auth_state"));
@@ -333,10 +328,8 @@ fn provider_name(input: &str) -> RuntimeResult<(&'static str, &'static str)> {
 }
 
 fn validate_preflight(client: &str, nonce: &str, redirect: Option<&str>, callback: &str) -> RuntimeResult<()> {
-  if !matches!(
-    client,
-    "web" | "affine" | "affine-canary" | "affine-beta" | "affine-dev"
-  ) || nonce.is_empty()
+  if client != "web"
+    || nonce.is_empty()
     || nonce.len() > 512
     || redirect.is_some_and(|value| value.len() > 2048)
     || url::Url::parse(callback).is_err()

@@ -178,7 +178,7 @@ export const ModalInner = forwardRef<HTMLDivElement, ModalProps>(
       children,
       contentWrapperClassName,
       contentWrapperStyle,
-      animation = BUILD_CONFIG.isMobileEdition ? 'slideBottom' : 'fadeScaleTop',
+      animation = environment.isMobile ? 'slideBottom' : 'fadeScaleTop',
       contentAnimation = animation,
       fullScreen,
       disableAutoFocus,
@@ -275,7 +275,7 @@ export const ModalInner = forwardRef<HTMLDivElement, ModalProps>(
               `anim-${animation}`,
               styles.modalOverlay,
               overlayClassName,
-              { mobile: BUILD_CONFIG.isMobileEdition }
+              { mobile: environment.isMobile }
             )}
             style={{
               ...overlayStyle,
@@ -283,7 +283,7 @@ export const ModalInner = forwardRef<HTMLDivElement, ModalProps>(
             {...otherOverlayOptions}
           >
             <SafeArea
-              bottom={BUILD_CONFIG.isMobileEdition}
+              bottom={environment.isMobile}
               bottomOffset={
                 fullScreen
                   ? 0
@@ -298,7 +298,7 @@ export const ModalInner = forwardRef<HTMLDivElement, ModalProps>(
                 styles.modalContentWrapper,
                 contentWrapperClassName
               )}
-              data-mobile={BUILD_CONFIG.isMobileEdition ? '' : undefined}
+              data-mobile={environment.isMobile ? '' : undefined}
               style={{
                 ...assignInlineVars({
                   [styles.keyboardInsetVar]: getVar(

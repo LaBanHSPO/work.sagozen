@@ -125,13 +125,13 @@ export class ImportCommitService {
       tags.set(tag.name, docIds);
     }
 
-    const rootFolderId = this.applyNativeFolders(
+    const rootFolderId = this.applyFolders(
       batch.folders ?? [],
       warnings,
       batch.done
     );
-    this.applyNativeTags(tags);
-    this.applyNativeIcons(batch.icons);
+    this.applyTags(tags);
+    this.applyIcons(batch.icons);
     return {
       docIds,
       entryId: batch.entryId,
@@ -141,7 +141,7 @@ export class ImportCommitService {
     };
   }
 
-  private applyNativeFolders(
+  private applyFolders(
     folders: ImportFolder[],
     warnings: ImportCommitResult['warnings'],
     batchDone: boolean
@@ -251,7 +251,7 @@ export class ImportCommitService {
     return true;
   }
 
-  private applyNativeIcons(icons?: ImportBatch['icons']) {
+  private applyIcons(icons?: ImportBatch['icons']) {
     for (const icon of icons ?? []) {
       this.applyIcon(icon.docId, icon.icon);
     }
@@ -268,7 +268,7 @@ export class ImportCommitService {
     });
   }
 
-  private applyNativeTags(tags?: Map<string, string[]>) {
+  private applyTags(tags?: Map<string, string[]>) {
     const { tagService, collection } = this.options;
     if (!tagService || !tags?.size) return;
 

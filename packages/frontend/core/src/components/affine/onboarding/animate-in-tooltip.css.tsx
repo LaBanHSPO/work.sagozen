@@ -18,12 +18,6 @@ export const tooltip = style({
   animation: `${fadeIn} 1s ease forwards`,
   animationDelay: onboardingVars.animateIn.tooltipShowUpDelay,
   color: '#121212',
-  selectors: {
-    '[data-is-desktop="true"] &': {
-      color: 'white',
-      textShadow: '0px 0px 4px rgba(66, 65, 73, 0.14)',
-    },
-  },
 });
 
 export const next = style({

@@ -144,7 +144,7 @@ const DatabaseBacklinkRow = ({
         suffix={
           <AffinePageReference
             className={
-              BUILD_CONFIG.isMobileEdition
+              environment.isMobile
                 ? styles.mobileDocRefLink
                 : styles.docRefLink
             }

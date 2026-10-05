@@ -215,9 +215,7 @@ const SharePageInner = ({
             },
           },
           blob: {
-            name: BUILD_CONFIG.isElectron
-              ? 'SqliteBlobStorage'
-              : 'IndexedDBBlobStorage',
+            name: 'IndexedDBBlobStorage',
             opts: {
               id: workspaceId,
               flavour: 'affine-cloud',

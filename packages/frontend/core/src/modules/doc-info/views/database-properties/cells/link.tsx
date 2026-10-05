@@ -107,7 +107,7 @@ export const LinkCell = ({
         ref={ref}
         onKeyDown={onKeydown}
         className={
-          !BUILD_CONFIG.isMobileEdition
+          !environment.isMobile
             ? styles.textarea
             : styles.mobileTextarea
         }
@@ -121,7 +121,7 @@ export const LinkCell = ({
       />
       <div
         className={
-          !BUILD_CONFIG.isMobileEdition
+          !environment.isMobile
             ? styles.textInvisible
             : styles.mobileTextInvisible
         }
@@ -158,11 +158,11 @@ export const LinkCell = ({
               {link?.replace(/^https?:\/\//, '').trim()}
             </a>
           )
-        ) : !BUILD_CONFIG.isMobileEdition ? (
+        ) : !environment.isMobile ? (
           editingElement
         ) : null}
       </PropertyValue>
-      {BUILD_CONFIG.isMobileEdition ? (
+      {environment.isMobile ? (
         <ConfigModal
           open={editing}
           onOpenChange={setEditing}

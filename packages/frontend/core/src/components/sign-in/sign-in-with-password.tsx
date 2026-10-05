@@ -11,26 +11,19 @@ import { useAsyncCallback } from '@affine/core/components/hooks/affine-async-hoo
 import {
   AuthService,
   CaptchaService,
-  getSelfHostedServerName,
-  ServerService,
 } from '@affine/core/modules/cloud';
 import type { AuthSessionStatus } from '@affine/core/modules/cloud/entities/session';
-import {
-  isFixedSelfHostedSignIn,
-  SELF_HOSTED_SERVER_URL,
-} from '@affine/core/modules/cloud/self-hosted-sign-in';
+import { SELF_HOSTED_SERVER_URL } from '@affine/core/modules/cloud/self-hosted-sign-in';
 import { Unreachable } from '@affine/env/constant';
 import { UserFriendlyError } from '@affine/error';
-import { ServerDeploymentType } from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
 import type { Dispatch, SetStateAction } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { SignInState } from '.';
 import { Back } from './back';
 import { Captcha } from './captcha';
-import * as styles from './style.css';
 
 export const SignInWithPasswordStep = ({
   state,
@@ -42,7 +35,6 @@ export const SignInWithPasswordStep = ({
   onAuthenticated?: (status: AuthSessionStatus) => void;
 }) => {
   const t = useI18n();
-  const selfHostedOnly = isFixedSelfHostedSignIn();
   const authService = useService(AuthService);
 
   const email = state.email;
@@ -55,20 +47,7 @@ export const SignInWithPasswordStep = ({
   const [passwordError, setPasswordError] = useState(false);
   const [passwordErrorHint, setPasswordErrorHint] = useState('');
   const captchaService = useService(CaptchaService);
-  const serverService = useService(ServerService);
-  const isSelfhosted = useLiveData(
-    serverService.server.config$.selector(
-      c => c.type === ServerDeploymentType.Selfhosted
-    )
-  );
-  const serverName = useLiveData(
-    serverService.server.config$.selector(c => c.serverName)
-  );
-  const signInServerName = selfHostedOnly
-    ? SELF_HOSTED_SERVER_URL
-    : isSelfhosted
-      ? getSelfHostedServerName(serverName)
-      : serverName;
+  const signInServerName = SELF_HOSTED_SERVER_URL;
 
   const verifyToken = useLiveData(captchaService.verifyToken$);
   const needCaptcha = useLiveData(captchaService.needCaptcha$);
@@ -137,9 +116,6 @@ export const SignInWithPasswordStep = ({
     t,
   ]);
 
-  const sendMagicLink = useCallback(() => {
-    changeState(prev => ({ ...prev, step: 'signInWithEmail' }));
-  }, [changeState]);
 
   return (
     <AuthContainer>
@@ -193,17 +169,6 @@ export const SignInWithPasswordStep = ({
             {t['com.affine.auth.sign.in']()}
           </Button>
         </form>
-        {!selfHostedOnly && !isSelfhosted && (
-          <div className={styles.passwordButtonRow}>
-            <a
-              data-testid="send-magic-link-button"
-              className={styles.linkButton}
-              onClick={sendMagicLink}
-            >
-              {t['com.affine.auth.sign.auth.code.send-email.sign-in']()}
-            </a>
-          </div>
-        )}
       </AuthContent>
       <AuthFooter>
         <Back changeState={changeState} />

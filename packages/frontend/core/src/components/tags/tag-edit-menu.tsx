@@ -215,6 +215,6 @@ const MobileTagEditMenu = ({
   );
 };
 
-export const TagEditMenu = BUILD_CONFIG.isMobileEdition
+export const TagEditMenu = environment.isMobile
   ? MobileTagEditMenu
   : DesktopTagEditMenu;

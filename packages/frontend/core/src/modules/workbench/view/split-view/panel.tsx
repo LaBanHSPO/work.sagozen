@@ -158,8 +158,7 @@ export const SplitViewPanel = memo(function SplitViewPanel({
       canDrop(data) {
         const entityType = data.source.data.entity?.type;
         return (
-          (BUILD_CONFIG.isElectron &&
-            data.source.data.from?.at === 'workbench:view') ||
+          data.source.data.from?.at === 'workbench:view' ||
           data.source.data.from?.at === 'workbench:link' ||
           (!!entityType && allowedSplitViewEntityTypes.has(entityType))
         );
@@ -197,7 +196,7 @@ export const SplitViewPanel = memo(function SplitViewPanel({
         });
       },
       canDrag() {
-        return BUILD_CONFIG.isElectron && views.length > 1;
+        return views.length > 1;
       },
       disableDragPreview: true,
     };

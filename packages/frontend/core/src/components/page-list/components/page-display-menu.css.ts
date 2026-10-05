@@ -7,7 +7,6 @@ export const menu = style({
 
 export const headerDisplayButton = style({
   marginLeft: '16px',
-  ['WebkitAppRegion' as string]: 'no-drag',
 });
 
 export const subMenuTrigger = style({

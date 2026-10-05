@@ -53,7 +53,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   return (
     <div
       className={clsx(
-        BUILD_CONFIG.isMobileEdition ? mobileInputWrapper : inputWrapper,
+        environment.isMobile ? mobileInputWrapper : inputWrapper,
         className,
         {
           // status

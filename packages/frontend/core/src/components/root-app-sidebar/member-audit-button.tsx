@@ -98,7 +98,7 @@ const MemberAuditList = ({ workspaceId }: { workspaceId: string }) => {
   return (
     <div
       className={styles.container}
-      data-mobile={BUILD_CONFIG.isMobileEdition ? '' : undefined}
+      data-mobile={environment.isMobile ? '' : undefined}
     >
       <div className={styles.header}>Member activity</div>
       <Scrollable.Root className={styles.scrollRoot}>

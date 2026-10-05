@@ -252,8 +252,8 @@ export const DocsExplorer = ({
       <Masonry
         className={className}
         items={masonryItems}
-        gapY={BUILD_CONFIG.isMobileEdition ? 12 : view === 'list' ? 12 : 24}
-        gapX={BUILD_CONFIG.isMobileEdition ? 12 : 24}
+        gapY={environment.isMobile ? 12 : view === 'list' ? 12 : 24}
+        gapX={environment.isMobile ? 12 : 24}
         groupsGap={12}
         groupHeaderGapWithItems={12}
         columns={view === 'list' ? 1 : undefined}
@@ -262,8 +262,8 @@ export const DocsExplorer = ({
         itemWidth={'stretch'}
         virtualScroll
         collapsedGroups={collapsedGroups}
-        paddingY={BUILD_CONFIG.isMobileEdition ? 12 : 0}
-        paddingX={BUILD_CONFIG.isMobileEdition ? 16 : responsivePaddingX}
+        paddingY={environment.isMobile ? 12 : 0}
+        paddingX={environment.isMobile ? 16 : responsivePaddingX}
       />
       {!disableMultiSelectToolbar || onRestore ? (
         <ListFloatingToolbar

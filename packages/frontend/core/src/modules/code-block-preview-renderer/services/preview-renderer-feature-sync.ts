@@ -3,7 +3,7 @@ import { distinctUntilChanged } from 'rxjs';
 
 import type { FeatureFlagService } from '../../feature-flag';
 import { ApplicationStarted } from '../../lifecycle';
-import { setMermaidWasmNativeRendererEnabled } from '../runtime-config';
+import { setMermaidWasmRendererEnabled } from '../runtime-config';
 
 @OnEvent(ApplicationStarted, e => e.syncFlag)
 export class PreviewRendererFeatureSyncService extends Service {
@@ -13,12 +13,12 @@ export class PreviewRendererFeatureSyncService extends Service {
 
   syncFlag() {
     const mermaidFlag =
-      this.featureFlagService.flags.enable_mermaid_wasm_native_renderer;
+      this.featureFlagService.flags.enable_mermaid_wasm_renderer;
 
-    setMermaidWasmNativeRendererEnabled(!!mermaidFlag.value);
+    setMermaidWasmRendererEnabled(!!mermaidFlag.value);
     const subscription = mermaidFlag.$.pipe(distinctUntilChanged()).subscribe(
       enabled => {
-        setMermaidWasmNativeRendererEnabled(!!enabled);
+        setMermaidWasmRendererEnabled(!!enabled);
       }
     );
     this.disposables.push(() => subscription.unsubscribe());

@@ -99,17 +99,14 @@ export const UpgradeToTeam = ({ recurring }: { recurring: string | null }) => {
     profile?.revalidate();
   }, [profile]);
 
-  const { jumpToPage, jumpToOpenInApp } = useNavigateHelper();
-  const [params] = useSearchParams();
+  const { jumpToPage } = useNavigateHelper();
   const isTeam = workspaceInfo?.isTeam;
 
   const openAFFiNE = useCallback(() => {
-    if (params.get('client')) {
-      jumpToOpenInApp(`/workspace/${selectedWorkspace?.id}/all`);
-    } else if (selectedWorkspace) {
+    if (selectedWorkspace) {
       jumpToPage(selectedWorkspace.id, 'all');
     }
-  }, [jumpToOpenInApp, jumpToPage, params, selectedWorkspace]);
+  }, [jumpToPage, selectedWorkspace]);
 
   useEffect(() => {
     revalidate();

@@ -9,7 +9,7 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 use zeroize::Zeroizing;
 
 use super::{
-  issuance, keyring, login, mail, oauth, oauth_http, principal, refresh, security, security_challenge, session,
+  cookie, issuance, keyring, login, mail, oauth, oauth_http, principal, security, security_challenge, session,
   types::{PrincipalInput, SessionIssueInput},
 };
 use crate::runtime::{
@@ -57,18 +57,85 @@ async fn create_user(pool: &PgPool, marker: &str) -> String {
   id
 }
 
-async fn create_exchange(pool: &PgPool, user_id: &str, marker: &str) -> String {
-  let code = uuid::Uuid::new_v4().to_string();
+struct LegacyDeviceSession {
+  id: String,
+  user_session_id: String,
+  refresh_token_id: String,
+  access_token: String,
+}
+
+async fn create_legacy_device_session(
+  pool: &PgPool,
+  config: &BackendRuntimeConfig,
+  user_id: &str,
+  marker: &str,
+) -> LegacyDeviceSession {
+  let mut tx = pool.begin().await.unwrap();
+  let now = session::decision_time(&mut tx).await.unwrap();
+  let cookie_session_id = uuid::Uuid::new_v4().to_string();
+  let user_session_id = uuid::Uuid::new_v4().to_string();
+  let id = uuid::Uuid::new_v4().to_string();
+  let refresh_token_id = uuid::Uuid::new_v4().to_string();
+  let expires_at = now + chrono::Duration::days(1);
+  sqlx::query("INSERT INTO multiple_users_sessions(id,created_at) VALUES($1,$2)")
+    .bind(&cookie_session_id)
+    .bind(now)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
   sqlx::query(
-    r#"INSERT INTO runtime_states(purpose,token_hash,lookup_key,payload,expires_at)
-       VALUES('auth_challenge:auth_session_exchange',$1,NULL,$2,clock_timestamp()+INTERVAL '1 minute')"#,
+    "INSERT INTO user_sessions(id,session_id,user_id,expires_at,created_at) VALUES($1,$2,$3,$4,$5)",
   )
-  .bind(super::super::token_hash(&code))
-  .bind(json!({ "userId": user_id, "clientVersion": marker, "authEpoch": 0 }))
-  .execute(pool)
+  .bind(&user_session_id)
+  .bind(&cookie_session_id)
+  .bind(user_id)
+  .bind(expires_at)
+  .bind(now)
+  .execute(&mut *tx)
   .await
   .unwrap();
-  code
+  sqlx::query(
+    r#"INSERT INTO auth_sessions(
+         id,user_session_id,installation_id,platform,created_at,last_seen_at,idle_expires_at,absolute_expires_at)
+       VALUES($1,$2,$3,'ios',$4,$4,$5,$5)"#,
+  )
+  .bind(&id)
+  .bind(&user_session_id)
+  .bind(format!("legacy-{marker}"))
+  .bind(now)
+  .bind(expires_at)
+  .execute(&mut *tx)
+  .await
+  .unwrap();
+  sqlx::query(
+    "INSERT INTO auth_refresh_tokens(id,auth_session_id,generation,secret_hash,created_at,expires_at) \
+     VALUES($1,$2,0,$3,$4,$5)",
+  )
+  .bind(&refresh_token_id)
+  .bind(&id)
+  .bind("0".repeat(64))
+  .bind(now)
+  .bind(expires_at)
+  .execute(&mut *tx)
+  .await
+  .unwrap();
+  let key = keyring::active(&mut tx, config).await.unwrap();
+  let access_token = crate::auth_session::sign_auth_session_access_token(
+    user_id,
+    &id,
+    &key.id,
+    &key.secret,
+    now.timestamp(),
+    (now + chrono::Duration::seconds(config.auth.access_token_ttl_seconds)).timestamp(),
+  )
+  .unwrap();
+  tx.commit().await.unwrap();
+  LegacyDeviceSession {
+    id,
+    user_session_id,
+    refresh_token_id,
+    access_token,
+  }
 }
 
 async fn oidc_server(nonce: Arc<tokio::sync::Mutex<String>>) -> String {
@@ -165,8 +232,36 @@ fn argon2_upgrade_verifies_existing_hashes() {
   );
 }
 
+#[test]
+fn auth_command_contract_accepts_cookie_issuance_only() {
+  let command = json!({
+    "action": "password_login",
+    "email": "browser@example.invalid",
+    "password": "password",
+    "issue": { "type": "cookie" }
+  });
+  assert!(serde_json::from_value::<super::types::AuthSessionCommand>(command.clone()).is_ok());
+  let mut native_command = command;
+  native_command["issue"] = json!({ "type": "native" });
+  assert!(serde_json::from_value::<super::types::AuthSessionCommand>(native_command).is_err());
+  for action in ["exchange", "refresh", "revoke_refresh", "create_open_app_code", "complete_open_app"] {
+    assert!(
+      serde_json::from_value::<super::types::AuthSessionCommand>(json!({
+        "action": action,
+        "code": "legacy-code",
+        "installationId": "legacy-installation",
+        "platform": "ios",
+        "refreshToken": "legacy-token",
+        "userId": "user-id",
+        "issue": { "type": "cookie" }
+      }))
+      .is_err()
+    );
+  }
+}
+
 #[tokio::test]
-async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() {
+async fn browser_session_kernel_preserves_login_security_and_legacy_device_revocation() {
   let _guard = crate::runtime::migrations::DATABASE_TEST_LOCK.lock().await;
   let Some(pool) = pool().await else {
     return;
@@ -223,36 +318,6 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     },
   );
   keyring::initialize(&pool, &config).await.unwrap();
-  let refresh_limit_selector = format!("rust-test-{marker}");
-  for _ in 0..affine_core::auth::AUTH_REFRESH_LIMIT {
-    assert!(
-      refresh::consume_refresh_rate_limit(&pool, &refresh_limit_selector)
-        .await
-        .unwrap()
-    );
-  }
-  assert!(
-    !refresh::consume_refresh_rate_limit(&pool, &refresh_limit_selector)
-      .await
-      .unwrap()
-  );
-  sqlx::query("DELETE FROM runtime_rolling_quota_counters WHERE scope_key=$1")
-    .bind(format!("auth:session_refresh:{refresh_limit_selector}"))
-    .execute(&pool)
-    .await
-    .unwrap();
-  let unknown_refresh = crate::auth_session::create_auth_session_refresh_token();
-  let unknown_result = refresh::refresh(&pool, &config, &unknown_refresh.token, None)
-    .await
-    .unwrap();
-  assert_eq!(serde_json::to_value(unknown_result).unwrap()["status"], "invalid");
-  let unknown_counter: i64 =
-    sqlx::query_scalar("SELECT count(*) FROM runtime_rolling_quota_counters WHERE scope_key=$1")
-      .bind(format!("auth:session_refresh:{}", unknown_refresh.id))
-      .fetch_one(&pool)
-      .await
-      .unwrap();
-  assert_eq!(unknown_counter, 0);
   sqlx::query("UPDATE users SET password=$2 WHERE id=$1")
     .bind(&user_id)
     .bind("$argon2id$v=19$m=19456,t=2,p=1$/JC3Ue87NEBXtjra7TY9TQ$oysAbNozbP/Z6kdbyPXYDRcZFr4WJlFEHhx+88QRjoc")
@@ -285,8 +350,13 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
   )
   .await
   .unwrap();
-  assert!(password_login.session_id.is_some());
+  assert!(!password_login.session_id.is_empty());
+  assert!(password_login.session_expires_at > chrono::Utc::now());
   assert_eq!(password_login.user.id, user_id);
+  let password_result = serde_json::to_value(&password_login).unwrap();
+  assert!(password_result["sessionId"].is_string());
+  assert!(password_result["sessionExpiresAt"].is_string());
+  assert!(password_result.get("exchangeCode").is_none());
 
   let magic_email = format!("magic-{marker}@example.invalid");
   let auth_source = mail::AuthRequestSource {
@@ -362,7 +432,10 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
       &magic_email,
       "000000",
       Some("magic-nonce"),
-      SessionIssueInput::Native { client_version: None },
+      SessionIssueInput::Cookie {
+        session_id: None,
+        client_version: None,
+      },
     )
     .await
     .is_err()
@@ -375,7 +448,10 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
       &magic_email,
       &magic_otp,
       Some("magic-nonce"),
-      SessionIssueInput::Native { client_version: None },
+      SessionIssueInput::Cookie {
+        session_id: None,
+        client_version: None,
+      },
     )
     .await
     .is_err()
@@ -387,14 +463,16 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     &magic_email,
     &magic_otp,
     Some("magic-nonce"),
-    SessionIssueInput::Native {
+    SessionIssueInput::Cookie {
+      session_id: None,
       client_version: Some("magic-client".to_string()),
     },
   )
   .await
   .unwrap();
   assert_eq!(magic_login.created, Some(true));
-  assert!(magic_login.exchange_code.is_some());
+  assert!(!magic_login.session_id.is_empty());
+  assert!(magic_login.session_expires_at > chrono::Utc::now());
   assert!(
     login::complete_magic_link(
       &pool,
@@ -402,7 +480,10 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
       &magic_email,
       &magic_otp,
       Some("magic-nonce"),
-      SessionIssueInput::Native { client_version: None },
+      SessionIssueInput::Cookie {
+        session_id: None,
+        client_version: None,
+      },
     )
     .await
     .is_err()
@@ -435,261 +516,65 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     &magic_email,
     existing_magic_otp,
     Some("existing-magic-nonce"),
-    SessionIssueInput::Native { client_version: None },
-  )
-  .await
-  .unwrap();
-  assert_eq!(existing_magic_login.created, Some(false));
-  config.auth.allow_signup = true;
-  config.auth.require_email_domain_verification = false;
-  let open_app_code = login::create_open_app_code(&pool, &user_id).await.unwrap();
-  let open_app_login = login::complete_open_app(
-    &pool,
-    &config,
-    &open_app_code,
-    SessionIssueInput::Native { client_version: None },
-  )
-  .await
-  .unwrap();
-  assert_eq!(open_app_login.user.id, user_id);
-  assert!(
-    login::complete_open_app(
-      &pool,
-      &config,
-      &open_app_code,
-      SessionIssueInput::Native { client_version: None },
-    )
-    .await
-    .is_err()
-  );
-  let code = create_exchange(&pool, &user_id, &marker).await;
-  let issued = session::exchange(
-    &pool,
-    &config,
-    &code,
-    &format!("installation-{marker}"),
-    "ios",
-    Some("phone"),
-    Some("1.0.0"),
-  )
-  .await
-  .unwrap();
-  assert!(issued.is_new_device.unwrap());
-  assert!(
-    session::exchange(
-      &pool,
-      &config,
-      &code,
-      &format!("installation-{marker}"),
-      "ios",
-      None,
-      None,
-    )
-    .await
-    .is_err()
-  );
-  let (first, second) = tokio::join!(
-    refresh::refresh(&pool, &config, &issued.refresh_token, Some("1.1.0")),
-    refresh::refresh(&pool, &config, &issued.refresh_token, Some("1.1.0"))
-  );
-  let (first, second) = (
-    serde_json::to_value(first.unwrap()).unwrap(),
-    serde_json::to_value(second.unwrap()).unwrap(),
-  );
-  assert_eq!(first["status"], "rotated");
-  assert_eq!(second["status"], "rotated");
-  assert_ne!(first["grace"], second["grace"]);
-  assert_eq!(first["refreshToken"], second["refreshToken"]);
-  let replay = refresh::refresh(&pool, &config, &issued.refresh_token, None)
-    .await
-    .unwrap();
-  let replay = serde_json::to_value(replay).unwrap();
-  assert_eq!(replay["status"], "reused");
-  let principal = principal::resolve(
-    &pool,
-    &config,
-    PrincipalInput::AccessToken {
-      token: first["accessToken"].as_str().unwrap().to_string(),
+    SessionIssueInput::Cookie {
+      session_id: Some(magic_login.session_id.clone()),
+      client_version: None,
     },
   )
   .await
   .unwrap();
-  assert_eq!(
-    serde_json::to_value(principal).unwrap()["status"],
-    "auth_session_revoked"
-  );
-
-  let second_code = create_exchange(&pool, &user_id, &format!("{marker}-second")).await;
-  let second_session = session::exchange(
+  assert_eq!(existing_magic_login.created, Some(false));
+  assert_eq!(existing_magic_login.session_id, magic_login.session_id);
+  let preserved_client_version: Option<String> =
+    sqlx::query_scalar("SELECT sign_in_client_version FROM user_sessions WHERE session_id=$1 AND user_id=$2")
+      .bind(&magic_login.session_id)
+      .bind(&magic_login.user.id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
+  assert_eq!(preserved_client_version.as_deref(), Some("magic-client"));
+  let magic_session_count: i64 =
+    sqlx::query_scalar("SELECT count(*) FROM user_sessions WHERE session_id=$1 AND user_id=$2")
+      .bind(&magic_login.session_id)
+      .bind(&magic_login.user.id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
+  assert_eq!(magic_session_count, 1);
+  config.auth.allow_signup = true;
+  config.auth.require_email_domain_verification = false;
+  let revoked_device = create_legacy_device_session(&pool, &config, &user_id, &marker).await;
+  let valid_device = principal::resolve(
     &pool,
     &config,
-    &second_code,
-    &format!("installation-{marker}-second"),
-    "android",
-    None,
-    None,
+    PrincipalInput::AccessToken {
+      token: revoked_device.access_token.clone(),
+    },
   )
   .await
   .unwrap();
-  let rotated = refresh::refresh(&pool, &config, &second_session.refresh_token, None)
-    .await
-    .unwrap();
-  let rotated = serde_json::to_value(rotated).unwrap();
-  let source_id = crate::auth_session::parse_auth_session_refresh_token(&second_session.refresh_token)
-    .unwrap()
-    .id;
-  sqlx::query("UPDATE auth_refresh_tokens SET successor_ciphertext=NULL,successor_expires_at=NULL WHERE id=$1")
-    .bind(&source_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-  let token_count: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_refresh_tokens WHERE auth_session_id=$1")
-    .bind(&second_session.session.id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-  let unavailable = refresh::refresh(&pool, &config, &second_session.refresh_token, None)
-    .await
-    .unwrap();
-  assert_eq!(
-    serde_json::to_value(unavailable).unwrap()["status"],
-    "temporarily_unavailable"
-  );
-  let unchanged_count: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_refresh_tokens WHERE auth_session_id=$1")
-    .bind(&second_session.session.id)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-  assert_eq!(unchanged_count, token_count);
-
-  sqlx::query("DROP TRIGGER IF EXISTS rfc12_auth_refresh_fault ON auth_refresh_tokens")
-    .execute(&pool)
-    .await
-    .unwrap();
-  sqlx::query("DROP FUNCTION IF EXISTS rfc12_auth_refresh_fault()")
-    .execute(&pool)
-    .await
-    .unwrap();
-  sqlx::query(
-    r#"CREATE FUNCTION rfc12_auth_refresh_fault() RETURNS trigger AS $$
-       BEGIN
-         IF TG_OP = 'INSERT' AND EXISTS(
-           SELECT 1 FROM app_configs
-           WHERE id='test.auth.refresh.fail_insert' AND value #>> '{}' = NEW.auth_session_id
-         ) THEN
-           RAISE EXCEPTION 'injected refresh successor insert failure';
-         END IF;
-         IF TG_OP = 'UPDATE' AND OLD.grace_used_at IS NULL AND NEW.grace_used_at IS NOT NULL AND EXISTS(
-           SELECT 1 FROM app_configs
-           WHERE id='test.auth.refresh.fail_grace' AND value #>> '{}' = NEW.auth_session_id
-         ) THEN
-           RAISE EXCEPTION 'injected refresh grace failure';
-         END IF;
-         RETURN NEW;
-       END
-       $$ LANGUAGE plpgsql"#,
-  )
-  .execute(&pool)
-  .await
-  .unwrap();
-  sqlx::query(
-    "CREATE TRIGGER rfc12_auth_refresh_fault BEFORE INSERT OR UPDATE ON auth_refresh_tokens FOR EACH ROW EXECUTE \
-     FUNCTION rfc12_auth_refresh_fault()",
-  )
-  .execute(&pool)
-  .await
-  .unwrap();
-  let rollback_refresh_code = create_exchange(&pool, &user_id, &format!("{marker}-refresh-rollback")).await;
-  let rollback_refresh_session = session::exchange(
+  assert_eq!(serde_json::to_value(valid_device).unwrap()["status"], "valid");
+  assert!(!session::revoke(&pool, &revoked_device.id, Some("wrong-owner"), "sign_out").await.unwrap());
+  assert!(session::revoke(&pool, &revoked_device.id, Some(&user_id), "sign_out").await.unwrap());
+  let revoked_refresh: bool =
+    sqlx::query_scalar("SELECT revoked_at IS NOT NULL FROM auth_refresh_tokens WHERE id=$1")
+      .bind(&revoked_device.refresh_token_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
+  assert!(revoked_refresh);
+  let revoked_principal = principal::resolve(
     &pool,
     &config,
-    &rollback_refresh_code,
-    &format!("installation-{marker}-refresh-rollback"),
-    "ios",
-    None,
-    None,
+    PrincipalInput::AccessToken {
+      token: revoked_device.access_token,
+    },
   )
   .await
   .unwrap();
-  sqlx::query(
-    "INSERT INTO app_configs(id,value,created_at,updated_at) VALUES($1,$2,clock_timestamp(),clock_timestamp()) ON \
-     CONFLICT(id) DO UPDATE SET value=EXCLUDED.value,updated_at=clock_timestamp()",
-  )
-  .bind("test.auth.refresh.fail_insert")
-  .bind(json!(rollback_refresh_session.session.id))
-  .execute(&pool)
-  .await
-  .unwrap();
-  assert!(
-    refresh::refresh(&pool, &config, &rollback_refresh_session.refresh_token, None)
-      .await
-      .is_err()
-  );
-  sqlx::query("DELETE FROM app_configs WHERE id='test.auth.refresh.fail_insert'")
-    .execute(&pool)
-    .await
-    .unwrap();
-  let rollback_source_id =
-    crate::auth_session::parse_auth_session_refresh_token(&rollback_refresh_session.refresh_token)
-      .unwrap()
-      .id;
-  let rollback_source: (Option<chrono::DateTime<chrono::Utc>>, Option<String>, Option<String>) =
-    sqlx::query_as("SELECT used_at,replaced_by_id,successor_ciphertext FROM auth_refresh_tokens WHERE id=$1")
-      .bind(&rollback_source_id)
-      .fetch_one(&pool)
-      .await
-      .unwrap();
-  assert_eq!(rollback_source, (None, None, None));
-  let rollback_token_count: i64 =
-    sqlx::query_scalar("SELECT count(*) FROM auth_refresh_tokens WHERE auth_session_id=$1")
-      .bind(&rollback_refresh_session.session.id)
-      .fetch_one(&pool)
-      .await
-      .unwrap();
-  assert_eq!(rollback_token_count, 1);
-
-  let rotated_after_rollback = refresh::refresh(&pool, &config, &rollback_refresh_session.refresh_token, None)
-    .await
-    .unwrap();
-  assert_eq!(
-    serde_json::to_value(&rotated_after_rollback).unwrap()["status"],
-    "rotated"
-  );
-  sqlx::query(
-    "INSERT INTO app_configs(id,value,created_at,updated_at) VALUES($1,$2,clock_timestamp(),clock_timestamp()) ON \
-     CONFLICT(id) DO UPDATE SET value=EXCLUDED.value,updated_at=clock_timestamp()",
-  )
-  .bind("test.auth.refresh.fail_grace")
-  .bind(json!(rollback_refresh_session.session.id))
-  .execute(&pool)
-  .await
-  .unwrap();
-  assert!(
-    refresh::refresh(&pool, &config, &rollback_refresh_session.refresh_token, None)
-      .await
-      .is_err()
-  );
-  sqlx::query("DELETE FROM app_configs WHERE id='test.auth.refresh.fail_grace'")
-    .execute(&pool)
-    .await
-    .unwrap();
-  let grace_used_at: Option<chrono::DateTime<chrono::Utc>> =
-    sqlx::query_scalar("SELECT grace_used_at FROM auth_refresh_tokens WHERE id=$1")
-      .bind(&rollback_source_id)
-      .fetch_one(&pool)
-      .await
-      .unwrap();
-  assert!(grace_used_at.is_none());
-  let grace_after_rollback = refresh::refresh(&pool, &config, &rollback_refresh_session.refresh_token, None)
-    .await
-    .unwrap();
-  let grace_after_rollback = serde_json::to_value(grace_after_rollback).unwrap();
-  assert_eq!(grace_after_rollback["status"], "rotated");
-  assert_eq!(grace_after_rollback["grace"], true);
-  assert_eq!(
-    grace_after_rollback["refreshToken"],
-    serde_json::to_value(rotated_after_rollback).unwrap()["refreshToken"]
-  );
+  assert_eq!(serde_json::to_value(revoked_principal).unwrap()["status"], "auth_session_revoked");
+  let second_session = create_legacy_device_session(&pool, &config, &user_id, &format!("{marker}-second")).await;
+  assert!(session::list(&pool, &user_id).await.unwrap().iter().any(|item| item.id == second_session.id));
 
   let before_keys = keyring::metadata(&pool, &config).await.unwrap();
   let before_keys = serde_json::to_value(&before_keys).unwrap();
@@ -718,7 +603,7 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     .unwrap();
   assert!(!active.contains_key("retiredAt"));
   assert!(!active.contains_key("verifyUntil"));
-  let old_access = rotated["accessToken"].as_str().unwrap();
+  let old_access = &second_session.access_token;
   let old_principal = principal::resolve(
     &pool,
     &config,
@@ -775,25 +660,31 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
   );
 
   let second_user_id = create_user(&pool, &format!("{marker}-cookie")).await;
-  let shared_session_id = uuid::Uuid::new_v4().to_string();
-  sqlx::query("INSERT INTO multiple_users_sessions(id) VALUES($1)")
-    .bind(&shared_session_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-  for (position, owner) in [&user_id, &second_user_id].into_iter().enumerate() {
-    sqlx::query(
-      "INSERT INTO user_sessions(id,session_id,user_id,expires_at,created_at) \
-       VALUES($1,$2,$3,clock_timestamp()+INTERVAL '1 day',clock_timestamp()+($4*INTERVAL '1 second'))",
-    )
-    .bind(uuid::Uuid::new_v4().to_string())
-    .bind(&shared_session_id)
-    .bind(owner)
-    .bind(i32::try_from(position).unwrap())
-    .execute(&pool)
-    .await
-    .unwrap();
-  }
+  let shared_login = issuance::issue_existing(
+    &pool,
+    &config,
+    &user_id,
+    SessionIssueInput::Cookie {
+      session_id: None,
+      client_version: Some("browser-version".to_string()),
+    },
+  )
+  .await
+  .unwrap();
+  let shared_session_id = shared_login.session_id;
+  let second_login = issuance::issue_existing(
+    &pool,
+    &config,
+    &second_user_id,
+    SessionIssueInput::Cookie {
+      session_id: Some(shared_session_id.clone()),
+      client_version: None,
+    },
+  )
+  .await
+  .unwrap();
+  assert_eq!(second_login.session_id, shared_session_id);
+  assert_eq!(cookie::users(&pool, &shared_session_id).await.unwrap().len(), 2);
   let selected = principal::resolve(
     &pool,
     &config,
@@ -811,7 +702,7 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     &pool,
     &config,
     PrincipalInput::Cookie {
-      session_id: shared_session_id,
+      session_id: shared_session_id.clone(),
       user_id: Some("missing-user".to_string()),
       refresh_client_version: None,
       refresh: false,
@@ -823,6 +714,69 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     serde_json::to_value(fallback).unwrap()["principal"]["userId"],
     second_user_id
   );
+  sqlx::query("UPDATE user_sessions SET expires_at=NULL WHERE session_id=$1 AND user_id=$2")
+    .bind(&shared_session_id)
+    .bind(&second_user_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+  let refreshed = principal::resolve(
+    &pool,
+    &config,
+    PrincipalInput::Cookie {
+      session_id: shared_session_id.clone(),
+      user_id: Some(second_user_id.clone()),
+      refresh_client_version: Some("browser-refreshed".to_string()),
+      refresh: true,
+    },
+  )
+  .await
+  .unwrap();
+  let refreshed = serde_json::to_value(refreshed).unwrap();
+  assert_eq!(refreshed["status"], "valid");
+  assert_eq!(refreshed["principal"]["refreshClientVersion"], "browser-refreshed");
+  assert!(refreshed["refreshedExpiresAt"].is_string());
+  assert_eq!(cookie::sign_out(&pool, &shared_session_id, Some(&second_user_id)).await.unwrap(), 1);
+  let signed_in_users = cookie::users(&pool, &shared_session_id).await.unwrap();
+  assert_eq!(signed_in_users.len(), 1);
+  assert_eq!(signed_in_users[0].id, user_id);
+  let signed_out_login = issuance::issue_existing(
+    &pool,
+    &config,
+    &second_user_id,
+    SessionIssueInput::Cookie {
+      session_id: None,
+      client_version: None,
+    },
+  )
+  .await
+  .unwrap();
+  assert_eq!(cookie::sign_out(&pool, &signed_out_login.session_id, None).await.unwrap(), 1);
+  assert!(cookie::users(&pool, &signed_out_login.session_id).await.unwrap().is_empty());
+  let mut rollback_tx = pool.begin().await.unwrap();
+  session::lock_user(&mut rollback_tx, &second_user_id).await.unwrap();
+  let now = session::decision_time(&mut rollback_tx).await.unwrap();
+  let rollback_login = issuance::issue(
+    &mut rollback_tx,
+    &config,
+    &second_user_id,
+    SessionIssueInput::Cookie {
+      session_id: None,
+      client_version: None,
+    },
+    now,
+    None,
+  )
+  .await
+  .unwrap();
+  rollback_tx.rollback().await.unwrap();
+  let rolled_back_cookie: i64 =
+    sqlx::query_scalar("SELECT count(*) FROM multiple_users_sessions WHERE id=$1")
+      .bind(&rollback_login.session_id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
+  assert_eq!(rolled_back_cookie, 0);
   let existing_email: String = sqlx::query_scalar("SELECT email FROM users WHERE id=$1")
     .bind(&user_id)
     .fetch_one(&pool)
@@ -858,96 +812,15 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     .await
     .unwrap();
   assert_eq!(duplicate_count, 1);
-  let stored_keys: serde_json::Value =
-    sqlx::query_scalar("SELECT value FROM app_configs WHERE id='auth.session.signingKeys'")
-      .fetch_one(&pool)
-      .await
-      .unwrap();
-  sqlx::query(
-    r#"UPDATE app_configs SET value=jsonb_set(value,'{0,secret}',to_jsonb('invalid'::text))
-       WHERE id='auth.session.signingKeys'"#,
-  )
-  .execute(&pool)
-  .await
-  .unwrap();
-  let rollback_code = create_exchange(&pool, &user_id, &format!("{marker}-rollback")).await;
-  assert!(
-    session::exchange(
-      &pool,
-      &config,
-      &rollback_code,
-      &format!("installation-{marker}-rollback"),
-      "ios",
-      None,
-      None,
-    )
-    .await
-    .is_err()
-  );
-  let consumed: Option<chrono::DateTime<chrono::Utc>> =
-    sqlx::query_scalar("SELECT consumed_at FROM runtime_states WHERE token_hash=$1")
-      .bind(super::super::token_hash(&rollback_code))
-      .fetch_one(&pool)
-      .await
-      .unwrap();
-  assert!(consumed.is_none());
-  let rolled_back: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_sessions WHERE installation_id=$1")
-    .bind(format!("installation-{marker}-rollback"))
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-  assert_eq!(rolled_back, 0);
-  sqlx::query("UPDATE app_configs SET value=$1 WHERE id='auth.session.signingKeys'")
-    .bind(stored_keys)
-    .execute(&pool)
-    .await
-    .unwrap();
-
-  let third_code = create_exchange(&pool, &user_id, &format!("{marker}-third")).await;
-  let third = session::exchange(
-    &pool,
-    &config,
-    &third_code,
-    &format!("installation-{marker}-third"),
-    "electron",
-    None,
-    None,
-  )
-  .await
-  .unwrap();
-  let stale_exchange = issuance::issue_existing(
-    &pool,
-    &config,
-    &user_id,
-    SessionIssueInput::Native { client_version: None },
-  )
-  .await
-  .unwrap()
-  .exchange_code
-  .unwrap();
-  let refresh_future = refresh::refresh(&pool, &config, &third.refresh_token, None);
-  let revoke_future = security::revoke_user(&pool, &user_id, "security_action");
-  let (_refresh_outcome, revoked) = tokio::join!(refresh_future, revoke_future);
-  assert!(revoked.unwrap() >= 1);
+  let third = create_legacy_device_session(&pool, &config, &user_id, &format!("{marker}-third")).await;
+  let revoked = security::revoke_user(&pool, &user_id, "security_action").await.unwrap();
+  assert!(revoked >= 1);
   let epoch: i32 = sqlx::query_scalar("SELECT auth_epoch FROM users WHERE id=$1")
     .bind(&user_id)
     .fetch_one(&pool)
     .await
     .unwrap();
   assert_eq!(epoch, 1);
-  assert!(
-    session::exchange(
-      &pool,
-      &config,
-      &stale_exchange,
-      &format!("installation-{marker}-stale"),
-      "ios",
-      None,
-      None,
-    )
-    .await
-    .is_err()
-  );
   let live_sessions: i64 = sqlx::query_scalar(
     "SELECT count(*) FROM auth_sessions a JOIN user_sessions u ON u.id=a.user_session_id WHERE u.user_id=$1",
   )
@@ -956,6 +829,32 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
   .await
   .unwrap();
   assert_eq!(live_sessions, 0);
+  let cookie_principal = principal::resolve(
+    &pool,
+    &config,
+    PrincipalInput::Cookie {
+      session_id: password_login.session_id,
+      user_id: Some(user_id.clone()),
+      refresh_client_version: None,
+      refresh: false,
+    },
+  )
+  .await
+  .unwrap();
+  assert_eq!(serde_json::to_value(cookie_principal).unwrap()["status"], "invalid");
+  let removed_legacy_user_session: i64 = sqlx::query_scalar("SELECT count(*) FROM user_sessions WHERE id=$1")
+    .bind(third.user_session_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+  assert_eq!(removed_legacy_user_session, 0);
+  let remaining_refresh_tokens: i64 =
+    sqlx::query_scalar("SELECT count(*) FROM auth_refresh_tokens WHERE auth_session_id=$1")
+      .bind(&third.id)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
+  assert_eq!(remaining_refresh_tokens, 0);
 
   assert!(
     oauth::preflight(
@@ -1013,51 +912,76 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
   oauth::claim_state(&pool, &state_hash).await.unwrap();
   assert!(oauth::claim_state(&pool, &state_hash).await.is_err());
 
-  let apple_preflight = oauth::preflight(
+  assert!(
+    oauth::preflight(
+      &pool,
+      &config,
+      "Apple",
+      None,
+      "affine",
+      "apple-nonce",
+      None,
+      "https://app.affine.pro/api/oauth/callback",
+      "https://app.affine.pro",
+      &["https://app.affine.pro".to_string()],
+      &[],
+    )
+    .await
+    .is_err()
+  );
+
+  let apple_browser_preflight = oauth::preflight(
     &pool,
     &config,
     "Apple",
     None,
-    "affine",
-    "apple-nonce",
+    "web",
+    "apple-browser-nonce",
     None,
-    "https://app.affine.pro/api/oauth/callback",
-    "https://app.affine.pro",
-    &["https://app.affine.pro".to_string()],
+    "https://example.invalid/api/oauth/callback",
+    "https://example.invalid",
+    &["https://example.invalid".to_string()],
     &[],
   )
   .await
   .unwrap();
-  let apple_state = url::Url::parse(&apple_preflight.url)
+  let apple_browser_state = url::Url::parse(&apple_browser_preflight.url)
     .unwrap()
     .query_pairs()
     .find(|(key, _)| key == "state")
     .unwrap()
     .1
     .into_owned();
-  let handoff = oauth::callback(
-    &pool,
-    &config,
-    "apple-code",
-    &apple_state,
-    None,
-    SessionIssueInput::Native { client_version: None },
-  )
-  .await
-  .unwrap();
-  assert_eq!(serde_json::to_value(handoff).unwrap()["type"], "handoff");
-  let apple_token = serde_json::from_str::<serde_json::Value>(&apple_state).unwrap()["state"]
-    .as_str()
-    .unwrap()
-    .to_string();
-  let apple_consumed: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
-    "SELECT consumed_at FROM runtime_states WHERE purpose='auth_challenge:oauth_state' AND token_hash=$1",
-  )
-  .bind(super::super::token_hash(&apple_token))
-  .fetch_one(&pool)
-  .await
-  .unwrap();
-  assert!(apple_consumed.is_none());
+  let apple_browser_envelope: serde_json::Value = serde_json::from_str(&apple_browser_state).unwrap();
+  assert_eq!(apple_browser_envelope["client"], "web");
+  let apple_state_hash = super::super::token_hash(apple_browser_envelope["state"].as_str().unwrap());
+  sqlx::query("UPDATE runtime_states SET payload=jsonb_set(payload,'{client}',to_jsonb('affine'::text)) WHERE token_hash=$1")
+    .bind(&apple_state_hash)
+    .execute(&pool)
+    .await
+    .unwrap();
+  assert!(
+    oauth::callback(
+      &pool,
+      &config,
+      "legacy-apple-code",
+      &apple_browser_state,
+      None,
+      SessionIssueInput::Cookie {
+        session_id: None,
+        client_version: None,
+      },
+    )
+    .await
+    .is_err()
+  );
+  let legacy_oauth_consumed: bool =
+    sqlx::query_scalar("SELECT consumed_at IS NOT NULL FROM runtime_states WHERE token_hash=$1")
+      .bind(&apple_state_hash)
+      .fetch_one(&pool)
+      .await
+      .unwrap();
+  assert!(!legacy_oauth_consumed);
 
   let oidc_preflight = oauth::preflight(
     &pool,
@@ -1094,6 +1018,21 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     .unwrap()
     .to_string();
   *oidc_nonce.lock().await = oidc_state_token;
+  assert!(
+    oauth::callback(
+      &pool,
+      &config,
+      "oidc-code",
+      &oidc_state,
+      Some("wrong-nonce"),
+      SessionIssueInput::Cookie {
+        session_id: None,
+        client_version: None,
+      },
+    )
+    .await
+    .is_err()
+  );
   let oidc_login = oauth::callback(
     &pool,
     &config,
@@ -1165,7 +1104,10 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
       name: Some("Existing OAuth User".to_string()),
       avatar_url: None,
     },
-    SessionIssueInput::Native { client_version: None },
+    SessionIssueInput::Cookie {
+      session_id: None,
+      client_version: None,
+    },
   )
   .await
   .unwrap();
@@ -1196,7 +1138,10 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     &oauth_state,
     &oauth_namespace,
     account,
-    SessionIssueInput::Native { client_version: None },
+    SessionIssueInput::Cookie {
+      session_id: None,
+      client_version: None,
+    },
   );
   let (first_oauth, second_oauth) = tokio::join!(first_oauth, second_oauth);
   let first_oauth = first_oauth.unwrap();
@@ -1450,14 +1395,6 @@ async fn session_kernel_serializes_refresh_replay_revocation_and_key_rotation() 
     .await
     .unwrap();
   sqlx::query("DELETE FROM users WHERE email='oidc@example.invalid'")
-    .execute(&pool)
-    .await
-    .unwrap();
-  sqlx::query("DROP TRIGGER IF EXISTS rfc12_auth_refresh_fault ON auth_refresh_tokens")
-    .execute(&pool)
-    .await
-    .unwrap();
-  sqlx::query("DROP FUNCTION IF EXISTS rfc12_auth_refresh_fault()")
     .execute(&pool)
     .await
     .unwrap();

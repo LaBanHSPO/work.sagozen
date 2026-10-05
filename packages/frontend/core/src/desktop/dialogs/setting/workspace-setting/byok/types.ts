@@ -8,7 +8,6 @@ import {
 
 export const ByokStorage = {
   server: 'server',
-  local: 'local',
 } as const;
 export type ByokStorage = (typeof ByokStorage)[keyof typeof ByokStorage];
 
@@ -28,29 +27,16 @@ type ByokKeyBase = {
   validation?: WorkspaceByokSettingsQuery['workspace']['byokSettings']['profiles'][number]['validation'];
 };
 
-export type ByokKey = ByokKeyBase &
-  (
-    | { storage: typeof ByokStorage.server; revision: number }
-    | { storage: typeof ByokStorage.local; revision?: never }
-  );
-
-export type LocalByokKeyInput = Pick<
-  ByokKey,
-  | 'id'
-  | 'provider'
-  | 'name'
-  | 'description'
-  | 'sortOrder'
-  | 'enabled'
-  | 'definition'
-> & { credential: string };
+export type ByokKey = ByokKeyBase & {
+  storage: typeof ByokStorage.server;
+  revision: number;
+};
 
 export type ByokSettings = Omit<
   WorkspaceByokSettingsQuery['workspace']['byokSettings'],
   'profiles'
 > & {
   keys: ByokKey[];
-  localStorageSupported: boolean;
 };
 
 export type ByokUsagePoint =
@@ -66,6 +52,3 @@ export type GqlFn = <Query extends GraphQLQuery>(
   input: QueryOptions<Query>
 ) => Promise<QueryResponse<Query>>;
 
-export type LocalByokPublicKey = Omit<LocalByokKeyInput, 'credential'> & {
-  configured?: boolean;
-};

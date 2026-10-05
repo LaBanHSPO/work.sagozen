@@ -12,12 +12,13 @@ import { TestingModuleBuilder } from '@nestjs/testing';
 import { PrismaClient, User } from '@prisma/client';
 import cookieParser from 'cookie-parser';
 import graphqlUploadExpress from 'graphql-upload/graphqlUploadExpress.mjs';
+import jwt from 'jsonwebtoken';
 import supertest from 'supertest';
+import { z } from 'zod';
 
 import { AFFiNELogger, ApplyType, GlobalExceptionFilter } from '../../base';
 import { SocketIoAdapter } from '../../base/websocket';
 import { AuthService, AuthSigningKeyRing } from '../../core/auth';
-import { BackendRuntimeProvider } from '../../core/backend-runtime';
 import { Mailer } from '../../core/mail';
 import { UserModel } from '../../models';
 import { createFactory, MockedUser, MockUser, MockUserInput } from '../mocks';
@@ -104,7 +105,8 @@ export class TestingApp extends ApplyType<INestApplication>() {
     this.clearAuth();
   }
 
-  async createNativeAuthSession(
+  // Seed historical device records to cover revocation and verification, not login.
+  async seedLegacyAuthSession(
     userId: string,
     metadata: {
       installationId?: string;
@@ -113,31 +115,47 @@ export class TestingApp extends ApplyType<INestApplication>() {
       appVersion?: string;
     } = {}
   ) {
-    const rt = this.get(BackendRuntimeProvider);
-    const issued = await rt.executeAuthSessionCommandV1<{
-      exchangeCode: string;
-    }>({
-      action: 'issue_user',
-      userId,
-      issue: { type: 'native', clientVersion: metadata.appVersion },
+    const issued = await this.get(AuthService).issueUser(userId, {
+      type: 'cookie',
+      clientVersion: metadata.appVersion,
     });
-    return await rt.executeAuthSessionCommandV1<{
-      userId: string;
-      tokenType: 'Bearer';
-      accessToken: string;
-      expiresIn: number;
-      refreshToken: string;
-      refreshExpiresAt: string;
-      session: { id: string; absoluteExpiresAt: string };
-      isNewDevice: boolean;
-    }>({
-      action: 'exchange',
-      code: issued.exchangeCode,
-      installationId: metadata.installationId ?? `test-${randomUUID()}`,
-      platform: metadata.platform ?? 'ios',
-      deviceName: metadata.deviceName,
-      appVersion: metadata.appVersion,
+    const db = this.get(PrismaClient);
+    const userSession = await db.userSession.findUniqueOrThrow({
+      where: { sessionId_userId: { sessionId: issued.sessionId, userId } },
     });
+    const session = await db.authSession.create({
+      data: {
+        userSessionId: userSession.id,
+        installationId: metadata.installationId ?? `historical-${randomUUID()}`,
+        platform: metadata.platform ?? 'ios',
+        deviceName: metadata.deviceName,
+        appVersion: metadata.appVersion,
+        idleExpiresAt: new Date(issued.sessionExpiresAt),
+        absoluteExpiresAt: new Date(issued.sessionExpiresAt),
+      },
+    });
+    const stored = await db.appConfig.findUniqueOrThrow({
+      where: { id: 'auth.session.signingKeys' },
+    });
+    const keys = z
+      .array(z.object({ id: z.string(), secret: z.string(), status: z.string() }))
+      .parse(stored.value);
+    const key = keys.find(key => key.status === 'active');
+    if (!key) {
+      throw new Error('Historical session fixture requires an active key');
+    }
+    const accessToken = jwt.sign(
+      { sub: userId, sid: session.id, typ: 'session_access' },
+      Buffer.from(key.secret, 'base64url'),
+      {
+        algorithm: 'HS256',
+        keyid: key.id,
+        issuer: 'affine',
+        audience: 'affine-client',
+        expiresIn: 15 * 60,
+      }
+    );
+    return { session, accessToken };
   }
 
   clearAuth() {

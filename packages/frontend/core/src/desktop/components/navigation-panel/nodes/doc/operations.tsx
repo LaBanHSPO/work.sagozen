@@ -25,7 +25,6 @@ import {
   LinkedPageIcon,
   OpenInNewIcon,
   PlusIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useServices } from '@toeverything/infra';
 import { useCallback, useMemo, useState } from 'react';
@@ -113,15 +112,6 @@ export const useNavigationPanelDocNodeOperations = (
     });
   }, [docId, workbenchService]);
 
-  const handleOpenInSplitView = useCallback(() => {
-    workbenchService.workbench.openDoc(docId, {
-      at: 'beside',
-    });
-    track.$.navigationPanel.docs.openDoc();
-    track.$.navigationPanel.organize.openInSplitView({
-      type: 'doc',
-    });
-  }, [docId, workbenchService.workbench]);
 
   const handleAddLinkedPage = useAsyncCallback(async () => {
     setAddLinkedPageLoading(true);
@@ -214,21 +204,6 @@ export const useNavigationPanelDocNodeOperations = (
           </MenuItem>
         ),
       },
-      ...(BUILD_CONFIG.isElectron
-        ? [
-            {
-              index: 100,
-              view: (
-                <MenuItem
-                  prefixIcon={<SplitViewIcon />}
-                  onClick={handleOpenInSplitView}
-                >
-                  {t['com.affine.workbench.split-view.page-menu-open']()}
-                </MenuItem>
-              ),
-            },
-          ]
-        : []),
       {
         index: 199,
         view: (
@@ -273,7 +248,6 @@ export const useNavigationPanelDocNodeOperations = (
       handleDuplicate,
       handleMoveToTrash,
       handleOpenInNewTab,
-      handleOpenInSplitView,
       handleOpenInfoModal,
       handleToggleFavoriteDoc,
       t,

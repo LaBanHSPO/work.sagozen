@@ -2,7 +2,7 @@
 
 ```
  ┌─────────────Workbench─────-----──────┐
- |  Tab1 | Tab2 | Tab3            - □ x |
+ |             Browser view            |
  │ ┌───────┐ ┌───────┐ ┌───────┐ ┌──────┤
  │ │header │ │header │ │header │ │      │
  │ │       │ │       │ │       │ │ side │
@@ -15,7 +15,7 @@
  └───────────────────────────────┴──────┘
 ```
 
-`Workbench` is the window manager in affine, including the main area and the right sidebar area.
+`Workbench` manages browser views in AFFiNE, including the main area and the right sidebar area.
 
 `View` is a managed window under the workbench. Each view has its own history(Support go back and forward) and currently URL.
 The view renders the content as defined by the router ([here](../../router.tsx)).
@@ -31,13 +31,10 @@ If the same view has multiple sidebars, a switcher will be displayed so that use
 
 > only the sidebar of the currently active view will be displayed.
 
-## Tab
+## Browser navigation and persistence
 
-WIP
+The browser router owns application navigation. Back and forward navigation is passed to the active view, whose URL is the application URL.
 
-## Persistence
+New tabs open browser tabs. Split views can be resized, reordered, and closed inside the workbench, and the right sidebar floats on narrow screens.
 
-When close the application and reopen, the entire workbench should be restored to its previous state.
-WIP
-
-> If running in a browser, the workbench will passing the browser's back and forward navigation to the active view.
+Workbench views start from the in-memory default state; native window/tab restoration is not used. Workspace documents, blobs, sync state, and indexes use IndexedDB, including the v1 IndexedDB migration sources. Global preferences and workspace IDs retain their browser local-storage keys.

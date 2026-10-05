@@ -49,18 +49,12 @@ export class CaptchaService {
     }
   }
 
-  async getClientConfig(nativeClient: boolean) {
-    const provider = nativeClient
-      ? ('hashcash' as const)
-      : ('turnstile' as const);
-    if (provider === 'turnstile') {
-      return {
-        provider,
-        siteKey: this.captcha.turnstile.siteKey,
-        action: this.captcha.turnstile.action,
-      };
-    }
-    return { provider, ...(await this.runtime.createAuthCaptchaChallengeV1()) };
+  getClientConfig() {
+    return {
+      provider: 'turnstile' as const,
+      siteKey: this.captcha.turnstile.siteKey,
+      action: this.captcha.turnstile.action,
+    };
   }
 
   assertValidCredential(credential: any): Credential {

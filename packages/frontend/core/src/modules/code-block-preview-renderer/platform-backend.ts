@@ -2,13 +2,13 @@ import { getMermaidRenderer } from '@affine/core/modules/mermaid/renderer';
 import { getTypstRenderer } from '@affine/core/modules/typst/renderer';
 
 import { renderClassicMermaidSvg } from './classic-mermaid';
-import { isMermaidWasmNativeRendererEnabled } from './runtime-config';
+import { isMermaidWasmRendererEnabled } from './runtime-config';
 import type { PreviewRenderRequestMap, PreviewRenderResultMap } from './types';
 
 export async function renderMermaidSvgBackend(
   request: PreviewRenderRequestMap['mermaid']
 ): Promise<PreviewRenderResultMap['mermaid']> {
-  if (!isMermaidWasmNativeRendererEnabled()) {
+  if (!isMermaidWasmRendererEnabled()) {
     return renderClassicMermaidSvg(request);
   }
 

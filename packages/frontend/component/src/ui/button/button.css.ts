@@ -39,7 +39,6 @@ export const button = style({
   outline: 0,
   borderRadius: 8,
   transition: 'all .3s',
-  ['WebkitAppRegion' as string]: 'no-drag',
 
   // hover layer
   ':before': {

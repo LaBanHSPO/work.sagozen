@@ -214,7 +214,7 @@ export const MemberSelector = ({
       data-testid="tags-editor-popup"
       className={clsx(
         className,
-        BUILD_CONFIG.isMobileEdition
+        environment.isMobile
           ? styles.memberSelectorRootMobile
           : styles.memberSelectorRoot
       )}
@@ -236,14 +236,14 @@ export const MemberSelector = ({
             placeholder="Type here ..."
           />
         </InlineMemberList>
-        {BUILD_CONFIG.isMobileEdition ? null : (
+        {environment.isMobile ? null : (
           <MenuItem
             className={styles.memberSelectorDoneButton}
             prefixIcon={<DoneIcon />}
           />
         )}
       </div>
-      {BUILD_CONFIG.isMobileEdition ? null : (
+      {environment.isMobile ? null : (
         <Divider size="thinner" className={styles.memberDivider} />
       )}
       <div className={styles.memberSelectorBody}>
@@ -382,6 +382,6 @@ const DesktopMemberSelectorInline = ({
   );
 };
 
-export const MemberSelectorInline = BUILD_CONFIG.isMobileEdition
+export const MemberSelectorInline = environment.isMobile
   ? MobileMemberSelectorInline
   : DesktopMemberSelectorInline;

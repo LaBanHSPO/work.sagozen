@@ -207,16 +207,24 @@ test('can get request base url with multiple hosts', t => {
 
 test('should allow websocket secure origin by normalizing wss to https', t => {
   const allowedOrigins = buildCorsAllowedOrigins({
-    allowedOrigins: ['https://app.affine.pro'],
-  } as any);
+    allowedOrigins: ['https://work.example.test'],
+  });
 
-  t.true(isCorsOriginAllowed('wss://app.affine.pro', allowedOrigins));
+  t.true(isCorsOriginAllowed('wss://work.example.test', allowedOrigins));
 });
 
-test('should allow desktop file origin', t => {
+test('does not implicitly trust native client origins', t => {
   const allowedOrigins = buildCorsAllowedOrigins({
-    allowedOrigins: [],
-  } as any);
+    allowedOrigins: ['https://work.example.test'],
+  });
 
-  t.true(isCorsOriginAllowed('file://', allowedOrigins));
+  for (const origin of [
+    'file://',
+    'assets://.',
+    'assets://another-host',
+    'capacitor://localhost',
+    'ionic://localhost',
+  ]) {
+    t.false(isCorsOriginAllowed(origin, allowedOrigins));
+  }
 });

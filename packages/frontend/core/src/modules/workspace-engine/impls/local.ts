@@ -5,9 +5,7 @@ import {
   type BlobStorage,
   type DocStorage,
   type ListedBlobRecord,
-  universalId,
 } from '@affine/nbstore';
-import { DiskDocStorage } from '@affine/nbstore/disk';
 import {
   IndexedDBBlobStorage,
   IndexedDBBlobSyncStorage,
@@ -20,27 +18,13 @@ import {
   IndexedDBV1BlobStorage,
   IndexedDBV1DocStorage,
 } from '@affine/nbstore/idb/v1';
-import {
-  SqliteBlobStorage,
-  SqliteBlobSyncStorage,
-  SqliteDocStorage,
-  SqliteDocSyncStorage,
-  SqliteIndexerStorage,
-  SqliteIndexerSyncStorage,
-} from '@affine/nbstore/sqlite';
-import {
-  SqliteV1BlobStorage,
-  SqliteV1DocStorage,
-} from '@affine/nbstore/sqlite/v1';
 import type { WorkerInitOptions } from '@affine/nbstore/worker/client';
-import type { FrameworkProvider } from '@toeverything/infra';
 import { LiveData, Service } from '@toeverything/infra';
 import { isEqual } from 'lodash-es';
 import { nanoid } from 'nanoid';
 import { Observable } from 'rxjs';
 import { Doc as YDoc, encodeStateAsUpdate } from 'yjs';
 
-import { DesktopApiService } from '../../desktop-api';
 import type {
   WorkspaceFlavourProvider,
   WorkspaceFlavoursProvider,
@@ -48,7 +32,6 @@ import type {
   WorkspaceProfileInfo,
 } from '../../workspace';
 import { WorkspaceImpl } from '../../workspace/impls/workspace';
-import { getDiskSyncRemoteOptions } from './disk-config';
 import { getWorkspaceProfileWorker } from './out-worker';
 import {
   dedupeWorkspaceIds,
@@ -56,32 +39,13 @@ import {
 } from './workspace-id-utils';
 
 export const LOCAL_WORKSPACE_LOCAL_STORAGE_KEY = 'affine-local-workspace';
-export const LOCAL_WORKSPACE_GLOBAL_STATE_KEY =
-  'workspace-engine:local-workspace-ids:v1';
 const LOCAL_WORKSPACE_CHANGED_BROADCAST_CHANNEL_KEY =
   'affine-local-workspace-changed';
 
 const logger = new DebugLogger('local-workspace');
 
-type GlobalStateStorageLike = {
-  ready: Promise<void>;
-  get<T>(key: string): T | undefined;
-  set<T>(key: string, value: T): void;
-};
 
-function getElectronGlobalStateStorage(): GlobalStateStorageLike | null {
-  if (!BUILD_CONFIG.isElectron) {
-    return null;
-  }
-  const sharedStorage = (
-    globalThis as {
-      __sharedStorage?: { globalState?: GlobalStateStorageLike };
-    }
-  ).__sharedStorage;
-  return sharedStorage?.globalState ?? null;
-}
-
-function getLegacyLocalWorkspaceIds(): string[] {
+export function getLocalWorkspaceIds(): string[] {
   try {
     return normalizeWorkspaceIds(
       JSON.parse(
@@ -94,17 +58,6 @@ function getLegacyLocalWorkspaceIds(): string[] {
   }
 }
 
-export function getLocalWorkspaceIds(): string[] {
-  const globalState = getElectronGlobalStateStorage();
-  if (globalState) {
-    const value = globalState.get(LOCAL_WORKSPACE_GLOBAL_STATE_KEY);
-    if (value !== undefined) {
-      return normalizeWorkspaceIds(value);
-    }
-  }
-
-  return getLegacyLocalWorkspaceIds();
-}
 
 export function setLocalWorkspaceIds(
   idsOrUpdater: string[] | ((ids: string[]) => string[])
@@ -115,12 +68,6 @@ export function setLocalWorkspaceIds(
       : idsOrUpdater
   );
   const deduplicated = dedupeWorkspaceIds(next);
-
-  const globalState = getElectronGlobalStateStorage();
-  if (globalState) {
-    globalState.set(LOCAL_WORKSPACE_GLOBAL_STATE_KEY, deduplicated);
-    return;
-  }
 
   try {
     localStorage.setItem(
@@ -133,107 +80,24 @@ export function setLocalWorkspaceIds(
 }
 
 class LocalWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
-  constructor(private readonly framework: FrameworkProvider) {
-    if (BUILD_CONFIG.isElectron) {
-      void this.ensureWorkspaceIdsMigrated();
-    }
-  }
-
-  private migration: Promise<void> | null = null;
-
-  private ensureWorkspaceIdsMigrated() {
-    if (!BUILD_CONFIG.isElectron) {
-      return;
-    }
-    if (this.migration) {
-      return;
-    }
-
-    this.migration = (async () => {
-      const electronApi = this.framework.get(DesktopApiService);
-      await electronApi.sharedStorage.globalState.ready;
-
-      const persistedIds = normalizeWorkspaceIds(
-        electronApi.sharedStorage.globalState.get(
-          LOCAL_WORKSPACE_GLOBAL_STATE_KEY
-        )
-      );
-      const legacyIds = getLegacyLocalWorkspaceIds();
-
-      let scannedIds: string[] = [];
-      try {
-        scannedIds =
-          await electronApi.handler.workspace.listLocalWorkspaceIds();
-      } catch (e) {
-        logger.error('Failed to scan local workspace ids', e);
-      }
-
-      setLocalWorkspaceIds(currentIds => {
-        return dedupeWorkspaceIds([
-          ...currentIds,
-          ...persistedIds,
-          ...legacyIds,
-          ...scannedIds,
-        ]);
-      });
-    })()
-      .catch(e => {
-        logger.error('Failed to migrate local workspace ids', e);
-      })
-      .finally(() => {
-        this.notifyChannel.postMessage(null);
-      });
-  }
 
   readonly flavour = 'local';
   readonly notifyChannel = new BroadcastChannel(
     LOCAL_WORKSPACE_CHANGED_BROADCAST_CHANNEL_KEY
   );
 
-  DocStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteDocStorage
-      : IndexedDBDocStorage;
-  DocStorageV1Type = BUILD_CONFIG.isElectron
-    ? SqliteV1DocStorage
-    : BUILD_CONFIG.isWeb || BUILD_CONFIG.isMobileWeb
-      ? IndexedDBV1DocStorage
-      : undefined;
-  BlobStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteBlobStorage
-      : IndexedDBBlobStorage;
-  BlobStorageV1Type = BUILD_CONFIG.isElectron
-    ? SqliteV1BlobStorage
-    : BUILD_CONFIG.isWeb || BUILD_CONFIG.isMobileWeb
-      ? IndexedDBV1BlobStorage
-      : undefined;
-  DocSyncStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteDocSyncStorage
-      : IndexedDBDocSyncStorage;
-  BlobSyncStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteBlobSyncStorage
-      : IndexedDBBlobSyncStorage;
-  IndexerStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteIndexerStorage
-      : IndexedDBIndexerStorage;
-  IndexerSyncStorageType = BUILD_CONFIG.isElectron
-    ? SqliteIndexerSyncStorage
-    : IndexedDBIndexerSyncStorage;
+  DocStorageType = IndexedDBDocStorage;
+  DocStorageV1Type = IndexedDBV1DocStorage;
+  BlobStorageType = IndexedDBBlobStorage;
+  BlobStorageV1Type = IndexedDBV1BlobStorage;
+  DocSyncStorageType = IndexedDBDocSyncStorage;
+  BlobSyncStorageType = IndexedDBBlobSyncStorage;
+  IndexerStorageType = IndexedDBIndexerStorage;
+  IndexerSyncStorageType = IndexedDBIndexerSyncStorage;
 
   async deleteWorkspace(id: string): Promise<void> {
     setLocalWorkspaceIds(ids => ids.filter(x => x !== id));
 
-    // TODO(@forehalo): deleting logic for indexeddb workspaces
-    if (BUILD_CONFIG.isElectron) {
-      const electronApi = this.framework.get(DesktopApiService);
-      await electronApi.handler.workspace.moveToTrash(
-        universalId({ peer: 'local', type: 'workspace', id })
-      );
-    }
     // notify all browser tabs, so they can update their workspace list
     this.notifyChannel.postMessage(id);
   }
@@ -349,9 +213,6 @@ class LocalWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
   );
   isRevalidating$ = new LiveData(false);
   revalidate(): void {
-    if (BUILD_CONFIG.isElectron) {
-      void this.ensureWorkspaceIdsMigrated();
-    }
     // notify livedata to re-scan workspaces
     this.notifyChannel.postMessage(null);
   }
@@ -437,7 +298,6 @@ class LocalWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
   }
 
   getEngineWorkerInitOptions(workspaceId: string): WorkerInitOptions {
-    const disk = getDiskSyncRemoteOptions(workspaceId);
     return {
       local: {
         doc: {
@@ -496,28 +356,12 @@ class LocalWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
         },
       },
       remotes: {
-        ...(disk
-          ? {
-              disk: {
-                doc: {
-                  name: DiskDocStorage.identifier,
-                  opts: {
-                    flavour: this.flavour,
-                    type: 'workspace',
-                    id: workspaceId,
-                    syncFolder: disk.syncFolder,
-                  },
-                },
-              },
-            }
-          : {}),
         v1: {
           doc: this.DocStorageV1Type
             ? {
                 name: this.DocStorageV1Type.identifier,
                 opts: {
                   id: workspaceId,
-                  type: 'workspace',
                 },
               }
             : undefined,
@@ -526,7 +370,6 @@ class LocalWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
                 name: this.BlobStorageV1Type.identifier,
                 opts: {
                   id: workspaceId,
-                  type: 'workspace',
                 },
               }
             : undefined,
@@ -545,6 +388,6 @@ export class LocalWorkspaceFlavoursProvider
   }
 
   workspaceFlavours$ = new LiveData<WorkspaceFlavourProvider[]>([
-    new LocalWorkspaceFlavourProvider(this.framework),
+    new LocalWorkspaceFlavourProvider(),
   ]);
 }

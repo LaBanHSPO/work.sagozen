@@ -51,7 +51,7 @@ export const JournalPlaceholder = ({ dateString }: { dateString: string }) => {
   }, [dateString, journalService, redirecting, workbench]);
 
   return (
-    <div className={styles.body} data-mobile={BUILD_CONFIG.isMobileEdition}>
+    <div className={styles.body} data-mobile={environment.isMobile}>
       <div className={styles.content}>
         <BlocksuiteEditorJournalDocTitleUI
           date={dateString}
@@ -69,8 +69,8 @@ export const JournalPlaceholder = ({ dateString }: { dateString: string }) => {
           </div>
           <Button
             variant="primary"
-            size={BUILD_CONFIG.isMobileEdition ? 'extraLarge' : undefined}
-            prefix={BUILD_CONFIG.isMobileEdition ? <PlusIcon /> : undefined}
+            size={environment.isMobile ? 'extraLarge' : undefined}
+            prefix={environment.isMobile ? <PlusIcon /> : undefined}
             onClick={createJournal}
             data-testid="confirm-create-journal-button"
           >

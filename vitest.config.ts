@@ -48,7 +48,6 @@ export default defineConfig({
   test: {
     projects: [
       '.',
-      './packages/frontend/apps/electron',
       './blocksuite/**/*/vitest.config.ts',
     ],
     setupFiles: [
@@ -67,7 +66,6 @@ export default defineConfig({
       '**/dist',
       '**/build',
       '**/out,',
-      '**/packages/frontend/apps/electron',
     ],
     testTimeout: 5000,
     coverage: {

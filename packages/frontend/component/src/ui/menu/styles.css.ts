@@ -15,7 +15,6 @@ export const menuContent = style({
   backgroundColor: cssVarV2('layer/background/overlayPanel'),
   boxShadow: cssVar('menuShadow'),
   userSelect: 'none',
-  ['WebkitAppRegion' as string]: 'no-drag',
   display: 'flex',
   flexDirection: 'column',
   gap: 4,

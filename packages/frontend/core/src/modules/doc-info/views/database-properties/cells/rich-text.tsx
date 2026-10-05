@@ -129,6 +129,6 @@ const MobileRichTextCell = ({
   );
 };
 
-export const RichTextCell = BUILD_CONFIG.isMobileEdition
+export const RichTextCell = environment.isMobile
   ? MobileRichTextCell
   : DesktopRichTextCell;

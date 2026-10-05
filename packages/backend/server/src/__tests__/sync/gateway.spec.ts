@@ -179,26 +179,6 @@ function expectNoEvent(
 }
 
 async function login(app: TestingApp) {
-  const { user, cookieHeader } = await loginWithCookie(app);
-  const nativeRes = await app
-    .POST('/api/auth/sign-in')
-    .set('x-affine-client-kind', 'native')
-    .send({ email: user.email, password: user.password })
-    .expect(200);
-  const tokenRes = await app
-    .POST('/api/auth/session/exchange')
-    .set('x-affine-client-kind', 'native')
-    .send({
-      code: nativeRes.body.exchangeCode,
-      installationId: '00000000-0000-4000-8000-000000000005',
-      platform: 'electron',
-    })
-    .expect(201);
-
-  return { user, cookieHeader, token: tokenRes.body.accessToken as string };
-}
-
-async function loginWithCookie(app: TestingApp) {
   const user = await app.createUser();
   const cookieRes = await app
     .POST('/api/auth/sign-in')
@@ -314,9 +294,9 @@ test('should reject websocket legacy session token auth', async t => {
   }
 });
 
-test('should connect websocket with jwt auth', async t => {
-  const { token } = await login(app);
-  const socket = createClient(url, undefined, { token, tokenType: 'jwt' });
+test('should connect websocket with cookie auth', async t => {
+  const { cookieHeader } = await login(app);
+  const socket = createClient(url, cookieHeader);
 
   try {
     await waitForConnect(socket);
@@ -326,15 +306,12 @@ test('should connect websocket with jwt auth', async t => {
   }
 });
 
-test('should reject websocket jwt auth after session deletion', async t => {
-  const { token } = await login(app);
+test('should reject websocket cookie auth after session deletion', async t => {
+  const { cookieHeader } = await login(app);
 
-  await app
-    .POST('/api/auth/sign-out')
-    .set('Authorization', `Bearer ${token}`)
-    .expect(200);
+  await app.POST('/api/auth/sign-out').expect(200);
 
-  const socket = createClient(url, undefined, { token, tokenType: 'jwt' });
+  const socket = createClient(url, cookieHeader);
 
   try {
     await t.throwsAsync(() => waitForConnect(socket));
@@ -344,7 +321,7 @@ test('should reject websocket jwt auth after session deletion', async t => {
 });
 
 test('push requires an authorized document subscription', async t => {
-  const { user, cookieHeader } = await loginWithCookie(app);
+  const { user, cookieHeader } = await login(app);
   const spaceId = user.id;
   const update = createYjsUpdateBase64();
 

@@ -8,7 +8,6 @@ import { AffineErrorBoundary } from '@affine/core/components/affine/affine-error
 import { GlobalPageHistoryModal } from '@affine/core/components/affine/page-history-modal';
 import { CommentSidebar } from '@affine/core/components/comment/sidebar';
 import { useGuard } from '@affine/core/components/guard';
-import { useAppSettingHelper } from '@affine/core/components/hooks/affine/use-app-setting-helper';
 import { useEnableAI } from '@affine/core/components/hooks/affine/use-enable-ai';
 import { useRegisterBlocksuiteEditorCommands } from '@affine/core/components/hooks/affine/use-register-blocksuite-editor-commands';
 import { useActiveBlocksuiteEditor } from '@affine/core/components/hooks/use-block-suite-editor';
@@ -103,7 +102,6 @@ const DetailPageImpl = memo(function DetailPageImpl() {
   const editorContainer = useLiveData(editor.editorContainer$);
 
   const isSideBarOpen = useLiveData(workbench.sidebarOpen$);
-  const { appSettings } = useAppSettingHelper();
 
   const peekView = useService(PeekViewService).peekView;
 
@@ -245,9 +243,8 @@ const DetailPageImpl = memo(function DetailPageImpl() {
                     if (openMode === 'open-in-active-view') {
                       return 'active';
                     }
-                    // split view is only supported on electron
                     if (openMode === 'open-in-new-view') {
-                      return BUILD_CONFIG.isElectron ? 'tail' : 'new-tab';
+                      return 'new-tab';
                     }
                     if (openMode === 'open-in-new-tab') {
                       return 'new-tab';
@@ -297,21 +294,12 @@ const DetailPageImpl = memo(function DetailPageImpl() {
     [editor, workbench, peekView, isJournal]
   );
 
-  const [hasScrollTop, setHasScrollTop] = useState(false);
-
   const openOutlinePanel = useCallback(() => {
     workbench.openSidebar();
     view.activeSidebarTab('outline');
   }, [workbench, view]);
 
   const scrollViewportRef = useRef<HTMLDivElement | null>(null);
-
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const scrollTop = e.currentTarget.scrollTop;
-
-    const hasScrollTop = scrollTop > 0;
-    setHasScrollTop(hasScrollTop);
-  }, []);
 
   const [dragging, setDragging] = useState(false);
 
@@ -329,17 +317,12 @@ const DetailPageImpl = memo(function DetailPageImpl() {
         />
       </ViewHeader>
       <ViewBody>
-        <div
-          className={styles.mainContainer}
-          data-dynamic-top-border={BUILD_CONFIG.isElectron}
-          data-has-scroll-top={hasScrollTop}
-        >
+        <div className={styles.mainContainer}>
           {/* Add a key to force rerender when page changed, to avoid error boundary persisting. */}
           <AffineErrorBoundary key={doc.id}>
             <TopTip pageId={doc.id} workspace={workspace} />
             <Scrollable.Root>
               <Scrollable.Viewport
-                onScroll={handleScroll}
                 ref={scrollViewportRef}
                 data-dragging={dragging}
                 className={clsx(
@@ -351,11 +334,7 @@ const DetailPageImpl = memo(function DetailPageImpl() {
               >
                 <PageDetailEditor onLoad={onLoad} readonly={readonly} />
               </Scrollable.Viewport>
-              <Scrollable.Scrollbar
-                className={clsx({
-                  [styles.scrollbar]: !appSettings.clientBorder,
-                })}
-              />
+              <Scrollable.Scrollbar className={styles.scrollbar} />
             </Scrollable.Root>
             <EditorOutlineViewer
               editor={editorContainer?.host ?? null}

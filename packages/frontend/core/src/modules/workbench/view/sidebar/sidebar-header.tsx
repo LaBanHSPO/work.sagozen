@@ -63,12 +63,8 @@ export const Header = ({ children, onToggle }: HeaderProps) => {
   return (
     <Container className={styles.header}>
       {children}
-      {!BUILD_CONFIG.isElectron && (
-        <>
-          <div className={styles.spacer} />
-          <ToggleButton onToggle={onToggle} />
-        </>
-      )}
+      <div className={styles.spacer} />
+      <ToggleButton onToggle={onToggle} />
     </Container>
   );
 };

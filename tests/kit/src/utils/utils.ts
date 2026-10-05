@@ -1,8 +1,5 @@
-import { setTimeout } from 'node:timers/promises';
-
 import type { Locator, Page } from '@playwright/test';
 import { expect } from '@playwright/test';
-import fs from 'fs-extra';
 
 export async function waitForLogMessage(
   page: Page,
@@ -15,27 +12,6 @@ export async function waitForLogMessage(
       }
     });
   });
-}
-
-export async function removeWithRetry(
-  filePath: string,
-  maxRetries = 5,
-  delay = 500
-) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      await fs.remove(filePath);
-      return true;
-    } catch (err: any) {
-      if (err.code === 'EBUSY' || err.code === 'EPERM') {
-        await setTimeout(delay);
-      } else {
-        console.error(`Failed to delete file ${filePath}:`, err);
-      }
-    }
-  }
-  // Add a return statement here to ensure that a value is always returned
-  return false;
 }
 
 export async function isContainedInBoundingBox(

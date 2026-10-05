@@ -15,7 +15,6 @@ import { IsFavoriteIcon } from '@affine/core/components/pure/icons';
 import { useDetailPageHeaderResponsive } from '@affine/core/desktop/pages/workspace/detail-page/use-header-responsive';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { EditorService } from '@affine/core/modules/editor';
-import { OpenInAppService } from '@affine/core/modules/open-in-app/services';
 import { GuardService } from '@affine/core/modules/permissions';
 import { ShareMenuContent } from '@affine/core/modules/share-menu';
 import { WorkbenchService } from '@affine/core/modules/workbench';
@@ -32,18 +31,12 @@ import {
   HistoryIcon,
   ImportIcon,
   InformationIcon,
-  LocalWorkspaceIcon,
   OpenInNewIcon,
   PageIcon,
   ShareIcon,
-  SplitViewIcon,
   TocIcon,
 } from '@blocksuite/icons/rc';
-import {
-  useLiveData,
-  useService,
-  useServiceOptional,
-} from '@toeverything/infra';
+import { useLiveData, useService } from '@toeverything/infra';
 import { useCallback, useState } from 'react';
 
 import { HeaderDropDownButton } from '../../../components/pure/header-drop-down-button';
@@ -150,7 +143,6 @@ const PageHeaderMenuItem = ({
   const primaryMode = useLiveData(editorService.editor.doc.primaryMode$);
 
   const workbench = useService(WorkbenchService).workbench;
-  const openInAppService = useServiceOptional(OpenInAppService);
 
   const { favorite, toggleFavorite } = useFavorite(pageId);
 
@@ -183,12 +175,6 @@ const PageHeaderMenuItem = ({
   const handleOpenInNewTab = useCallback(() => {
     workbench.openDoc(pageId, {
       at: 'new-tab',
-    });
-  }, [pageId, workbench]);
-
-  const handleOpenInSplitView = useCallback(() => {
-    workbench.openDoc(pageId, {
-      at: 'tail',
     });
   }, [pageId, workbench]);
 
@@ -334,10 +320,6 @@ const PageHeaderMenuItem = ({
     </>
   );
 
-  const onOpenInDesktop = useCallback(() => {
-    openInAppService?.showOpenInAppPage();
-  }, [openInAppService]);
-
   const canEdit = useGuard('Doc_Update', pageId);
   const canMoveToTrash = useGuard('Doc_Trash', pageId);
 
@@ -381,16 +363,6 @@ const PageHeaderMenuItem = ({
       >
         {t['com.affine.workbench.tab.page-menu-open']()}
       </MenuItem>
-      {BUILD_CONFIG.isElectron && (
-        <MenuItem
-          prefixIcon={<SplitViewIcon />}
-          data-testid="editor-option-menu-open-in-split-new"
-          onSelect={handleOpenInSplitView}
-        >
-          {t['com.affine.workbench.split-view.page-menu-open']()}
-        </MenuItem>
-      )}
-
       <MenuSeparator />
       <MenuItem
         prefixIcon={<InformationIcon />}
@@ -447,15 +419,6 @@ const PageHeaderMenuItem = ({
         onSelect={handleOpenTrashModal}
         disabled={!canMoveToTrash}
       />
-      {BUILD_CONFIG.isWeb && workspace.flavour !== 'local' ? (
-        <MenuItem
-          prefixIcon={<LocalWorkspaceIcon />}
-          data-testid="editor-option-menu-link"
-          onSelect={onOpenInDesktop}
-        >
-          {t['com.affine.header.option.open-in-desktop']()}
-        </MenuItem>
-      ) : null}
     </>
   );
 };

@@ -258,7 +258,7 @@ export const TagsEditor = ({
       style={style}
       data-testid="tags-editor-popup"
       className={
-        BUILD_CONFIG.isMobileEdition
+        environment.isMobile
           ? styles.tagsEditorRootMobile
           : styles.tagsEditorRoot
       }
@@ -282,14 +282,14 @@ export const TagsEditor = ({
           />
         </InlineTagList>
 
-        {BUILD_CONFIG.isMobileEdition ? null : (
+        {environment.isMobile ? null : (
           <MenuItem
             className={styles.tagsEditorDoneButton}
             prefixIcon={<DoneIcon />}
           />
         )}
       </div>
-      {BUILD_CONFIG.isMobileEdition ? null : (
+      {environment.isMobile ? null : (
         <Divider size="thinner" className={styles.tagDivider} />
       )}
       <div className={styles.tagsEditorTagsSelector}>
@@ -482,7 +482,7 @@ const DesktopTagsInlineEditor = ({
   );
 };
 
-export const TagsInlineEditor = BUILD_CONFIG.isMobileEdition
+export const TagsInlineEditor = environment.isMobile
   ? MobileInlineEditor
   : DesktopTagsInlineEditor;
 

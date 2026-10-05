@@ -21,11 +21,10 @@ import {
 } from '../../base';
 import { WEBSOCKET_OPTIONS } from '../../base/websocket';
 import { AccessTokenService, SessionAccessTokenError } from './access-token';
-import { AuthSessionService } from './auth-session';
+import { AuthSessionHttpError, AuthSessionService } from './auth-session';
 import { extractTokenFromHeader } from './input';
 import { AuthService } from './service';
 import { AuthSessionPrincipal, Session } from './session';
-import { AuthSessionHttpError } from './session-exchange';
 import { isLikelyJwt } from './token';
 
 const PUBLIC_ENTRYPOINT_SYMBOL = Symbol('public');

@@ -15,7 +15,6 @@ import {
 import { Store } from '@toeverything/infra';
 
 import type { GlobalCache } from '../../storage';
-import type { UrlService } from '../../url';
 import type { SubscriptionType } from '../entities/subscription';
 import type { GraphQLService } from '../services/graphql';
 import type { ServerService } from '../services/server';
@@ -23,8 +22,7 @@ const SUBSCRIPTION_CACHE_KEY = 'subscription:';
 
 const getDefaultSubscriptionSuccessCallbackLink = (
   baseUrl: string,
-  plan?: SubscriptionPlan | null,
-  scheme?: string
+  plan?: SubscriptionPlan | null
 ) => {
   const path =
     plan === SubscriptionPlan.Team
@@ -34,9 +32,6 @@ const getDefaultSubscriptionSuccessCallbackLink = (
         : '/upgrade-success';
   const urlString = baseUrl + path;
   const url = new URL(urlString);
-  if (scheme) {
-    url.searchParams.set('scheme', scheme);
-  }
   return url.toString();
 };
 
@@ -44,7 +39,6 @@ export class SubscriptionStore extends Store {
   constructor(
     private readonly gqlService: GraphQLService,
     private readonly globalCache: GlobalCache,
-    private readonly urlService: UrlService,
     private readonly serverService: ServerService
   ) {
     super();
@@ -193,8 +187,7 @@ export class SubscriptionStore extends Store {
             input.successCallbackLink ||
             getDefaultSubscriptionSuccessCallbackLink(
               this.serverService.server.baseUrl,
-              input.plan,
-              this.urlService.getClientScheme()
+              input.plan
             ),
         },
       },

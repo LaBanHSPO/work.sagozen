@@ -21,13 +21,6 @@ import { CoveragePanel } from './coverage';
 import { logByokError } from './errors';
 import * as styles from './index.css';
 import { KeyList } from './key-list';
-import {
-  clearLocalKeys,
-  deleteLocalKey,
-  localByokStorageSupported,
-  readLocalKeys,
-  reorderLocalKeys,
-} from './local-storage';
 import { byokT, capabilitiesFor } from './metadata';
 import { probeChecks } from './model-utils';
 import type { ByokKey, ByokSettings, ByokUsagePoint, GqlFn } from './types';
@@ -40,7 +33,6 @@ export const WorkspaceByokSetting = () => {
   const workspaceServer = useService(WorkspaceServerService);
   const [settings, setSettings] = useState<ByokSettings | null>(null);
   const [usage, setUsage] = useState<ByokUsagePoint[]>([]);
-  const [localKeys, setLocalKeys] = useState<ByokKey[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<ByokKey | null>(null);
   const [testingKeyId, setTestingKeyId] = useState<string | null>(null);
@@ -64,10 +56,6 @@ export const WorkspaceByokSetting = () => {
         to: to.toISOString(),
       },
     });
-    const [localStorageSupported, nextLocalKeys] = await Promise.all([
-      localByokStorageSupported(),
-      readLocalKeys(workspace.id),
-    ]);
     const serverKeys = data.workspace.byokSettings.profiles.map(profile => {
       const key: ByokKey = {
         id: profile.profileId,
@@ -89,11 +77,8 @@ export const WorkspaceByokSetting = () => {
     setSettings({
       ...data.workspace.byokSettings,
       keys: serverKeys,
-      localStorageSupported:
-        data.workspace.byokSettings.localEntitled && localStorageSupported,
     });
     setUsage(data.workspace.byokUsage);
-    setLocalKeys(nextLocalKeys);
   }, [workspace.id, workspaceServer.server]);
 
   useEffect(() => {
@@ -106,24 +91,16 @@ export const WorkspaceByokSetting = () => {
     });
   }, [load, t]);
 
-  const keys = useMemo(() => {
-    return [...localKeys, ...(settings?.keys ?? [])].toSorted((a, b) => {
-      if (a.storage !== b.storage) {
-        return a.storage === ByokStorage.local ? -1 : 1;
-      }
-      return a.sortOrder - b.sortOrder;
-    });
-  }, [localKeys, settings?.keys]);
+  const keys = useMemo(
+    () => (settings?.keys ?? []).toSorted((a, b) => a.sortOrder - b.sortOrder),
+    [settings?.keys]
+  );
   const policyAllowsCreation =
     (settings?.policy.enabled ?? false) &&
     (settings?.policy.allowedProviders.length ?? 0) > 0;
   const canAddServerKey =
     (settings?.serverEntitled ?? false) && policyAllowsCreation;
-  const canAddLocalKey =
-    (settings?.localEntitled ?? false) &&
-    (settings?.localStorageSupported ?? false) &&
-    policyAllowsCreation;
-  const canManageKeys = canAddServerKey || canAddLocalKey;
+  const canManageKeys = canAddServerKey;
 
   const clearAll = useCallback(async () => {
     if (!settings) {
@@ -141,9 +118,6 @@ export const WorkspaceByokSetting = () => {
         )
       );
     }
-    if (settings.localStorageSupported) {
-      deletions.push(clearLocalKeys(workspace.id));
-    }
     const results = await Promise.allSettled(deletions);
     await load();
     if (
@@ -157,11 +131,6 @@ export const WorkspaceByokSetting = () => {
 
   const deleteKey = useCallback(
     async (key: ByokKey) => {
-      if (key.storage === ByokStorage.local) {
-        await deleteLocalKey(workspace.id, key.id);
-        setLocalKeys(await readLocalKeys(workspace.id));
-        return;
-      }
       const gql = workspaceServer.server?.gql as
         | ((input: {
             query: GraphQLQuery;
@@ -207,13 +176,6 @@ export const WorkspaceByokSetting = () => {
       if (!draggingKey || draggingKey.id === targetKey.id) {
         return;
       }
-      if (draggingKey.storage !== targetKey.storage) {
-        notify.error({
-          title: byokT(t, 'notify.cross-storage-reorder.title'),
-          message: byokT(t, 'notify.cross-storage-reorder.message'),
-        });
-        return;
-      }
 
       const bucket = keys.filter(key => key.storage === targetKey.storage);
       const fromIndex = bucket.findIndex(key => key.id === draggingKey.id);
@@ -225,11 +187,8 @@ export const WorkspaceByokSetting = () => {
       const nextBucket = [...bucket];
       const [moved] = nextBucket.splice(fromIndex, 1);
       nextBucket.splice(toIndex, 0, moved);
-      const nextBucketIds = nextBucket.map(key => key.id);
 
-      if (targetKey.storage === ByokStorage.local) {
-        setLocalKeys(await reorderLocalKeys(workspace.id, nextBucketIds));
-      } else if (workspaceServer.server) {
+      if (workspaceServer.server) {
         if (nextBucket.some(key => key.revision === undefined)) {
           notify.error({
             title: byokT(t, 'notify.reload-required.title'),
@@ -393,11 +352,6 @@ export const WorkspaceByokSetting = () => {
           }
         }}
         onSaved={load}
-        localKeys={localKeys}
-        setLocalKeys={setLocalKeys}
-        localStorageSupported={settings.localStorageSupported}
-        canAddServerKey={canAddServerKey}
-        canAddLocalKey={canAddLocalKey}
         gql={workspaceServer.server?.gql as GqlFn | undefined}
       />
     </>

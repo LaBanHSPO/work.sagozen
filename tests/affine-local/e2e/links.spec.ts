@@ -605,10 +605,6 @@ test('should show edgeless content when switching card view of linked mode doc i
   const url = new URL(page.url());
 
   await clickNewPageButton(page);
-  const closeAdButton = page.locator(
-    '[data-testid="local-demo-tips-close-button"]'
-  );
-  await closeAdButton.click();
   await clickEdgelessModeButton(page);
 
   await page.mouse.move(x, y);

@@ -63,7 +63,7 @@ export const DateValue = ({
   return (
     <Menu
       contentOptions={{
-        style: BUILD_CONFIG.isMobileEdition ? { padding: '15px 20px' } : {},
+        style: environment.isMobile ? { padding: '15px 20px' } : {},
       }}
       items={<DatePicker value={parsedValue} onChange={onChange} />}
     >

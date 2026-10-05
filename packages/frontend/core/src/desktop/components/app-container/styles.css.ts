@@ -9,9 +9,6 @@ export const appStyle = style({
   display: 'flex',
   backgroundColor: cssVar('backgroundPrimaryColor'),
   selectors: {
-    '&.blur-background': {
-      backgroundColor: 'transparent',
-    },
     '&.noisy-background::before': {
       content: '""',
       position: 'absolute',
@@ -48,30 +45,6 @@ export const browserAppViewContainer = style({
   position: 'relative',
 });
 
-export const desktopAppViewContainer = style({
-  display: 'flex',
-  flexFlow: 'column',
-  height: '100%',
-  width: '100%',
-});
-
-export const desktopAppViewMain = style({
-  display: 'flex',
-  flexFlow: 'row',
-  width: '100%',
-  height: 'calc(100% - 40px)',
-  position: 'relative',
-});
-
-export const desktopTabsHeader = style({
-  display: 'flex',
-  flexFlow: 'row',
-  height: '40px',
-  zIndex: 1,
-  width: '100%',
-  overflow: 'hidden',
-});
-
 export const mainContainerStyle = style({
   position: 'relative',
   zIndex: 0,
@@ -80,34 +53,4 @@ export const mainContainerStyle = style({
   flex: 1,
   maxWidth: '100%',
 
-  selectors: {
-    '&[data-client-border="true"]': {
-      borderRadius: 6,
-      padding: '8px',
-      '@media': {
-        print: {
-          overflow: 'visible',
-          padding: '0px',
-          borderRadius: '0px',
-        },
-      },
-    },
-    '&[data-client-border="true"][data-side-bar-open="true"]': {
-      paddingLeft: 0,
-    },
-    '&[data-client-border="true"][data-is-desktop="true"]': {
-      paddingTop: 0,
-    },
-    '&[data-client-border="false"][data-is-desktop="true"][data-side-bar-open="true"]':
-      {
-        borderTopLeftRadius: 6,
-      },
-    '&[data-client-border="false"][data-is-desktop="true"]': {
-      borderTop: `0.5px solid ${cssVar('borderColor')}`,
-      borderLeft: `0.5px solid ${cssVar('borderColor')}`,
-    },
-    '&[data-transparent=true]': {
-      backgroundColor: 'transparent',
-    },
-  },
 });

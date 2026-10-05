@@ -37,14 +37,13 @@ yarn affine @affine/server-native build
 
 ## Build the self-hosted image from this checkout
 
-The image builds the server, web application, and admin web interface. It does
-not build Electron, Android, iOS, or the separate mobile web application. Mobile
-browsers receive the same web assets; these are also copied to `static/mobile`
-because the server loads that asset manifest at startup.
+The image builds the server, web application, and admin web interface. Every
+browser receives the same web assets and manifest under `static/`; the admin
+interface remains under `static/admin/`. There is no separate mobile build.
 
 The Rust step builds `@affine/server-native`, a required Node module used by the
-backend. Cargo needs the frontend native workspace directories to resolve its
-workspace, but copying them does not compile desktop or mobile applications.
+backend. Cargo contains only `packages/backend/native` and
+`packages/common/native`; frontend native workspace copies are not needed.
 
 From the repository root, build the shared server/migration image once:
 

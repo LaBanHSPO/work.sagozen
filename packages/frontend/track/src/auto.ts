@@ -1,4 +1,5 @@
 import { DebugLogger } from '@affine/debug';
+import type {} from 'react';
 
 import type { CallableEventsChain, EventsUnion } from './types';
 

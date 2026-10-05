@@ -1,4 +1,3 @@
-import { generateUrl } from '@affine/core/components/hooks/affine/use-share-url';
 import { AttachmentBlockModel } from '@blocksuite/affine/model';
 import {
   attachmentBlockAudioMediaKey,
@@ -13,7 +12,6 @@ import {
 import { clamp } from 'lodash-es';
 import { distinctUntilChanged } from 'rxjs';
 
-import { DesktopApiService } from '../../desktop-api';
 import type { WorkbenchService } from '../../workbench';
 import { AudioMedia } from '../entities/audio-media';
 import type { BaseGlobalMediaStateProvider } from '../providers/global-audio-state';
@@ -36,7 +34,6 @@ export class AudioMediaManagerService extends Service {
   });
 
   private readonly mediaDisposables = new WeakMap<AudioMedia, (() => void)[]>();
-  private readonly desktopApi = this.framework.getOptional(DesktopApiService);
 
   constructor(
     private readonly globalMediaState: BaseGlobalMediaStateProvider,
@@ -59,17 +56,6 @@ export class AudioMediaManagerService extends Service {
         const activeStats = this.getGlobalMediaStats();
 
         if (!activeStats) return;
-
-        if (
-          BUILD_CONFIG.isElectron &&
-          activeStats.tabId !== this.desktopApi?.appInfo.viewId
-        ) {
-          // other tab is playing, pause the current media
-          if (state.state === 'playing') {
-            this.pauseAllMedia();
-          }
-          return;
-        }
 
         const mediaRef = this.ensureMediaEntity(activeStats);
         const media = mediaRef.media;
@@ -258,15 +244,6 @@ export class AudioMediaManagerService extends Service {
         mode: 'page',
         blockIds: [mediaProps.blockId],
       });
-    } else if (BUILD_CONFIG.isElectron && tabId) {
-      const url = generateUrl({
-        baseUrl: window.location.origin,
-        workspaceId: mediaProps.workspaceId,
-        pageId: mediaProps.docId,
-        blockIds: [mediaProps.blockId],
-      });
-
-      this.desktopApi?.showTab(tabId, url).catch(console.error);
     }
   }
 
@@ -294,7 +271,7 @@ export class AudioMediaManagerService extends Service {
   }
 
   get currentTabId() {
-    return this.desktopApi?.appInfo.viewId || 'web';
+    return 'web';
   }
 
   private normalizeEntityDescriptor(

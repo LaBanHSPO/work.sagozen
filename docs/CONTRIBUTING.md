@@ -18,7 +18,7 @@ Already opened a PR? Sign, then click the **recheck** link in the CLA bot's comm
 ## Contribution flow
 
 1. **Find something to work on.** Browse [good first issues](https://github.com/toeverything/AFFiNE/contribute) or the [issue tracker](https://github.com/toeverything/AFFiNE/issues). Issues that are still in triage haven't been reviewed yet — better not to start work on those. For bigger changes, open a [discussion](https://github.com/toeverything/AFFiNE/discussions) or talk to us on [Discord](https://affine.pro/redirect/discord) first.
-2. **Set up your environment.** Follow [BUILDING.md](./BUILDING.md) for the web app. For the server (cloud features) see [developing-server.md](./developing-server.md); for the desktop client see [building-desktop-client-app.md](./building-desktop-client-app.md).
+2. **Set up your environment.** Follow [BUILDING.md](./BUILDING.md) for the browser app, including phone and tablet browsers. For the server (cloud features) see [developing-server.md](./developing-server.md).
 3. **Make your change** on a branch created from `canary`. Add tests where it makes sense, and run `yarn lint`, `yarn typecheck` and the relevant tests locally.
 4. **Open a PR to `canary`** with a [Conventional Commits](https://www.conventionalcommits.org/) title, e.g. `fix(editor): keep selection after paste` — the title format is enforced by CI.
 5. **Get it merged.** A PR merges once the `license/cla` check is green, CI passes, and a maintainer approves the review.

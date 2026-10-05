@@ -7,13 +7,7 @@ export const OAuthProviderSchema = z.enum([
   'OIDC',
 ]);
 
-export const OAuthClientSchema = z.enum([
-  'web',
-  'affine',
-  'affine-canary',
-  'affine-beta',
-  'affine-dev',
-]);
+export const OAuthClientSchema = z.literal('web');
 
 export const OAuthPreflightBodySchema = z
   .object({

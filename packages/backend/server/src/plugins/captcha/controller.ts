@@ -1,5 +1,4 @@
-import { Controller, Get, Header, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import { Controller, Get, Header } from '@nestjs/common';
 
 import { Throttle } from '../../base';
 import { Public } from '../../core/auth';
@@ -13,9 +12,7 @@ export class CaptchaController {
   @Public()
   @Get('/captcha')
   @Header('Cache-Control', 'no-store')
-  async getChallenge(@Req() req: Request) {
-    return this.captcha.getClientConfig(
-      req.get('x-affine-client-kind') === 'native'
-    );
+  getChallenge() {
+    return this.captcha.getClientConfig();
   }
 }

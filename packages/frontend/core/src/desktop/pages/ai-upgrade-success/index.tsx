@@ -2,8 +2,6 @@ import { Button } from '@affine/component';
 import { AuthPageContainer } from '@affine/component/auth-components';
 import { useNavigateHelper } from '@affine/core/components/hooks/use-navigate-helper';
 import { Trans, useI18n } from '@affine/i18n';
-import { useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
 
 import * as styles from './styles.css';
 
@@ -14,16 +12,7 @@ import * as styles from './styles.css';
  */
 export const Component = () => {
   const t = useI18n();
-  const [params] = useSearchParams();
-
-  const { jumpToIndex, jumpToOpenInApp } = useNavigateHelper();
-  const openAFFiNE = useCallback(() => {
-    if (params.get('client')) {
-      return jumpToOpenInApp('bring-to-front');
-    } else {
-      jumpToIndex();
-    }
-  }, [jumpToIndex, jumpToOpenInApp, params]);
+  const { jumpToIndex } = useNavigateHelper();
 
   const subtitle = (
     <div className={styles.leftContentText}>
@@ -49,7 +38,7 @@ export const Component = () => {
       title={t['com.affine.payment.ai-upgrade-success-page.title']()}
       subtitle={subtitle}
     >
-      <Button variant="primary" size="extraLarge" onClick={openAFFiNE}>
+      <Button variant="primary" size="extraLarge" onClick={() => jumpToIndex()}>
         {t['com.affine.other-page.nav.open-affine']()}
       </Button>
     </AuthPageContainer>

@@ -24,10 +24,8 @@ export const providerLabels: Record<ByokProvider, string> = {
   [ByokProvider.fal]: 'FAL',
 };
 
-export function storageLabel(t: I18nInstance, storage: ByokStorage) {
-  return storage === ByokStorage.local
-    ? byokT(t, 'storage.local')
-    : byokT(t, 'storage.server');
+export function storageLabel(t: I18nInstance) {
+  return byokT(t, 'storage.server');
 }
 
 export function endpointHintKey(
@@ -151,7 +149,7 @@ export function rowDescription(t: I18nInstance, key: ByokKey) {
         ? byokT(t, 'status.key-verified')
         : byokT(t, 'row.activity.unused');
 
-  return [storageLabel(t, key.storage), activity, key.description]
+  return [storageLabel(t), activity, key.description]
     .filter(Boolean)
     .join(' • ');
 }

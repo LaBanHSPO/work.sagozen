@@ -92,39 +92,16 @@ vi.mock('@affine/i18n', () => {
   const t = new Proxy({}, { get: (_, key) => () => String(key) });
   return { useI18n: () => t };
 });
-vi.mock('@affine/core/components/affine/auth/oauth', () => ({
-  OAuth: () => <div>OAuth</div>,
-}));
 vi.mock('../hooks/affine/use-selfhost-login-version-guard', () => ({
   useSelfhostLoginVersionGuard: () => null,
 }));
-vi.mock('./add-selfhosted', () => ({
-  AddSelfhostedStep: () => <div>Server picker</div>,
-}));
-vi.mock('./sign-in-with-email', () => ({
-  SignInWithEmailStep: () => <div>Email code</div>,
-}));
 vi.mock('./captcha', () => ({ Captcha: () => <div>Captcha</div> }));
-vi.mock('../../mobile/components/sign-in/layout', () => ({
-  MobileSignInLayout: ({ children }: PropsWithChildren) => children,
-}));
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => vi.fn(),
-  useSearchParams: () => [new URLSearchParams(location.search)],
-}));
 
-import { Component as MobileSignInPage } from '../../mobile/pages/sign-in';
 import { SELF_HOSTED_SERVER_URL } from '../../modules/cloud/self-hosted-sign-in';
 import { SignInPanel } from '.';
 
 describe('web self-hosted sign-in', () => {
   beforeEach(() => {
-    vi.stubGlobal('BUILD_CONFIG', {
-      ...BUILD_CONFIG,
-      isWeb: true,
-      isMobileWeb: false,
-      isNative: false,
-    });
     vi.stubGlobal('location', {
       origin: SELF_HOSTED_SERVER_URL,
       replace: vi.fn(),
@@ -144,14 +121,8 @@ describe('web self-hosted sign-in', () => {
     vi.clearAllMocks();
   });
 
-  test('ignores a custom server and opens the fixed server email form', () => {
-    render(
-      <SignInPanel
-        onSkip={vi.fn()}
-        server="https://other.example"
-        initStep="addSelfhosted"
-      />
-    );
+  test('opens the fixed server email form', () => {
+    render(<SignInPanel />);
     expect(screen.getByRole('heading').textContent).toBe(
       SELF_HOSTED_SERVER_URL
     );
@@ -164,7 +135,7 @@ describe('web self-hosted sign-in', () => {
   });
 
   test('uses password sign-in even when the preflight advertises an email code', async () => {
-    render(<SignInPanel onSkip={vi.fn()} />);
+    render(<SignInPanel />);
     fireEvent.change(screen.getByRole('textbox'), {
       target: { value: 'user@example.com' },
     });
@@ -191,7 +162,7 @@ describe('web self-hosted sign-in', () => {
       origin: 'https://other.example',
       replace: vi.fn(),
     });
-    render(<SignInPanel onSkip={vi.fn()} redirectUrl="/workspace?tab=docs" />);
+    render(<SignInPanel redirectUrl="/workspace?tab=docs" />);
     const target = new URL(vi.mocked(location.replace).mock.calls[0][0]);
     expect(target.origin).toBe(SELF_HOSTED_SERVER_URL);
     expect(target.pathname).toBe('/sign-in');
@@ -200,12 +171,8 @@ describe('web self-hosted sign-in', () => {
   });
 
   test('also simplifies the mobile browser login', () => {
-    vi.stubGlobal('BUILD_CONFIG', {
-      ...BUILD_CONFIG,
-      isWeb: false,
-      isMobileWeb: true,
-    });
-    render(<SignInPanel onSkip={vi.fn()} initStep="addSelfhosted" />);
+    vi.stubGlobal('environment', { ...environment, isMobile: true });
+    render(<SignInPanel />);
     expect(screen.getByRole('heading').textContent).toBe(
       SELF_HOSTED_SERVER_URL
     );
@@ -213,47 +180,4 @@ describe('web self-hosted sign-in', () => {
     expect(screen.queryByText('OAuth')).toBeNull();
   });
 
-  test('preserves redirect_uri from the mobile browser route', () => {
-    vi.stubGlobal('BUILD_CONFIG', {
-      ...BUILD_CONFIG,
-      isWeb: false,
-      isMobileWeb: true,
-    });
-    vi.stubGlobal('location', {
-      origin: 'https://other.example',
-      search: '?redirect_uri=%2Fworkspace%3Ftab%3Ddocs',
-      replace: vi.fn(),
-    });
-    render(<MobileSignInPage />);
-    const target = new URL(vi.mocked(location.replace).mock.calls[0][0]);
-    expect(target.origin).toBe(SELF_HOSTED_SERVER_URL);
-    expect(target.searchParams.get('redirect_uri')).toBe('/workspace?tab=docs');
-    expect(screen.queryByRole('textbox')).toBeNull();
-  });
-
-  test.each(['ios', 'android', 'desktop'])(
-    'preserves the %s native server picker',
-    distribution => {
-      vi.stubGlobal('BUILD_CONFIG', {
-        ...BUILD_CONFIG,
-        distribution,
-        isWeb: false,
-        isMobileWeb: false,
-        isNative: true,
-      });
-      vi.stubGlobal('location', {
-        origin: 'capacitor://localhost',
-        replace: vi.fn(),
-      });
-      render(
-        <SignInPanel
-          onSkip={vi.fn()}
-          server="https://other.example"
-          initStep="addSelfhosted"
-        />
-      );
-      expect(screen.getByText('Server picker')).toBeDefined();
-      expect(location.replace).not.toHaveBeenCalled();
-    }
-  );
 });

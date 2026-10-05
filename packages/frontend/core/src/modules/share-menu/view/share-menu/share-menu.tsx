@@ -165,7 +165,7 @@ export const ShareMenuContent = (props: ShareMenuProps) => {
             value={ShareMenuTab.Export}
             className={styles.tab}
             style={{
-              display: BUILD_CONFIG.isMobileEdition ? 'none' : undefined,
+              display: environment.isMobile ? 'none' : undefined,
             }}
           >
             {t['Export']()}

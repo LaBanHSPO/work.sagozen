@@ -8,11 +8,6 @@ import {
 } from 'react-router-dom';
 
 import { AuthService } from '../../../modules/cloud';
-import {
-  buildAuthenticationDeepLink,
-  buildOpenAppUrlRoute,
-} from '../../../modules/open-in-app';
-import { supportedClient } from './common';
 
 interface LoaderData {
   token: string;
@@ -38,23 +33,11 @@ export const loader: LoaderFunction = ({ request }) => {
     redirectUri,
   };
 
-  if (!client || client === 'web') {
-    return payload;
-  }
-
-  const clientCheckResult = supportedClient.safeParse(client);
-  if (!clientCheckResult.success) {
+  if (client && client !== 'web') {
     return redirect('/sign-in?error=Invalid callback parameters');
   }
 
-  const urlToOpen = buildAuthenticationDeepLink({
-    scheme: clientCheckResult.data,
-    method: 'magic-link',
-    payload,
-    server: location.origin,
-  });
-
-  return redirect(buildOpenAppUrlRoute(urlToOpen));
+  return payload;
 };
 
 export const Component = () => {

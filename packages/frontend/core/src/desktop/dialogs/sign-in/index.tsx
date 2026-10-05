@@ -1,5 +1,5 @@
 import { Modal } from '@affine/component';
-import { SignInPanel, type SignInStep } from '@affine/core/components/sign-in';
+import { SignInPanel } from '@affine/core/components/sign-in';
 import type { AuthSessionStatus } from '@affine/core/modules/cloud/entities/session';
 import type {
   DialogComponentProps,
@@ -8,8 +8,6 @@ import type {
 import { useCallback } from 'react';
 export const SignInDialog = ({
   close,
-  server: initialServerBaseUrl,
-  step,
 }: DialogComponentProps<GLOBAL_DIALOG_SCHEMA['sign-in']>) => {
   const onAuthenticated = useCallback(
     (status: AuthSessionStatus) => {
@@ -35,10 +33,7 @@ export const SignInDialog = ({
       }}
     >
       <SignInPanel
-        onSkip={close}
         onAuthenticated={onAuthenticated}
-        server={initialServerBaseUrl}
-        initStep={step as SignInStep}
       />
     </Modal>
   );

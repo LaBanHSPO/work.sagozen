@@ -65,10 +65,6 @@
     "packages/backend/server/src/__tests__/__snapshots__",
     "packages/common/native/fixtures/**",
     "packages/common/graphql/src/graphql/index.ts",
-    "packages/frontend/native/index.d.ts",
-    "packages/frontend/native/index.js",
-    "packages/frontend/apps/android/App/**",
-    "packages/frontend/apps/ios/App/**",
     "tests/blocksuite/snapshots",
     "blocksuite/docs/api/**",
     "blocksuite/docs-site/.vitepress/.temp/**",
@@ -483,7 +479,6 @@
     },
     {
       "files": [
-        "packages/frontend/apps/electron/scripts/**/*",
         "tests/blocksuite/**/*.{ts,tsx}",
         "blocksuite/**/__tests__/**/*.{ts,tsx}"
       ],

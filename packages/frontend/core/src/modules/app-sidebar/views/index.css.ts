@@ -9,12 +9,10 @@ export const navWrapperStyle = style({
     },
   },
   paddingBottom: 8,
+  backgroundColor: cssVarV2('layer/background/primary'),
   selectors: {
     '&[data-has-border=true]': {
       borderRight: `0.5px solid ${cssVarV2('layer/insideBorder/border')}`,
-    },
-    '&[data-is-floating="true"], &[data-is-electron="false"]': {
-      backgroundColor: cssVarV2('layer/background/primary'),
     },
   },
 });
@@ -28,34 +26,12 @@ export const hoverNavWrapperStyle = style({
       boxShadow: cssVar('--affine-popover-shadow'),
       borderRadius: '6px',
     },
-    '&[data-is-floating="true"][data-is-electron="true"]': {
-      height: '100%',
-      marginTop: '-4px',
-    },
-    '&[data-is-floating="true"][data-client-border="true"]': {
-      backgroundColor: cssVarV2('layer/background/overlayPanel'),
-    },
-    '&[data-is-floating="true"][data-client-border="true"]::before': {
-      content: '""',
-      position: 'absolute',
-      inset: 0,
-      opacity: `var(--affine-noise-opacity, 0)`,
-      backgroundRepeat: 'repeat',
-      backgroundSize: '50px',
-      // TODO(@Peng): figure out how to use vanilla-extract webpack plugin to inject img url
-      backgroundImage: `var(--noise-background)`,
-    },
   },
 });
 export const navHeaderButton = style({
   width: '32px',
   height: '32px',
   flexShrink: 0,
-});
-export const navHeaderNavigationButtons = style({
-  display: 'flex',
-  alignItems: 'center',
-  columnGap: '32px',
 });
 export const navStyle = style({
   position: 'relative',

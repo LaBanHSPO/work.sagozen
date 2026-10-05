@@ -75,7 +75,7 @@ export class DocBacklinks extends Entity {
                   'markdownPreview',
                 ],
                 pagination: {
-                  limit: BUILD_CONFIG.isElectron ? 100 : 5,
+                  limit: 5,
                 },
               },
               pagination: {

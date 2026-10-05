@@ -29,9 +29,7 @@ export const useDowngradeNotify = () => {
         },
         {
           key: 'ok',
-          label: BUILD_CONFIG.isElectron
-            ? t['com.affine.payment.downgraded-notify.ok-client']()
-            : t['com.affine.payment.downgraded-notify.ok-web'](),
+          label: t['com.affine.payment.downgraded-notify.ok-web'](),
           onClick: () => {
             window.open(link, '_blank', 'noreferrer');
           },

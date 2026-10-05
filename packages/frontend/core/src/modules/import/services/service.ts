@@ -1,6 +1,5 @@
 import { getStoreManager } from '@affine/core/blocksuite/manager/store';
 import { ImportCommitService } from '@affine/core/desktop/dialogs/import/commit-service';
-import { commitNativeImport } from '@affine/core/desktop/dialogs/import/native-backend';
 import {
   preflightWebFilesImport,
   preflightWebZipImport,
@@ -25,10 +24,6 @@ import { getAFFiNEWorkspaceSchema } from '../../workspace';
 
 const logger = new DebugLogger('import');
 
-export type ImportRunContext = {
-  signal?: AbortSignal;
-  onProgress?: (progress: { completed: number; total: number }) => void;
-};
 
 export class ImportService extends Service {
   constructor(
@@ -40,12 +35,9 @@ export class ImportService extends Service {
     super();
   }
 
-  async importMarkdownZip(file: File, context?: ImportRunContext) {
+  async importMarkdownZip(file: File) {
     const collection = this.workspaceService.workspace.docCollection;
     const commitService = this.createCommitService({ organize: true });
-    if (BUILD_CONFIG.isElectron) {
-      return commitNativeImport('markdownZip', file, commitService, context);
-    }
 
     await preflightWebZipImport(file);
     const snapshot = await snapshotFile(file);
@@ -58,15 +50,12 @@ export class ImportService extends Service {
     return commitService.commitBatch(batch);
   }
 
-  async importNotionZip(file: File, context?: ImportRunContext) {
+  async importNotionZip(file: File) {
     const collection = this.workspaceService.workspace.docCollection;
     const commitService = this.createCommitService({
       organize: true,
       explorerIcon: true,
     });
-    if (BUILD_CONFIG.isElectron) {
-      return commitNativeImport('notionZip', file, commitService, context);
-    }
 
     await preflightWebZipImport(file);
     const snapshot = await snapshotFile(file);
@@ -89,18 +78,13 @@ export class ImportService extends Service {
     return commitService.commitBatch(batch);
   }
 
-  async importObsidianVault(files: File[], context?: ImportRunContext) {
+  async importObsidianVault(files: File[]) {
     const collection = this.workspaceService.workspace.docCollection;
     const commitService = this.createCommitService({
       organize: true,
       explorerIcon: true,
     });
-    if (!BUILD_CONFIG.isElectron) {
-      await preflightWebFilesImport(files);
-    }
-    if (BUILD_CONFIG.isElectron) {
-      return commitNativeImport('obsidian', files, commitService, context);
-    }
+    await preflightWebFilesImport(files);
     const { files: snapshots, warnings } = await snapshotReadableFiles(files);
     if (!snapshots.length) {
       throw new Error('No readable files were found in the selected folder.');
@@ -116,15 +100,12 @@ export class ImportService extends Service {
     return commitService.commitBatch(batch);
   }
 
-  async importBearBackup(file: File, context?: ImportRunContext) {
+  async importBearBackup(file: File) {
     const collection = this.workspaceService.workspace.docCollection;
     const commitService = this.createCommitService({
       organize: true,
       tag: true,
     });
-    if (BUILD_CONFIG.isElectron) {
-      return commitNativeImport('bearZip', file, commitService, context);
-    }
 
     await preflightWebZipImport(file);
     const snapshot = await snapshotFile(file);
@@ -137,15 +118,6 @@ export class ImportService extends Service {
     return commitService.commitBatch(batch);
   }
 
-  async importOneNote(file: File, context?: ImportRunContext) {
-    if (!BUILD_CONFIG.isElectron) {
-      throw new Error('OneNote import is only available in the desktop app.');
-    }
-    const commitService = this.createCommitService({
-      organize: true,
-    });
-    return commitNativeImport('oneNote', file, commitService, context);
-  }
 
   private createCommitService(options: {
     organize?: boolean;

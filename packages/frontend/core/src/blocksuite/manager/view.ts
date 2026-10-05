@@ -15,7 +15,6 @@ import {
   AffineEditorViewExtension,
   type AffineEditorViewOptions,
 } from '@affine/core/blocksuite/view-extensions/editor-view/editor-view';
-import { ElectronViewExtension } from '@affine/core/blocksuite/view-extensions/electron';
 import { AffineIconPickerExtension } from '@affine/core/blocksuite/view-extensions/icon-picker';
 import { AffineLinkPreviewExtension } from '@affine/core/blocksuite/view-extensions/link-preview-service';
 import { MobileViewExtension } from '@affine/core/blocksuite/view-extensions/mobile';
@@ -56,9 +55,8 @@ type Configure = {
   cloud: (framework?: FrameworkProvider, enableCloud?: boolean) => Configure;
   turboRenderer: (enableTurboRenderer?: boolean) => Configure;
   pdf: (enablePDFEmbedPreview?: boolean, reactToLit?: ReactToLit) => Configure;
-  mobile: (framework?: FrameworkProvider) => Configure;
+  mobile: () => Configure;
   ai: (enable?: boolean, framework?: FrameworkProvider) => Configure;
-  electron: (framework?: FrameworkProvider) => Configure;
   linkPreview: (framework?: FrameworkProvider) => Configure;
   codeBlockPreview: (framework?: FrameworkProvider) => Configure;
   iconPicker: (framework?: FrameworkProvider) => Configure;
@@ -98,7 +96,6 @@ class ViewProvider {
       PdfViewExtension,
       MobileViewExtension,
       AIViewExtension,
-      ElectronViewExtension,
       AffineLinkPreviewExtension,
       AffineDatabaseViewExtension,
       CommentViewExtension,
@@ -125,7 +122,6 @@ class ViewProvider {
       pdf: this._configurePdf,
       mobile: this._configureMobile,
       ai: this._configureAI,
-      electron: this._configureElectron,
       linkPreview: this._configureLinkPreview,
       codeBlockPreview: this._configureCodeBlockHtmlPreview,
       iconPicker: this._configureIconPicker,
@@ -149,7 +145,6 @@ class ViewProvider {
       .pdf()
       .mobile()
       .ai()
-      .electron()
       .linkPreview()
       .codeBlockPreview()
       .iconPicker()
@@ -247,7 +242,7 @@ class ViewProvider {
   };
 
   private readonly _configureParagraph = (enableAI?: boolean) => {
-    if (BUILD_CONFIG.isMobileEdition) {
+    if (environment.isMobile) {
       this._manager.configure(ParagraphViewExtension, {
         getPlaceholder: model => {
           const placeholders = {
@@ -311,8 +306,8 @@ class ViewProvider {
     return this.config;
   };
 
-  private readonly _configureMobile = (framework?: FrameworkProvider) => {
-    this._manager.configure(MobileViewExtension, { framework });
+  private readonly _configureMobile = () => {
+    this._manager.configure(MobileViewExtension, {});
     return this.config;
   };
 
@@ -321,11 +316,6 @@ class ViewProvider {
     framework?: FrameworkProvider
   ) => {
     this._manager.configure(AIViewExtension, { framework, enable });
-    return this.config;
-  };
-
-  private readonly _configureElectron = (framework?: FrameworkProvider) => {
-    this._manager.configure(ElectronViewExtension, { framework });
     return this.config;
   };
 

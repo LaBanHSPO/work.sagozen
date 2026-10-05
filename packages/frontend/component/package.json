@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@affine/debug": "workspace:*",
+    "@affine/env": "workspace:*",
     "@affine/error": "workspace:*",
     "@affine/graphql": "workspace:*",
     "@affine/i18n": "workspace:*",

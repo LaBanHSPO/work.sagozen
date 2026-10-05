@@ -35,7 +35,7 @@ import {
   USER_COOKIE_NAME,
 } from './input';
 import type { CurrentUser } from './session';
-import type { NativeLoginResult, SessionIssueInput } from './session-issuer';
+import type { LoginResult, SessionIssueInput } from './session-issuer';
 
 export function sessionUser(
   user: Pick<
@@ -137,9 +137,9 @@ export class AuthService implements OnApplicationBootstrap {
     email: string,
     password: string,
     issue: SessionIssueInput
-  ): Promise<NativeLoginResult> {
+  ): Promise<LoginResult> {
     try {
-      return await this.rt.executeAuthSessionCommandV1<NativeLoginResult>({
+      return await this.rt.executeAuthSessionCommandV1<LoginResult>({
         action: 'password_login',
         email,
         password,
@@ -157,7 +157,7 @@ export class AuthService implements OnApplicationBootstrap {
   }
 
   async issueUser(userId: string, issue: SessionIssueInput) {
-    return await this.rt.executeAuthSessionCommandV1<NativeLoginResult>({
+    return await this.rt.executeAuthSessionCommandV1<LoginResult>({
       action: 'issue_user',
       userId,
       issue,

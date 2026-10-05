@@ -27,42 +27,7 @@ test.beforeEach(t => {
   };
 });
 
-test('auth session adapter maps protocol dates and refresh events', async t => {
-  t.context.runtime.executeAuthSessionCommandV1.onFirstCall().resolves({
-    status: 'rotated',
-    userId: 'user-1',
-    tokenType: 'Bearer',
-    accessToken: 'access',
-    expiresIn: 300,
-    refreshToken: 'refresh',
-    refreshExpiresAt: '2026-09-08T00:00:00.000Z',
-    session: {
-      id: 'session-1',
-      absoluteExpiresAt: '2026-10-01T00:00:00.000Z',
-    },
-    authSessionId: 'session-1',
-    platform: 'ios',
-    grace: false,
-  });
-  const refreshed = await t.context.sessions.refresh('source-token', '1.0.1');
-  t.is(refreshed.status, 'rotated');
-  if (refreshed.status !== 'rotated') return;
-  t.true(refreshed.refreshExpiresAt instanceof Date);
-  t.true(refreshed.session.absoluteExpiresAt instanceof Date);
-  t.true(
-    t.context.runtime.executeAuthSessionCommandV1.calledWithExactly({
-      action: 'refresh',
-      refreshToken: 'source-token',
-      appVersion: '1.0.1',
-    })
-  );
-  t.true(
-    t.context.event.emit.calledWithExactly('auth.session.refreshed', {
-      authSessionId: 'session-1',
-    })
-  );
-
-  t.context.runtime.executeAuthSessionCommandV1.reset();
+test('auth session adapter maps session history dates', async t => {
   t.context.runtime.executeAuthSessionCommandV1.resolves([
     {
       id: 'session-1',

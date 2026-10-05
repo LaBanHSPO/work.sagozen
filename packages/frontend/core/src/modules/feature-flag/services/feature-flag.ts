@@ -24,13 +24,6 @@ export class FeatureFlagService extends Service {
       this.flags.enable_ai.$,
       reload
     );
-    const diskReload = bindReloadOnFlagChange(
-      this.flags.enable_disk_sync.$,
-      reload
-    );
-    this.disposables.push(
-      () => enableAiReload.unsubscribe(),
-      () => diskReload.unsubscribe()
-    );
+    this.disposables.push(() => enableAiReload.unsubscribe());
   }
 }

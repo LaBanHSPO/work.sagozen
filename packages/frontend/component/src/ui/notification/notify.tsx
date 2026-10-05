@@ -12,11 +12,11 @@ import { MobileNotificationCard } from './mobile/notification-card';
 import { MobileNotificationCenter } from './mobile/notification-center';
 import type { Notification, NotificationCustomRendererProps } from './types';
 
-const NotificationCard = BUILD_CONFIG.isMobileEdition
+const NotificationCard = environment.isMobile
   ? MobileNotificationCard
   : DesktopNotificationCard;
 
-const NotificationCenter = BUILD_CONFIG.isMobileEdition
+const NotificationCenter = environment.isMobile
   ? MobileNotificationCenter
   : DesktopNotificationCenter;
 

@@ -57,12 +57,6 @@ export const importStatusContent = style({
   color: cssVar('textPrimaryColor'),
 });
 
-export const importProgress = style({
-  width: '100%',
-  fontSize: cssVar('fontSm'),
-  lineHeight: cssVar('lineHeight'),
-  color: cssVar('textSecondaryColor'),
-});
 
 export const importWarnings = style({
   width: '100%',
@@ -111,18 +105,6 @@ export const importItem = style({
   },
 });
 
-export const importItemDisabled = style([
-  importItem,
-  {
-    opacity: 0.5,
-    selectors: {
-      '&:hover': {
-        background: cssVarV2('button/secondary'),
-        cursor: 'not-allowed',
-      },
-    },
-  },
-]);
 
 export const importItemLabel = style({
   display: 'flex',

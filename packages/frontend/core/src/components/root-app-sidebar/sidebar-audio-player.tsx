@@ -32,12 +32,6 @@ export const SidebarAudioPlayer = () => {
     return;
   }, [playbackStats, audioAttachmentService]);
 
-  const isSameTab = useMemo(() => {
-    if (BUILD_CONFIG.isElectron) {
-      return playbackStats?.tabId === audioMediaManagerService.currentTabId;
-    }
-    return true;
-  }, [playbackStats, audioMediaManagerService.currentTabId]);
 
   const shouldShow = useLiveData(
     useMemo(() => {
@@ -47,7 +41,7 @@ export const SidebarAudioPlayer = () => {
           audioMediaManagerService.playbackState$,
         ]).pipe(
           map(([v, state]) => {
-            if (isSameTab && v) {
+            if (v) {
               return false;
             }
             if (state?.state === 'stopped') {
@@ -62,7 +56,6 @@ export const SidebarAudioPlayer = () => {
     }, [
       audioAttachmentBlockEntity,
       audioMediaManagerService.playbackState$,
-      isSameTab,
     ])
   );
 

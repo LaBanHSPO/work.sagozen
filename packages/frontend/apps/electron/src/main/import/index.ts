@@ -1,1 +1,0 @@
-export { importHandlers } from './handlers';

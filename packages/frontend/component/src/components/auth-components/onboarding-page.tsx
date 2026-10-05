@@ -51,20 +51,13 @@ function getCallbackUrl(location: Location) {
 export const ScrollableLayout = ({
   headerItems,
   children,
-  isMacosDesktop,
-  isWindowsDesktop,
 }: {
-  isMacosDesktop?: boolean;
-  isWindowsDesktop?: boolean;
   headerItems?: React.ReactNode;
   children: React.ReactNode;
 }) => {
   return (
-    <div className={styles.layout} data-is-macos-electron={isMacosDesktop}>
-      <header
-        className={styles.header}
-        data-is-windows-electron={isWindowsDesktop}
-      >
+    <div className={styles.layout}>
+      <header className={styles.header}>
         {headerItems}
       </header>
       <ScrollableContainer className={styles.scrollableContainer}>
@@ -118,8 +111,6 @@ export const OnboardingPage = ({
     () => questions?.[questionIdx],
     [questionIdx, questions]
   );
-  const isMacosDesktop = BUILD_CONFIG.isElectron && environment.isMacOs;
-  const isWindowsDesktop = BUILD_CONFIG.isElectron && environment.isWindows;
 
   if (!questions) {
     return null;
@@ -132,7 +123,6 @@ export const OnboardingPage = ({
           <Button
             className={clsx(styles.button, {
               [styles.disableButton]: questionIdx === 0,
-              [styles.windowsAppButton]: isWindowsDesktop,
             })}
             size="extraLarge"
             onClick={() => setQuestionIdx(questions.length)}
@@ -140,8 +130,6 @@ export const OnboardingPage = ({
             Skip
           </Button>
         }
-        isMacosDesktop={isMacosDesktop}
-        isWindowsDesktop={isWindowsDesktop}
       >
         <div className={styles.content}>
           <h1 className={styles.question}>{question.question}</h1>
@@ -239,10 +227,7 @@ export const OnboardingPage = ({
     );
   }
   return (
-    <ScrollableLayout
-      isMacosDesktop={isMacosDesktop}
-      isWindowsDesktop={isWindowsDesktop}
-    >
+    <ScrollableLayout>
       <div className={styles.thankContainer}>
         <h1 className={styles.thankTitle}>Thank you!</h1>
         <p className={styles.thankText}>

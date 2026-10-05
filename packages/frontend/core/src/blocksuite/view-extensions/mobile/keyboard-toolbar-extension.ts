@@ -1,26 +1,16 @@
-import { VirtualKeyboardProvider } from '@affine/core/mobile/modules/virtual-keyboard';
-import { globalVars } from '@affine/core/mobile/styles/variables.css';
 import type { Container } from '@blocksuite/affine/global/di';
 import { DisposableGroup } from '@blocksuite/affine/global/disposable';
-import {
-  VirtualKeyboardProvider as BSVirtualKeyboardProvider,
-  type VirtualKeyboardProviderWithAction,
-} from '@blocksuite/affine/shared/services';
+import { VirtualKeyboardProvider } from '@blocksuite/affine/shared/services';
 import { LifeCycleWatcher } from '@blocksuite/affine/std';
 import type { ExtensionType } from '@blocksuite/affine/store';
 import { batch, signal } from '@preact/signals-core';
-import type { FrameworkProvider } from '@toeverything/infra';
 
-export function KeyboardToolbarExtension(
-  framework: FrameworkProvider
-): ExtensionType {
-  const affineVirtualKeyboardProvider = framework.get(VirtualKeyboardProvider);
-
-  class BSVirtualKeyboardService
+export function KeyboardToolbarExtension(): ExtensionType {
+  class BrowserVirtualKeyboardService
     extends LifeCycleWatcher
-    implements BSVirtualKeyboardProvider
+    implements VirtualKeyboardProvider
   {
-    static override key = BSVirtualKeyboardProvider.identifierName;
+    static override key = VirtualKeyboardProvider.identifierName;
 
     private readonly _disposables = new DisposableGroup();
 
@@ -30,31 +20,48 @@ export function KeyboardToolbarExtension(
 
     readonly staticHeight$ = signal(0);
 
-    readonly appTabSafeArea$ = signal(`calc(${globalVars.appTabSafeArea})`);
+    readonly appTabSafeArea$ = signal('env(safe-area-inset-bottom, 0px)');
 
     static override setup(di: Container) {
       super.setup(di);
-      di.addImpl(BSVirtualKeyboardProvider, provider => {
-        return provider.get(this);
-      });
+      di.addImpl(VirtualKeyboardProvider, provider => provider.get(this));
     }
 
     override mounted() {
-      this._disposables.add(
-        affineVirtualKeyboardProvider.onChange(
-          ({ visible, height, overlaysContent }) => {
-            const layoutHeight = overlaysContent === false ? 0 : height;
+      const viewport = window.visualViewport;
+      if (!viewport) return;
 
-            batch(() => {
-              if (visible && this.staticHeight$.peek() !== height) {
-                this.staticHeight$.value = height;
-              }
-              this.visible$.value = visible;
-              this.height$.value = layoutHeight;
-            });
-          }
-        )
-      );
+      const update = () => {
+        const focused = document.activeElement;
+        const editing =
+          focused instanceof HTMLElement &&
+          (focused.isContentEditable ||
+            focused instanceof HTMLInputElement ||
+            focused instanceof HTMLTextAreaElement);
+        const height = Math.max(
+          0,
+          window.innerHeight - viewport.height - viewport.offsetTop
+        );
+        const visible = editing && viewport.scale === 1 && height > 100;
+
+        batch(() => {
+          if (visible) this.staticHeight$.value = height;
+          this.visible$.value = visible;
+          this.height$.value = visible ? height : 0;
+        });
+      };
+
+      viewport.addEventListener('resize', update);
+      viewport.addEventListener('scroll', update);
+      document.addEventListener('focusin', update);
+      document.addEventListener('focusout', update);
+      this._disposables.add(() => {
+        viewport.removeEventListener('resize', update);
+        viewport.removeEventListener('scroll', update);
+        document.removeEventListener('focusin', update);
+        document.removeEventListener('focusout', update);
+      });
+      update();
     }
 
     override unmounted() {
@@ -62,24 +69,5 @@ export function KeyboardToolbarExtension(
     }
   }
 
-  if ('show' in affineVirtualKeyboardProvider) {
-    const providerWithAction = affineVirtualKeyboardProvider;
-
-    class BSVirtualKeyboardServiceWithShowAndHide
-      extends BSVirtualKeyboardService
-      implements VirtualKeyboardProviderWithAction
-    {
-      show() {
-        providerWithAction.show();
-      }
-
-      hide() {
-        providerWithAction.hide();
-      }
-    }
-
-    return BSVirtualKeyboardServiceWithShowAndHide;
-  }
-
-  return BSVirtualKeyboardService;
+  return BrowserVirtualKeyboardService;
 }

@@ -29,7 +29,7 @@ export const EmptyCollectionDetail = ({
       title={t['com.affine.empty.collection-detail.title']()}
       description={t['com.affine.empty.collection-detail.description']()}
       action={
-        BUILD_CONFIG.isMobileEdition ? null : (
+        environment.isMobile ? null : (
           <Actions collection={collection} />
         )
       }

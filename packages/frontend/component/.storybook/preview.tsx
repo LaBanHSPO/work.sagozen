@@ -9,10 +9,8 @@ import type { Preview } from '@storybook/react';
 import React, { useEffect } from 'react';
 import { ConfirmModalProvider } from '../src/ui/modal/confirm-modal';
 
-import { setupGlobal } from '@affine/env/global';
 import { useTheme as useNextTheme } from 'next-themes';
 
-setupGlobal();
 
 export const parameters: Preview = {
   argTypes: {

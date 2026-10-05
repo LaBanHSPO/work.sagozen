@@ -17,7 +17,7 @@ import {
 } from '../backend-runtime';
 import { MailSender } from '../mail/sender';
 import { validators } from '../utils/validators';
-import type { NativeLoginResult, SessionIssueInput } from './session-issuer';
+import type { LoginResult, SessionIssueInput } from './session-issuer';
 
 @Injectable()
 export class MagicLinkAuthService {
@@ -79,10 +79,10 @@ export class MagicLinkAuthService {
     otp: string,
     clientNonce: string | undefined,
     issue: SessionIssueInput
-  ): Promise<NativeLoginResult> {
+  ): Promise<LoginResult> {
     validators.assertValidEmail(email);
     try {
-      return await this.runtime.executeAuthSessionCommandV1<NativeLoginResult>({
+      return await this.runtime.executeAuthSessionCommandV1<LoginResult>({
         action: 'complete_magic_link',
         email,
         otp,

@@ -31,9 +31,7 @@ export const SafeArea = forwardRef<HTMLDivElement, SafeAreaProps>(
         ref={ref}
         className={clsx(safeArea, className)}
         data-standalone={
-          environment.isPwa || BUILD_CONFIG.isAndroid || BUILD_CONFIG.isIOS
-            ? ''
-            : undefined
+          environment.isPwa ? '' : undefined
         }
         data-bottom={bottom ? '' : undefined}
         data-top={top ? '' : undefined}

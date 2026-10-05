@@ -30,7 +30,7 @@ export const useMenuItem = <T extends MenuItemProps>({
       checked,
       selected,
       block,
-      [mobileMenuItem]: BUILD_CONFIG.isMobileEdition,
+      [mobileMenuItem]: environment.isMobile,
     },
     propsClassName
   );

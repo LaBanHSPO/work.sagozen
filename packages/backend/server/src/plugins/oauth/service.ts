@@ -11,27 +11,19 @@ import {
   UnknownOauthProvider,
 } from '../../base';
 import type {
-  NativeLoginResult,
+  LoginResult,
   SessionIssueInput,
 } from '../../core/auth/session-issuer';
 import { BackendRuntimeProvider } from '../../core/backend-runtime';
 import { ServerFeature, ServerService } from '../../core/config';
 import { OAuthProviderName } from './config';
 
-type NativeOAuthCallback =
-  | {
-      type: 'handoff';
-      code: string;
-      provider: string;
-      stateToken: string;
-      client: string;
-    }
-  | ({
-      type: 'login';
-      redirectUri?: string;
-      provider: string;
-      client: string;
-    } & NativeLoginResult);
+type OAuthCallback = {
+  type: 'login';
+  redirectUri?: string;
+  provider: string;
+  client: 'web';
+} & LoginResult;
 
 @Injectable()
 export class OAuthService {
@@ -57,7 +49,7 @@ export class OAuthService {
       });
     } catch (error) {
       this.logger.error(
-        `Failed to load native OAuth providers: ${error instanceof Error ? error.name : 'unknown'}`
+        `Failed to load OAuth providers: ${error instanceof Error ? error.name : 'unknown'}`
       );
       return;
     }
@@ -76,7 +68,7 @@ export class OAuthService {
   async preflight(input: {
     provider: OAuthProviderName;
     redirectUri?: string;
-    client: string;
+    client: 'web';
     clientNonce: string;
     clientVersion?: string;
     callbackUrl: string;
@@ -96,7 +88,7 @@ export class OAuthService {
     clientNonce?: string;
     issue: SessionIssueInput;
   }) {
-    return await this.call<NativeOAuthCallback>({
+    return await this.call<OAuthCallback>({
       action: 'oauth_callback',
       ...input,
     });

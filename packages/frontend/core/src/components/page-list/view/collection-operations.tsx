@@ -11,7 +11,6 @@ import {
   FilterIcon,
   OpenInNewIcon,
   PlusIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService, useServices } from '@toeverything/infra';
 import type { PropsWithChildren, ReactElement } from 'react';
@@ -78,9 +77,6 @@ export const CollectionOperations = ({
     });
   }, [workspaceDialogService, collection.id]);
 
-  const openCollectionSplitView = useCallback(() => {
-    workbench.openCollection(collection.id, { at: 'tail' });
-  }, [collection.id, workbench]);
 
   const openCollectionNewTab = useCallback(() => {
     workbench.openCollection(collection.id, { at: 'new-tab' });
@@ -145,15 +141,6 @@ export const CollectionOperations = ({
         name: t['com.affine.workbench.tab.page-menu-open'](),
         click: openCollectionNewTab,
       },
-      ...(BUILD_CONFIG.isElectron
-        ? [
-            {
-              icon: <SplitViewIcon />,
-              name: t['com.affine.workbench.split-view.page-menu-open'](),
-              click: openCollectionSplitView,
-            },
-          ]
-        : []),
       {
         element: <div key="divider" className={styles.divider}></div>,
       },
@@ -174,7 +161,6 @@ export const CollectionOperations = ({
       favorite,
       onToggleFavoritePage,
       openCollectionNewTab,
-      openCollectionSplitView,
       service,
       collection.id,
     ]

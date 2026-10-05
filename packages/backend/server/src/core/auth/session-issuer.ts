@@ -4,19 +4,19 @@ import { Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 import { getClientVersionFromRequest, getRequestCookie } from '../../base';
-import { isNativeClientRequest } from './input';
 import { AuthService } from './service';
 import type { CurrentUser } from './session';
 
-export type SessionIssueInput =
-  | { type: 'native'; clientVersion?: string }
-  | { type: 'cookie'; sessionId?: string; clientVersion?: string };
-
-export type NativeLoginResult = {
-  user: CurrentUser;
+export type SessionIssueInput = {
+  type: 'cookie';
   sessionId?: string;
-  sessionExpiresAt?: string;
-  exchangeCode?: string;
+  clientVersion?: string;
+};
+
+export type LoginResult = {
+  user: CurrentUser;
+  sessionId: string;
+  sessionExpiresAt: string;
   created?: boolean;
 };
 
@@ -27,27 +27,14 @@ export class SessionIssuer {
   target(req: Request, clientVersion?: string): SessionIssueInput {
     const version =
       clientVersion ?? getClientVersionFromRequest(req) ?? undefined;
-    if (isNativeClientRequest(req)) {
-      return { type: 'native', clientVersion: version };
-    }
     return {
       type: 'cookie',
-      sessionId:
-        req.authType === 'jwt'
-          ? req.session?.sessionId
-          : getRequestCookie(req, AuthService.sessionCookieName),
+      sessionId: getRequestCookie(req, AuthService.sessionCookieName),
       clientVersion: version,
     };
   }
 
-  apply(res: Response, result: NativeLoginResult) {
-    if (result.exchangeCode) {
-      this.auth.clearCookies(res);
-      return;
-    }
-    if (!result.sessionId || !result.sessionExpiresAt) {
-      throw new Error('Native login result did not include a cookie session.');
-    }
+  apply(res: Response, result: LoginResult) {
     const expires = new Date(result.sessionExpiresAt);
     res.cookie(AuthService.sessionCookieName, result.sessionId, {
       ...this.auth.cookieOptions,

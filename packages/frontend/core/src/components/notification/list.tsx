@@ -120,7 +120,7 @@ export const NotificationList = () => {
   return (
     <div
       className={styles.container}
-      data-mobile={BUILD_CONFIG.isMobileEdition ? '' : undefined}
+      data-mobile={environment.isMobile ? '' : undefined}
     >
       <div className={styles.header}>
         <span>{t['com.affine.rootAppSidebar.notifications']()}</span>

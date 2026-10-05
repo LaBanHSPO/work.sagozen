@@ -136,7 +136,7 @@ export const EditWorkspacePropertyMenuItems = ({
     <>
       <div
         className={
-          BUILD_CONFIG.isMobileEdition
+          environment.isMobile
             ? styles.mobilePropertyRowNamePopupRow
             : styles.propertyRowNamePopupRow
         }
@@ -163,7 +163,7 @@ export const EditWorkspacePropertyMenuItems = ({
       </div>
       <div
         className={
-          BUILD_CONFIG.isMobileEdition
+          environment.isMobile
             ? styles.mobilePropertyRowTypeItem
             : styles.propertyRowTypeItem
         }

@@ -7,26 +7,6 @@ use super::{mail::AuthRequestSource, security_challenge::SecurityChallengeKind};
 #[serde(tag = "action", rename_all = "snake_case")]
 pub(super) enum AuthSessionCommand {
   InitializeKeyring,
-  Exchange {
-    code: String,
-    #[serde(rename = "installationId")]
-    installation_id: String,
-    platform: String,
-    #[serde(rename = "deviceName")]
-    device_name: Option<String>,
-    #[serde(rename = "appVersion")]
-    app_version: Option<String>,
-  },
-  Refresh {
-    #[serde(rename = "refreshToken")]
-    refresh_token: String,
-    #[serde(rename = "appVersion")]
-    app_version: Option<String>,
-  },
-  RevokeRefresh {
-    #[serde(rename = "refreshToken")]
-    refresh_token: String,
-  },
   RevokeSession {
     #[serde(rename = "authSessionId")]
     auth_session_id: String,
@@ -115,14 +95,6 @@ pub(super) enum AuthSessionCommand {
     client_nonce: Option<String>,
     issue: SessionIssueInput,
   },
-  CreateOpenAppCode {
-    #[serde(rename = "userId")]
-    user_id: String,
-  },
-  CompleteOpenApp {
-    code: String,
-    issue: SessionIssueInput,
-  },
   #[serde(rename = "oauth_preflight")]
   OAuthPreflight {
     provider: String,
@@ -204,22 +176,14 @@ pub(super) enum SessionIssueInput {
     #[serde(rename = "clientVersion")]
     client_version: Option<String>,
   },
-  Native {
-    #[serde(rename = "clientVersion")]
-    client_version: Option<String>,
-  },
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct LoginResult {
   pub(super) user: CurrentUser,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub(super) session_id: Option<String>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub(super) session_expires_at: Option<DateTime<Utc>>,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub(super) exchange_code: Option<String>,
+  pub(super) session_id: String,
+  pub(super) session_expires_at: DateTime<Utc>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub(super) created: Option<bool>,
 }
@@ -233,13 +197,6 @@ pub(super) struct OAuthPreflightResult {
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub(super) enum OAuthCallbackResult {
-  Handoff {
-    code: String,
-    provider: String,
-    #[serde(rename = "stateToken")]
-    state_token: String,
-    client: String,
-  },
   Login {
     #[serde(flatten)]
     login: LoginResult,
@@ -306,63 +263,6 @@ pub(super) enum PrincipalResult {
   AccessTokenExpired,
   AuthSessionExpired,
   AuthSessionRevoked,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct TokenPair {
-  pub(super) user_id: String,
-  pub(super) token_type: &'static str,
-  pub(super) access_token: String,
-  pub(super) expires_in: i64,
-  pub(super) refresh_token: String,
-  pub(super) refresh_expires_at: DateTime<Utc>,
-  pub(super) session: TokenPairSession,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub(super) is_new_device: Option<bool>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct TokenPairSession {
-  pub(super) id: String,
-  pub(super) absolute_expires_at: DateTime<Utc>,
-}
-
-#[derive(Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub(super) enum RefreshResult {
-  Rotated {
-    #[serde(flatten)]
-    pair: TokenPair,
-    #[serde(rename = "authSessionId")]
-    auth_session_id: String,
-    platform: String,
-    grace: bool,
-  },
-  Invalid {
-    code: &'static str,
-  },
-  Expired {
-    code: &'static str,
-  },
-  Revoked {
-    code: &'static str,
-  },
-  Reused {
-    code: &'static str,
-    #[serde(rename = "userId")]
-    user_id: String,
-    #[serde(rename = "authSessionId")]
-    auth_session_id: String,
-    platform: String,
-  },
-  TemporarilyUnavailable {
-    code: &'static str,
-  },
-  RateLimited {
-    code: &'static str,
-  },
 }
 
 #[derive(Serialize)]

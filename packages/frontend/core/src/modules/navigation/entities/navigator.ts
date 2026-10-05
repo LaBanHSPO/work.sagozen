@@ -40,18 +40,10 @@ export class Navigator extends Entity {
   );
 
   back() {
-    if (!BUILD_CONFIG.isElectron) {
-      window.history.back();
-    } else {
-      this.history$.value.back();
-    }
+    window.history.back();
   }
 
   forward() {
-    if (!BUILD_CONFIG.isElectron) {
-      window.history.forward();
-    } else {
-      this.history$.value.forward();
-    }
+    window.history.forward();
   }
 }

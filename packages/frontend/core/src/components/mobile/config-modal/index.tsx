@@ -1,6 +1,6 @@
-import { Button, Modal } from '@affine/component';
-import { PageHeader } from '@affine/core/mobile/components/page-header';
+import { Button, IconButton, Modal, SafeArea } from '@affine/component';
 import { useI18n } from '@affine/i18n';
+import { ArrowLeftSmallIcon } from '@blocksuite/icons/rc';
 import clsx from 'clsx';
 import {
   type CSSProperties,
@@ -52,27 +52,35 @@ export const ConfigModal = ({
       }}
     >
       {variant === 'page' ? (
-        <PageHeader
-          back={!!onBack}
-          backAction={onBack}
-          suffix={
-            onDone ? (
-              <Button
-                style={{
-                  fontSize: 17,
-                  fontWeight: 600,
-                }}
-                className={styles.doneButton}
-                variant="plain"
-                onClick={onDone}
-              >
-                {t['Done']()}
-              </Button>
-            ) : undefined
-          }
-        >
-          <div className={styles.pageTitle}>{title}</div>
-        </PageHeader>
+        <SafeArea top className={styles.pageHeader}>
+          <header className={styles.pageHeaderInner}>
+            <div className={styles.pageHeaderActions}>
+              {onBack ? (
+                <IconButton
+                  size="24"
+                  style={{ width: 44, height: 44 }}
+                  aria-label={t['com.affine.backButton']()}
+                  onClick={onBack}
+                >
+                  <ArrowLeftSmallIcon />
+                </IconButton>
+              ) : null}
+            </div>
+            <div className={styles.pageTitle}>{title}</div>
+            <div className={styles.pageHeaderActions}>
+              {onDone ? (
+                <Button
+                  style={{ fontSize: 17, fontWeight: 600 }}
+                  className={styles.doneButton}
+                  variant="plain"
+                  onClick={onDone}
+                >
+                  {t['Done']()}
+                </Button>
+              ) : null}
+            </div>
+          </header>
+        </SafeArea>
       ) : null}
       <div
         className={

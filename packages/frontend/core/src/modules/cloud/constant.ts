@@ -13,9 +13,6 @@ export const BUILD_IN_SERVERS: (ServerMetadata & { config: ServerConfig })[] =
         {
           id: 'affine-cloud',
           baseUrl: location.origin,
-          // selfhosted baseUrl is `location.origin`
-          // this is ok for web app, but not for desktop app
-          // since we never build desktop app in selfhosted mode, so it's fine
           config: {
             serverName: DEFAULT_SELF_HOSTED_SERVER_NAME,
             features: [],
@@ -34,9 +31,7 @@ export const BUILD_IN_SERVERS: (ServerMetadata & { config: ServerConfig })[] =
       ? [
           {
             id: 'affine-cloud',
-            baseUrl: BUILD_CONFIG.isElectron
-              ? 'http://localhost:8080'
-              : location.origin,
+            baseUrl: location.origin,
             config: {
               serverName: 'AFFiNE Cloud',
               features: [
@@ -152,9 +147,7 @@ export const BUILD_IN_SERVERS: (ServerMetadata & { config: ServerConfig })[] =
               ? [
                   {
                     id: 'affine-cloud',
-                    baseUrl: BUILD_CONFIG.isNative
-                      ? 'https://affine.fail'
-                      : location.origin,
+                    baseUrl: location.origin,
                     config: {
                       serverName: 'AFFiNE Cloud',
                       features: [

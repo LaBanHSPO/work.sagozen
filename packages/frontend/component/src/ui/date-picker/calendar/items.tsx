@@ -84,7 +84,7 @@ export const CalendarLayout = forwardRef<HTMLDivElement, CalendarLayoutProps>(
         className={styles.calendarWrapper}
         ref={ref}
         data-mode={mode}
-        data-mobile={BUILD_CONFIG.isMobileEdition}
+        data-mobile={environment.isMobile}
       >
         <HeaderLayout
           mode={mode}
@@ -130,7 +130,7 @@ interface NavButtonsProps extends PropsWithChildren {
   onNext?: () => void;
 }
 
-const iconButtonSize = BUILD_CONFIG.isMobileEdition ? 28 : 16;
+const iconButtonSize = environment.isMobile ? 28 : 16;
 
 export const NavButtons = memo(function NavButtons({
   children,

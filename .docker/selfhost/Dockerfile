@@ -121,28 +121,16 @@ COPY packages/common/reader/package.json packages/common/reader/
 COPY packages/common/realtime/package.json packages/common/realtime/
 COPY packages/common/s3-compat/package.json packages/common/s3-compat/
 COPY packages/frontend/admin/package.json packages/frontend/admin/
-COPY packages/frontend/apps/android/package.json packages/frontend/apps/android/
-COPY packages/frontend/apps/electron-renderer/package.json packages/frontend/apps/electron-renderer/
-COPY packages/frontend/apps/electron/package.json packages/frontend/apps/electron/
-COPY packages/frontend/apps/electron/scripts/package.json packages/frontend/apps/electron/scripts/
-COPY packages/frontend/apps/ios/package.json packages/frontend/apps/ios/
-COPY packages/frontend/apps/mobile-shared/package.json packages/frontend/apps/mobile-shared/
-COPY packages/frontend/apps/mobile/package.json packages/frontend/apps/mobile/
 COPY packages/frontend/apps/web/package.json packages/frontend/apps/web/
 COPY packages/frontend/component/package.json packages/frontend/component/
 COPY packages/frontend/core/package.json packages/frontend/core/
-COPY packages/frontend/electron-api/package.json packages/frontend/electron-api/
 COPY packages/frontend/i18n/package.json packages/frontend/i18n/
-COPY packages/frontend/native/package.json packages/frontend/native/
 COPY packages/frontend/routes/package.json packages/frontend/routes/
 COPY packages/frontend/templates/package.json packages/frontend/templates/
 COPY packages/frontend/track/package.json packages/frontend/track/
 COPY tests/affine-cloud-copilot/package.json tests/affine-cloud-copilot/
 COPY tests/affine-cloud/package.json tests/affine-cloud/
-COPY tests/affine-desktop-cloud/package.json tests/affine-desktop-cloud/
-COPY tests/affine-desktop/package.json tests/affine-desktop/
 COPY tests/affine-local/package.json tests/affine-local/
-COPY tests/affine-mobile/package.json tests/affine-mobile/
 COPY tests/blocksuite/package.json tests/blocksuite/
 COPY tests/kit/package.json tests/kit/
 COPY tools/@types/assets/package.json tools/@types/assets/
@@ -153,7 +141,6 @@ COPY tools/cli/package.json tools/cli/
 COPY tools/commitlint/package.json tools/commitlint/
 COPY tools/copilot-result/package.json tools/copilot-result/
 COPY tools/doc-diff/package.json tools/doc-diff/
-COPY tools/playstore-auto-bump/package.json tools/playstore-auto-bump/
 COPY tools/revert-update/package.json tools/revert-update/
 COPY tools/utils/package.json tools/utils/
 COPY packages/backend/server/schema.prisma packages/backend/server/schema.prisma
@@ -176,9 +163,7 @@ EOF
 FROM manifests AS deps
 
 ENV HUSKY=0 \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
-    SENTRYCLI_SKIP_DOWNLOAD=1
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 RUN --mount=type=cache,id=affine-yarn,target=/root/.yarn/berry/cache,sharing=locked \
     corepack enable \
@@ -193,9 +178,7 @@ RUN --mount=type=cache,id=affine-yarn,target=/root/.yarn/berry/cache,sharing=loc
 FROM manifests AS prod-deps
 
 ENV HUSKY=0 \
-    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
-    ELECTRON_SKIP_BINARY_DOWNLOAD=1 \
-    SENTRYCLI_SKIP_DOWNLOAD=1
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 RUN --mount=type=cache,id=affine-yarn,target=/root/.yarn/berry/cache,sharing=locked \
     corepack enable \
@@ -232,10 +215,6 @@ COPY Cargo.toml Cargo.lock ./
 COPY .cargo/config.toml .cargo/config.toml
 COPY packages/backend/native packages/backend/native
 COPY packages/common/native packages/common/native
-# Cargo resolves every workspace member's manifest, but napi builds only
-# packages/backend/native and its dependencies, not desktop or mobile apps.
-COPY packages/frontend/native packages/frontend/native
-COPY packages/frontend/mobile-native packages/frontend/mobile-native
 
 # Debug builds embed this key. Release builds need it too, or self-host
 # refuses to start. Override with --build-arg AFFINE_PRO_PUBLIC_KEY.
@@ -302,15 +281,13 @@ ENV BUILD_TYPE=stable
 # .git is not in the build context. The web bundler reads GITHUB_SHA instead.
 ARG SOURCE_SHA=selfhost
 ENV GITHUB_SHA=${SOURCE_SHA}
-# The server loads both manifests at startup. Serve the same web application
-# to mobile browsers without compiling the separate mobile application.
+# All browser devices use the web app; admin remains a separate browser interface.
 RUN yarn workspace @affine/server build \
  && node tools/cli/bin/runner.js affine.ts @affine/web build \
  && node tools/cli/bin/runner.js affine.ts @affine/admin build \
- && mkdir -p packages/backend/server/static/admin packages/backend/server/static/mobile \
+ && mkdir -p packages/backend/server/static/admin \
  && cp -a packages/frontend/apps/web/dist/. packages/backend/server/static/ \
- && cp -a packages/frontend/admin/dist/. packages/backend/server/static/admin/ \
- && cp -a packages/frontend/apps/web/dist/. packages/backend/server/static/mobile/
+ && cp -a packages/frontend/admin/dist/. packages/backend/server/static/admin/
 
 FROM node:22-bookworm-slim
 WORKDIR /app

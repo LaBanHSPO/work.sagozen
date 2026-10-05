@@ -15,6 +15,30 @@ export const popupModalContent = style({
   padding: '12px',
 });
 
+export const pageHeader = style({
+  position: 'sticky',
+  top: 0,
+  zIndex: 1,
+  backgroundColor: cssVarV2('layer/background/secondary'),
+});
+
+export const pageHeaderInner = style({
+  height: 44,
+  padding: '0 6px',
+  display: 'grid',
+  gridTemplateColumns: '1fr auto 1fr',
+  alignItems: 'center',
+});
+
+export const pageHeaderActions = style({
+  display: 'flex',
+  selectors: {
+    '&:last-child': {
+      justifyContent: 'flex-end',
+    },
+  },
+});
+
 export const pageTitle = style([
   bodyEmphasized,
   {

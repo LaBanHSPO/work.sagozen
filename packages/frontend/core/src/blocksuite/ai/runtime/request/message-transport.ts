@@ -2,7 +2,6 @@ import type { AIToolsConfig } from '@affine/core/modules/ai-button';
 import { partition } from 'lodash-es';
 
 import { toTextStream } from '../../provider/event-source';
-import { createWorkspaceByokLocalLease } from './byok-local-lease';
 import { type CopilotClient, Endpoint } from './copilot-client';
 
 const TIMEOUT = 50000;
@@ -10,7 +9,6 @@ const TIMEOUT = 50000;
 export type TextToTextOptions = {
   client: CopilotClient;
   sessionId: string;
-  workspaceId?: string;
   content?: string;
   attachments?: (string | Blob | File)[];
   params?: Record<string, unknown>;
@@ -130,7 +128,6 @@ async function createMessage({
 export function textToText({
   client,
   sessionId,
-  workspaceId,
   content,
   attachments,
   params,
@@ -167,13 +164,6 @@ export function textToText({
         if (signal?.aborted) {
           return;
         }
-        const byokLeaseId = await createWorkspaceByokLocalLease(
-          client,
-          workspaceId
-        );
-        if (signal?.aborted) {
-          return;
-        }
         const eventSource = client.chatTextStream(
           {
             sessionId,
@@ -187,7 +177,6 @@ export function textToText({
             actionVersion,
             runId,
             retry,
-            byokLeaseId,
           },
           endpoint
         );
@@ -237,13 +226,6 @@ export function textToText({
       if (signal?.aborted) {
         return '';
       }
-      const byokLeaseId = await createWorkspaceByokLocalLease(
-        client,
-        workspaceId
-      );
-      if (signal?.aborted) {
-        return '';
-      }
       const eventSource = client.chatTextStream(
         {
           sessionId,
@@ -257,7 +239,6 @@ export function textToText({
           actionVersion,
           runId,
           retry,
-          byokLeaseId,
         },
         endpoint
       );
@@ -299,7 +280,6 @@ export function textToText({
 export function toImage({
   content,
   sessionId,
-  workspaceId,
   attachments,
   params,
   seed,
@@ -329,13 +309,6 @@ export function toImage({
       if (signal?.aborted) {
         return;
       }
-      const byokLeaseId = await createWorkspaceByokLocalLease(
-        client,
-        workspaceId
-      );
-      if (signal?.aborted) {
-        return;
-      }
       const eventSource =
         endpoint === Endpoint.Action
           ? client.chatTextStream(
@@ -346,17 +319,10 @@ export function toImage({
                 actionVersion,
                 runId,
                 retry,
-                byokLeaseId,
               },
               Endpoint.Action
             )
-          : client.imagesStream(
-              sessionId,
-              messageId,
-              seed,
-              endpoint,
-              byokLeaseId
-            );
+          : client.imagesStream(sessionId, messageId, seed, endpoint);
 
       for await (const event of toTextStream(eventSource, {
         timeout,

@@ -36,30 +36,7 @@ function createRawSource(compiler: CompilerLike, source: string) {
   return new RawSource(source);
 }
 
-export const getPublicPath = (BUILD_CONFIG: BUILD_CONFIG_TYPE) => {
-  const { BUILD_TYPE } = process.env;
-  if (typeof process.env.PUBLIC_PATH === 'string') {
-    return process.env.PUBLIC_PATH;
-  }
-
-  if (
-    BUILD_CONFIG.debug ||
-    BUILD_CONFIG.distribution === 'desktop' ||
-    BUILD_CONFIG.distribution === 'ios' ||
-    BUILD_CONFIG.distribution === 'android'
-  ) {
-    return '/';
-  }
-
-  switch (BUILD_TYPE) {
-    case 'stable':
-      return 'https://prod.affineassets.com/';
-    case 'beta':
-      return 'https://beta.affineassets.com/';
-    default:
-      return 'https://dev.affineassets.com/';
-  }
-};
+export const getPublicPath = () => process.env.PUBLIC_PATH ?? '/';
 
 const DESCRIPTION = `There can be more than Notion and Miro. AFFiNE is a next-gen knowledge base that brings planning, sorting and creating all together.`;
 
@@ -91,8 +68,8 @@ export interface CreateHTMLPluginConfig {
   emitAssetsManifest?: boolean;
 }
 
-function getHTMLPluginOptions(BUILD_CONFIG: BUILD_CONFIG_TYPE) {
-  const publicPath = getPublicPath(BUILD_CONFIG);
+function getHTMLPluginOptions() {
+  const publicPath = getPublicPath();
   const cdnOrigin = publicPath.startsWith('/')
     ? undefined
     : new URL(publicPath).origin;
@@ -103,7 +80,7 @@ function getHTMLPluginOptions(BUILD_CONFIG: BUILD_CONFIG_TYPE) {
     PRECONNECT: cdnOrigin
       ? `<link rel="preconnect" href="${cdnOrigin}" />`
       : '',
-    VIEWPORT_FIT: BUILD_CONFIG.isMobileEdition ? 'cover' : 'auto',
+    VIEWPORT_FIT: 'cover',
   };
 
   return {
@@ -207,12 +184,11 @@ const CorsPlugin = {
 };
 
 export function createHTMLPlugins(
-  BUILD_CONFIG: BUILD_CONFIG_TYPE,
   config: CreateHTMLPluginConfig
 ): (HtmlRspackPluginInstance | PluginLike)[] {
-  const publicPath = getPublicPath(BUILD_CONFIG);
+  const publicPath = getPublicPath();
   const htmlPluginOptions = {
-    ...getHTMLPluginOptions(BUILD_CONFIG),
+    ...getHTMLPluginOptions(),
     ...(config.template ? { template: config.template } : {}),
   };
   const selfhostPublicPath = config.selfhostPublicPath ?? '/';
@@ -230,41 +206,7 @@ export function createHTMLPlugins(
     })
   );
 
-  if (BUILD_CONFIG.isElectron) {
-    plugins.push(
-      new HtmlRspackPlugin({
-        ...htmlPluginOptions,
-        chunks: ['shell'],
-        filename: 'shell.html',
-        publicPath,
-        meta: {
-          'env:publicPath': publicPath,
-        },
-      }),
-      new HtmlRspackPlugin({
-        ...htmlPluginOptions,
-        filename: 'popup.html',
-        chunks: ['popup'],
-        publicPath,
-        meta: {
-          'env:publicPath': publicPath,
-        },
-      }),
-      new HtmlRspackPlugin({
-        ...htmlPluginOptions,
-        filename: 'background-worker.html',
-        chunks: ['backgroundWorker'],
-        publicPath,
-        meta: {
-          'env:publicPath': publicPath,
-        },
-      })
-    );
-  }
-
-  if (!BUILD_CONFIG.isElectron) {
-    plugins.push(CorsPlugin);
-  }
+  plugins.push(CorsPlugin);
 
   if (config.emitAssetsManifest) {
     plugins.push(AssetsManifestPlugin);

@@ -1,5 +1,4 @@
 import { Checkbox, notify, useDndMonitor } from '@affine/component';
-import { useAppSettingHelper } from '@affine/core/components/hooks/affine/use-app-setting-helper';
 import type { AffineDNDData } from '@affine/core/types/dnd';
 import { useI18n } from '@affine/i18n';
 import track from '@affine/track';
@@ -37,7 +36,6 @@ export const SplitView = ({
   ...attrs
 }: SplitViewProps) => {
   const rootRef = useRef<HTMLDivElement>(null);
-  const { appSettings } = useAppSettingHelper();
   const workbench = useService(WorkbenchService).workbench;
 
   // workaround: blocksuite's lit host element has an issue on remounting.
@@ -92,15 +90,10 @@ export const SplitView = ({
   useDndMonitor<AffineDNDData>(() => {
     return {
       canMonitor(data) {
-        if (!BUILD_CONFIG.isElectron) {
-          return false;
-        }
         // allow dropping doc && tab view to split view panel
         const from = data.source.data.from;
         const entity = data.source.data.entity;
-        if (from?.at === 'app-header:tabs') {
-          return false;
-        } else if (
+        if (
           entity?.type &&
           (allowedSplitViewEntityTypes.has(entity?.type) ||
             // will show a toast warning for folder for now
@@ -229,7 +222,6 @@ export const SplitView = ({
       ref={rootRef}
       className={clsx(styles.splitViewRoot, className)}
       data-orientation={orientation}
-      data-client-border={appSettings.clientBorder}
       {...attrs}
     >
       {localViewsState.map(view => {

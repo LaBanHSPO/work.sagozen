@@ -1,16 +1,13 @@
 import { DefaultServerService } from '@affine/core/modules/cloud';
-import { DesktopApiService } from '@affine/core/modules/desktop-api';
 import { WorkspacesService } from '@affine/core/modules/workspace';
 import { buildShowcaseWorkspace } from '@affine/core/utils/first-app-data';
 import {
   useLiveData,
   useService,
-  useServiceOptional,
 } from '@toeverything/infra';
 import {
   type ReactNode,
   useCallback,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -133,12 +130,6 @@ export const Component = ({
     navigating,
     defaultIndexRoute,
   ]);
-
-  const desktopApi = useServiceOptional(DesktopApiService);
-
-  useEffect(() => {
-    desktopApi?.handler.ui.pingAppLayoutReady().catch(console.error);
-  }, [desktopApi]);
 
   if (navigating || !loggedIn) {
     return fallback ?? <AppContainer fallback />;

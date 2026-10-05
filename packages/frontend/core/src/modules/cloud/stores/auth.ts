@@ -150,21 +150,9 @@ export class AuthStore extends Store {
     return await this.authProvider.signInPassword(credential);
   }
 
-  async signInOpenAppSignInCode(code: string) {
-    await this.authProvider.signInOpenAppSignInCode(code);
-  }
-
   async signOut() {
     try {
       await this.authProvider.signOut();
-    } finally {
-      await this.deauthenticateRealtime();
-    }
-  }
-
-  async clearSession() {
-    try {
-      await this.authProvider.clearSession();
     } finally {
       await this.deauthenticateRealtime();
     }

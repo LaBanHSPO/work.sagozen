@@ -9,8 +9,6 @@ import { useLiveData, useService } from '@toeverything/infra';
 
 import { EnableCloudPanel } from '../preference/enable-cloud';
 import { BlobManagementPanel } from './blob-management';
-import { DiskSyncPanel } from './disk-sync';
-import { DesktopExportPanel } from './export';
 import { WorkspaceQuotaPanel } from './workspace-quota';
 
 export const WorkspaceSettingStorage = ({
@@ -24,9 +22,6 @@ export const WorkspaceSettingStorage = ({
     WorkspacePermissionService
   ).permission;
   const isTeam = useLiveData(workspacePermissionService.isTeam$);
-  const isOwner = useLiveData(workspacePermissionService.isOwner$);
-
-  const canExport = !isTeam || isOwner;
   return (
     <>
       <SettingHeader
@@ -36,17 +31,6 @@ export const WorkspaceSettingStorage = ({
       {workspace.flavour === 'local' ? (
         <>
           <EnableCloudPanel onCloseSetting={onCloseSetting} />{' '}
-          {BUILD_CONFIG.isElectron &&
-            BUILD_CONFIG.appBuildType === 'canary' && (
-              <SettingWrapper>
-                <DiskSyncPanel workspaceId={workspace.id} />
-              </SettingWrapper>
-            )}
-          {BUILD_CONFIG.isElectron && (
-            <SettingWrapper>
-              <DesktopExportPanel workspace={workspace} />
-            </SettingWrapper>
-          )}
         </>
       ) : (
         <>
@@ -56,11 +40,6 @@ export const WorkspaceSettingStorage = ({
             </SettingWrapper>
           ) : null}
 
-          {BUILD_CONFIG.isElectron && canExport && (
-            <SettingWrapper>
-              <DesktopExportPanel workspace={workspace} />
-            </SettingWrapper>
-          )}
 
           <SettingWrapper>
             <BlobManagementPanel />

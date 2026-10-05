@@ -6,13 +6,6 @@ export const layout = style({
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
-  selectors: {
-    '&[data-is-macos-electron="true"]': {
-      margin: '8px',
-      borderRadius: '8px',
-      height: 'calc(100vh - 16px)',
-    },
-  },
 });
 export const header = style({
   paddingTop: '24px',
@@ -22,14 +15,6 @@ export const header = style({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'flex-end',
-  ['WebkitAppRegion' as string]: 'drag',
-  selectors: {
-    '&[data-is-windows-electron="true"]': {
-      paddingTop: '0',
-      paddingRight: '0',
-      gap: '16px',
-    },
-  },
 });
 export const footer = style({
   padding: '20px',
@@ -118,9 +103,6 @@ export const disableButton = style({
   position: 'absolute',
   display: 'none',
   pointerEvents: 'none',
-});
-export const windowsAppButton = style({
-  marginRight: '24px',
 });
 export const thankContainer = style({
   display: 'flex',

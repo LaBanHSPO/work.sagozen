@@ -32,8 +32,8 @@ export const Switch = ({
   padding: propsPadding,
   ...otherProps
 }: SwitchProps) => {
-  const size = propsSize ?? (BUILD_CONFIG.isMobileEdition ? 24 : 26);
-  const padding = propsPadding ?? (BUILD_CONFIG.isMobileEdition ? 2 : 3);
+  const size = propsSize ?? (environment.isMobile ? 24 : 26);
+  const padding = propsPadding ?? (environment.isMobile ? 2 : 3);
   const [checkedState, setCheckedState] = useState(checkedProp);
 
   const checked = onChangeProp ? checkedProp : checkedState;

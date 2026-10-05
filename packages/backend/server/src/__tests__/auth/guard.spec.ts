@@ -49,8 +49,6 @@ const test = ava.serial as TestFn<{
   config: ConfigFactory;
   u1: Pick<CurrentUser, 'id'>;
   sessionId: string;
-  authSessionId: string;
-  accessToken: string;
 }>;
 
 test.before(async t => {
@@ -81,18 +79,10 @@ test.beforeEach(async t => {
   });
 
   t.context.u1 = await t.context.app.createUser('u1@affine.pro');
-  const issued = await t.context.app.createNativeAuthSession(t.context.u1.id, {
-    installationId: 'installation-1',
-    platform: 'ios',
+  const issued = await t.context.auth.issueUser(t.context.u1.id, {
+    type: 'cookie',
   });
-  t.context.authSessionId = issued.session.id;
-  t.context.accessToken = issued.accessToken;
-  t.context.sessionId = (
-    await t.context.db.authSession.findUniqueOrThrow({
-      where: { id: issued.session.id },
-      include: { userSession: true },
-    })
-  ).userSession.sessionId;
+  t.context.sessionId = issued.sessionId;
 });
 
 test.after.always(async t => {
@@ -150,10 +140,13 @@ test('should reject a legacy bearer session id', async t => {
   t.pass();
 });
 
-test('should be able to visit private api with auth-session access jwt', async t => {
+test('should be able to visit private api with a historical access jwt', async t => {
+  const { accessToken } = await t.context.app.seedLegacyAuthSession(
+    t.context.u1.id
+  );
   const res = await request(t.context.server)
     .get('/private')
-    .set('Authorization', `Bearer ${t.context.accessToken}`)
+    .set('Authorization', `Bearer ${accessToken}`)
     .expect(HttpStatus.OK);
 
   t.is(res.body.user.id, t.context.u1.id);
@@ -161,7 +154,7 @@ test('should be able to visit private api with auth-session access jwt', async t
 
 test('should prefer bearer jwt over cookie session', async t => {
   const u2 = await t.context.app.createUser('u2@affine.pro');
-  const u2Session = await t.context.app.createNativeAuthSession(u2.id, {
+  const u2Session = await t.context.app.seedLegacyAuthSession(u2.id, {
     installationId: 'installation-2',
     platform: 'android',
   });
@@ -176,11 +169,17 @@ test('should prefer bearer jwt over cookie session', async t => {
 });
 
 test('should reject jwt after its user session is deleted', async t => {
-  await t.context.auth.signOut(t.context.sessionId, t.context.u1.id);
+  const { accessToken } = await t.context.app.seedLegacyAuthSession(
+    t.context.u1.id
+  );
+  const historical = await t.context.db.userSession.findFirstOrThrow({
+    where: { userId: t.context.u1.id, authSession: { isNot: null } },
+  });
+  await t.context.auth.signOut(historical.sessionId, t.context.u1.id);
 
   await request(t.context.server)
     .get('/private')
-    .set('Authorization', `Bearer ${t.context.accessToken}`)
+    .set('Authorization', `Bearer ${accessToken}`)
     .expect(HttpStatus.UNAUTHORIZED);
 
   t.pass();
@@ -196,7 +195,7 @@ test('should enforce client version for auth-session access jwt auth', async t =
     },
   });
 
-  const authSession = await t.context.app.createNativeAuthSession(
+  const authSession = await t.context.app.seedLegacyAuthSession(
     t.context.u1.id,
     {
       installationId: 'version-installation',
@@ -267,7 +266,9 @@ test('should expose auth-session version rejection on a public api', async t => 
       },
     },
   });
-  const token = t.context.accessToken;
+  const { accessToken: token } = await t.context.app.seedLegacyAuthSession(
+    t.context.u1.id
+  );
   const res = await request(t.context.server)
     .get('/public')
     .set('Authorization', `Bearer ${token}`)

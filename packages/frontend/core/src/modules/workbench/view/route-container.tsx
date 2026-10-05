@@ -53,7 +53,7 @@ export const RouteContainer = () => {
     workbench.toggleSidebar();
   }, [workbench]);
 
-  const showSwitch = !BUILD_CONFIG.isElectron && viewPosition.isFirst;
+  const showSwitch = viewPosition.isFirst;
 
   return (
     <div className={styles.root}>
@@ -71,7 +71,7 @@ export const RouteContainer = () => {
           viewId={view.id}
           className={styles.viewHeaderContainer}
         />
-        {!BUILD_CONFIG.isElectron && viewPosition.isLast && (
+        {viewPosition.isLast && (
           <ToggleButton
             show={!sidebarOpen}
             className={styles.rightSidebarButton}

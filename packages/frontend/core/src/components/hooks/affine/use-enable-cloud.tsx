@@ -59,10 +59,7 @@ export const useEnableCloud = () => {
   );
 
   const openSignIn = useCallback(
-    () =>
-      globalDialogService.open('sign-in', {
-        step: 'signIn',
-      }),
+    () => globalDialogService.open('sign-in', {}),
     [globalDialogService]
   );
 

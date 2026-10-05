@@ -16,7 +16,7 @@ The codebase is organized as follows:
 
 - `packages/` contains all code running in production.
   - `backend/` contains backend code, more information from <https://github.com/toeverything/OctoBase>.
-  - `frontend/` contains frontend code, including the web app, the electron app and business libraries.
+  - `frontend/` contains the web/admin browser apps and business libraries.
   - `common` contains the isomorphic code or basic libraries without business.
 - `tools/` contains tools to help developing or CI, not used in production.
 - `tests/` contains testings across different libraries, including e2e testings and integration testings.
@@ -44,12 +44,12 @@ Each component should be a standalone component which can be used in any context
 
 ## Debugging Environments
 
-### `@affine/env`
+### `@affine/web`
 
 ```shell
-yarn dev
+yarn dev -p @affine/web
 ```
 
-### `@affine/electron`
-
-See [building desktop client app](../building-desktop-client-app.md).
+Use this same app for desktop, tablet, and phone browsers. See
+[BUILDING](../BUILDING.md) for browser builds and
+[developing-server](../developing-server.md) for backend development.

@@ -20,7 +20,6 @@ export const useDetailPageHeaderResponsive = (availableWidth: number) => {
   const hideToday = availableWidth < 300;
 
   const showDivider =
-    !BUILD_CONFIG.isElectron &&
     viewPosition.isLast &&
     !rightSidebarOpen &&
     !(hidePresent && hideShare);

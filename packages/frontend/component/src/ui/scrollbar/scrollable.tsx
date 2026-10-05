@@ -50,7 +50,7 @@ export const ScrollableScrollbar = forwardRef<
       ref={ref}
       className={clsx(
         className,
-        BUILD_CONFIG.isMobileEdition ? styles.mobileScrollbar : styles.scrollbar
+        environment.isMobile ? styles.mobileScrollbar : styles.scrollbar
       )}
     >
       <ScrollArea.Thumb className={styles.scrollbarThumb} />

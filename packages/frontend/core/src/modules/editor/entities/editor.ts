@@ -304,7 +304,7 @@ export class Editor extends Entity {
           HTMLElement & { inlineEditor: InlineEditor | null }
         >('rich-text');
         // Only focus on the title when it's empty on mobile edition.
-        if (BUILD_CONFIG.isMobileEdition) {
+        if (environment.isMobile) {
           const titleText = this.doc.title$.value;
           if (!titleText?.length) {
             title?.inlineEditor?.focusEnd();

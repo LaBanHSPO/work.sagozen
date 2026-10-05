@@ -8,7 +8,6 @@ import {
   createAIRequestService,
   setupAIProvider,
 } from '@affine/core/blocksuite/ai';
-import { useRegisterFindInPageCommands } from '@affine/core/components/hooks/affine/use-register-find-in-page-commands';
 import { useRegisterWorkspaceCommands } from '@affine/core/components/hooks/use-register-workspace-commands';
 import { OverCapacityNotification } from '@affine/core/components/over-capacity';
 import {
@@ -201,7 +200,6 @@ export const WorkspaceSideEffects = () => {
 
   useRegisterWorkspaceCommands();
   useRegisterNavigationCommands();
-  useRegisterFindInPageCommands();
 
   return (
     <>

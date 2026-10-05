@@ -21,7 +21,6 @@ import {
   CollaborationIcon,
   DoneIcon,
   InformationFillDuotoneIcon,
-  LocalWorkspaceIcon,
   NoNetworkIcon,
   SelfhostIcon,
   SettingsIcon,
@@ -72,11 +71,7 @@ const UnSyncWorkspaceStatus = () => {
 const LocalWorkspaceStatus = () => {
   return (
     <>
-      {!BUILD_CONFIG.isElectron ? (
-        <InformationFillDuotoneIcon style={{ color: cssVar('errorColor') }} />
-      ) : (
-        <LocalWorkspaceIcon />
-      )}
+      <InformationFillDuotoneIcon style={{ color: cssVar('errorColor') }} />
       Local
     </>
   );
@@ -127,11 +122,7 @@ const useSyncEngineSyncProgress = (meta: WorkspaceMetadata) => {
   let content;
   // TODO(@eyhn): add i18n
   if (workspace.flavour === 'local') {
-    if (!BUILD_CONFIG.isElectron) {
-      content = 'This is a local demo workspace.';
-    } else {
-      content = 'Saved locally';
-    }
+    content = 'This is a local demo workspace.';
   } else if (!isOnline) {
     content = 'Disconnected, please check your network connection';
   } else if (engineState.syncRetrying && engineState.syncErrorMessage) {

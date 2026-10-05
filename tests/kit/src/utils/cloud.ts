@@ -231,15 +231,12 @@ export async function loginUser(
     password: string;
   },
   config?: {
-    isElectron?: boolean;
     beforeLogin?: () => Promise<void>;
     afterLogin?: () => Promise<void>;
   }
 ) {
-  if (config?.isElectron !== true) {
-    await openHomePage(page);
-    await waitForEditorLoad(page);
-  }
+  await openHomePage(page);
+  await waitForEditorLoad(page);
 
   await page.getByTestId('sidebar-user-avatar').click({
     delay: 200,
@@ -254,7 +251,6 @@ export async function loginUserDirectly(
     password: string;
   },
   config?: {
-    isElectron?: boolean;
     beforeLogin?: () => Promise<void>;
     afterLogin?: () => Promise<void>;
   }

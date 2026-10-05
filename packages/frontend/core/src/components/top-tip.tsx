@@ -11,14 +11,6 @@ import type { Workspace } from '../modules/workspace';
 const minimumChromeVersion = 106;
 
 const shouldShowWarning = (() => {
-  if (BUILD_CONFIG.isElectron) {
-    // even though desktop has compatibility issues,
-    //  we don't want to show the warning
-    return false;
-  }
-  if (BUILD_CONFIG.isMobileEdition) {
-    return true;
-  }
   if (environment.isChrome && environment.chromeVersion) {
     return environment.chromeVersion < minimumChromeVersion;
   }
@@ -33,10 +25,6 @@ const OSWarningMessage = () => {
     environment.chromeVersion &&
     environment.chromeVersion < minimumChromeVersion;
 
-  // TODO(@L-Sun): remove this message when mobile version is able to edit.
-  if (environment.isMobile) {
-    return <span>{t['com.affine.top-tip.mobile']()}</span>;
-  }
 
   if (notChrome) {
     return (
@@ -73,11 +61,7 @@ export const TopTip = ({
     globalDialogService.open('sign-in', {});
   }, [globalDialogService]);
 
-  if (
-    !BUILD_CONFIG.isElectron &&
-    showLocalDemoTips &&
-    workspace.flavour === 'local'
-  ) {
+  if (showLocalDemoTips && workspace.flavour === 'local') {
     return (
       <LocalDemoTips
         isLoggedIn={isLoggedIn}

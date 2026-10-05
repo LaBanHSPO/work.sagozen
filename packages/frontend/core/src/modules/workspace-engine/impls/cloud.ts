@@ -26,18 +26,6 @@ import {
   IndexedDBV1BlobStorage,
   IndexedDBV1DocStorage,
 } from '@affine/nbstore/idb/v1';
-import {
-  SqliteBlobStorage,
-  SqliteBlobSyncStorage,
-  SqliteDocStorage,
-  SqliteDocSyncStorage,
-  SqliteIndexerStorage,
-  SqliteIndexerSyncStorage,
-} from '@affine/nbstore/sqlite';
-import {
-  SqliteV1BlobStorage,
-  SqliteV1DocStorage,
-} from '@affine/nbstore/sqlite/v1';
 import type { WorkerInitOptions } from '@affine/nbstore/worker/client';
 import {
   catchErrorInto,
@@ -111,39 +99,14 @@ class CloudWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
 
   readonly flavour = this.server.id;
 
-  DocStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteDocStorage
-      : IndexedDBDocStorage;
-  DocStorageV1Type = BUILD_CONFIG.isElectron
-    ? SqliteV1DocStorage
-    : BUILD_CONFIG.isWeb || BUILD_CONFIG.isMobileWeb
-      ? IndexedDBV1DocStorage
-      : undefined;
-  BlobStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteBlobStorage
-      : IndexedDBBlobStorage;
-  BlobStorageV1Type = BUILD_CONFIG.isElectron
-    ? SqliteV1BlobStorage
-    : BUILD_CONFIG.isWeb || BUILD_CONFIG.isMobileWeb
-      ? IndexedDBV1BlobStorage
-      : undefined;
-  DocSyncStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteDocSyncStorage
-      : IndexedDBDocSyncStorage;
-  BlobSyncStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteBlobSyncStorage
-      : IndexedDBBlobSyncStorage;
-  IndexerStorageType =
-    BUILD_CONFIG.isElectron || BUILD_CONFIG.isIOS || BUILD_CONFIG.isAndroid
-      ? SqliteIndexerStorage
-      : IndexedDBIndexerStorage;
-  IndexerSyncStorageType = BUILD_CONFIG.isElectron
-    ? SqliteIndexerSyncStorage
-    : IndexedDBIndexerSyncStorage;
+  DocStorageType = IndexedDBDocStorage;
+  DocStorageV1Type = IndexedDBV1DocStorage;
+  BlobStorageType = IndexedDBBlobStorage;
+  BlobStorageV1Type = IndexedDBV1BlobStorage;
+  DocSyncStorageType = IndexedDBDocSyncStorage;
+  BlobSyncStorageType = IndexedDBBlobSyncStorage;
+  IndexerStorageType = IndexedDBIndexerStorage;
+  IndexerSyncStorageType = IndexedDBIndexerSyncStorage;
 
   async deleteWorkspace(id: string): Promise<void> {
     await this.graphqlService.gql({
@@ -599,8 +562,6 @@ class CloudWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
             ? {
                 name: 'CloudIndexerStorage',
                 opts: {
-                  flavour: this.flavour,
-                  type: 'workspace',
                   id: workspaceId,
                   serverBaseUrl: this.server.serverMetadata.baseUrl,
                 },
@@ -613,7 +574,6 @@ class CloudWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
                 name: this.DocStorageV1Type.identifier,
                 opts: {
                   id: workspaceId,
-                  type: 'workspace',
                 },
               }
             : undefined,
@@ -622,7 +582,6 @@ class CloudWorkspaceFlavourProvider implements WorkspaceFlavourProvider {
                 name: this.BlobStorageV1Type.identifier,
                 opts: {
                   id: workspaceId,
-                  type: 'workspace',
                 },
               }
             : undefined,

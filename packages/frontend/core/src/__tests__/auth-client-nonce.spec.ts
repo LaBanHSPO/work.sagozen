@@ -5,7 +5,6 @@ import { ServerService } from '@affine/core/modules/cloud/services/server';
 import { AuthStore } from '@affine/core/modules/cloud/stores/auth';
 import { GlobalDialogService } from '@affine/core/modules/dialogs/services/dialog';
 import { NbstoreService } from '@affine/core/modules/storage';
-import { UrlService } from '@affine/core/modules/url/services/url';
 import { ServerDeploymentType } from '@affine/graphql';
 import { Framework } from '@toeverything/infra';
 import { of } from 'rxjs';
@@ -38,7 +37,6 @@ describe('AuthService oauthPreflight', () => {
         nonce = n;
       },
     } as any);
-    framework.service(UrlService, { getClientScheme: () => null } as any);
     framework.service(GlobalDialogService, { open: vi.fn() } as any);
     framework.service(NbstoreService, {
       realtime: { subscribe: () => of() },
@@ -56,7 +54,6 @@ describe('AuthService oauthPreflight', () => {
     framework.service(AuthService, [
       FetchService,
       AuthStore,
-      UrlService,
       GlobalDialogService,
       NbstoreService,
       ServerService,

@@ -8,10 +8,6 @@ rustflags = ["-C", "link-args=-Wl,--warn-unresolved-symbols"]
 rustflags = [
   "-C",
   "link-args=-Wl,-undefined,dynamic_lookup,-no_fixup_chains",
-  "-C",
-  "link-args=-all_load",
-  "-C",
-  "link-args=-weak_framework ScreenCaptureKit",
 ]
 # https://sourceware.org/bugzilla/show_bug.cgi?id=21032
 # https://sourceware.org/bugzilla/show_bug.cgi?id=21031

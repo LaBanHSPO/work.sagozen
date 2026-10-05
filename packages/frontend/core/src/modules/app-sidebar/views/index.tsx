@@ -1,6 +1,5 @@
 import { type DropTargetGetFeedback, Skeleton } from '@affine/component';
 import { ResizePanel } from '@affine/component/resize-panel';
-import { useAppSettingHelper } from '@affine/core/components/hooks/affine/use-app-setting-helper';
 import { NavigateContext } from '@affine/core/components/hooks/use-navigate-helper';
 import { WorkspaceNavigator } from '@affine/core/components/workspace-selector';
 import type { AffineDNDData } from '@affine/core/types/dnd';
@@ -37,13 +36,8 @@ export type History = {
 
 const MAX_WIDTH = 480;
 const MIN_WIDTH = 248;
-const isMacosDesktop = BUILD_CONFIG.isElectron && environment.isMacOs;
 
 export function AppSidebar({ children }: PropsWithChildren) {
-  const { appSettings } = useAppSettingHelper();
-
-  const clientBorder = appSettings.clientBorder;
-
   const appSidebarService = useService(AppSidebarService).sidebar;
   const workbenchService = useService(WorkbenchService).workbench;
 
@@ -63,7 +57,6 @@ export function AppSidebar({ children }: PropsWithChildren) {
         ? 'floating'
         : 'close';
 
-  const hasRightBorder = !BUILD_CONFIG.isElectron && !clientBorder;
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -159,7 +152,7 @@ export function AppSidebar({ children }: PropsWithChildren) {
           [hoverNavWrapperStyle]: sidebarState === 'floating',
         })}
         resizeHandleOffset={0}
-        resizeHandleVerticalPadding={clientBorder ? 16 : 0}
+        resizeHandleVerticalPadding={0}
         resizeHandleTooltip={<ResizeHandleTooltipContent />}
         resizeHandleTooltipOptions={{
           side: 'right',
@@ -169,14 +162,11 @@ export function AppSidebar({ children }: PropsWithChildren) {
         resizeHandleTooltipShortcutClassName={resizeHandleShortcutStyle}
         data-transparent
         data-open={sidebarState !== 'close'}
-        data-has-border={hasRightBorder}
+        data-has-border
         data-testid="app-sidebar-wrapper"
-        data-is-macos-electron={isMacosDesktop}
-        data-client-border={clientBorder}
-        data-is-electron={BUILD_CONFIG.isElectron}
       >
         <nav className={navStyle} data-testid="app-sidebar">
-          {!BUILD_CONFIG.isElectron && sidebarState !== 'floating' && (
+          {sidebarState !== 'floating' && (
             <SidebarHeader />
           )}
           <div className={navBodyStyle} data-testid="sliderBar-inner">
@@ -290,18 +280,16 @@ const FallbackBody = () => {
 export const AppSidebarFallback = (): ReactElement | null => {
   const appSidebarService = useService(AppSidebarService).sidebar;
   const width = useLiveData(appSidebarService.width$);
-  const { appSettings } = useAppSettingHelper();
-  const clientBorder = appSettings.clientBorder;
 
   return (
     <div
       style={{ width }}
       className={navWrapperStyle}
-      data-has-border={!BUILD_CONFIG.isElectron && !clientBorder}
+      data-has-border
       data-open="true"
     >
       <nav className={navStyle}>
-        {!BUILD_CONFIG.isElectron ? <div className={navHeaderStyle} /> : null}
+        <div className={navHeaderStyle} />
         <div className={navBodyStyle}>
           <div className={styles.fallback}>
             <FallbackHeaderWithWorkspaceNavigator />
@@ -313,42 +301,11 @@ export const AppSidebarFallback = (): ReactElement | null => {
   );
 };
 
-/**
- * NOTE(@forehalo): this is a copy of [AppSidebarFallback] without [WorkspaceNavigator] which will introduce a lot useless dependencies for shell(tab bar)
- */
-export const ShellAppSidebarFallback = () => {
-  const appSidebarService = useService(AppSidebarService).sidebar;
-  const width = useLiveData(appSidebarService.width$);
-  const { appSettings } = useAppSettingHelper();
-  const clientBorder = appSettings.clientBorder;
-
-  return (
-    <div
-      style={{ width }}
-      className={navWrapperStyle}
-      data-has-border={!BUILD_CONFIG.isElectron && !clientBorder}
-      data-open="true"
-    >
-      <nav className={navStyle}>
-        {!BUILD_CONFIG.isElectron ? <div className={navHeaderStyle} /> : null}
-        <div className={navBodyStyle}>
-          <div className={styles.fallback}>
-            <FallbackHeader />
-            <FallbackBody />
-          </div>
-        </div>
-      </nav>
-    </div>
-  );
-};
 
 export * from './add-page-button';
-export * from './app-download-button';
-export * from './app-updater-button';
 export * from './category-divider';
 export * from './index.css';
 export * from './menu-item';
-export * from './open-in-app-card';
 export * from './quick-search-input';
 export * from './sidebar-containers';
 export * from './sidebar-header';

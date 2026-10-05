@@ -7,7 +7,6 @@ import { DeleteIcon, ResetIcon } from '@blocksuite/icons/rc';
 import { useService } from '@toeverything/infra';
 import { useCallback, useState } from 'react';
 
-import { useAppSettingHelper } from '../../../components/hooks/affine/use-app-setting-helper';
 import { useBlockSuiteMetaHelper } from '../../../components/hooks/affine/use-block-suite-meta-helper';
 import { useNavigateHelper } from '../../../components/hooks/use-navigate-helper';
 import { toast } from '../../../utils';
@@ -18,7 +17,6 @@ export const TrashPageFooter = () => {
   const docCollection = workspace.docCollection;
   const doc = useService(DocService).doc;
   const t = useI18n();
-  const { appSettings } = useAppSettingHelper();
   const { jumpToPage } = useNavigateHelper();
   const { restoreFromTrash } = useBlockSuiteMetaHelper();
   const [open, setOpen] = useState(false);
@@ -49,7 +47,7 @@ export const TrashPageFooter = () => {
   return (
     <div
       className={styles.deleteHintContainer}
-      data-has-background={!appSettings.clientBorder}
+      data-has-background
     >
       <div className={styles.deleteHintText}>{hintText}</div>
       <div className={styles.group}>

@@ -26,10 +26,6 @@ export async function createLocalWorkspace(
   // open create workspace modal
   await page.getByTestId('new-workspace').click();
 
-  // const isDesktop: boolean = await page.evaluate(() => {
-  //   return !!window.appInfo?.electron;
-  // }, []);
-
   // input workspace name
   const workspaceName = page.getByTestId('create-workspace-input');
   await workspaceName.click();
@@ -51,7 +47,4 @@ export async function createLocalWorkspace(
 
   await expect(page.getByTestId('workspace-name')).toHaveText(params.name);
 
-  // if (isDesktop) {
-  //   await page.getByTestId('create-workspace-continue-button').click();
-  // }
 }

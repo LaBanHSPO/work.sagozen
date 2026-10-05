@@ -16,7 +16,7 @@ export {
   DEFAULT_SELF_HOSTED_SERVER_NAME,
   getSelfHostedServerName,
 } from './server-name';
-export { AuthService, type DeviceAuthSession } from './services/auth';
+export { AuthService } from './services/auth';
 export { CaptchaService } from './services/captcha';
 export { DefaultServerService } from './services/default-server';
 export { DocCreatedByUpdatedBySyncService } from './services/doc-created-by-updated-by-sync';
@@ -52,7 +52,6 @@ import { type Framework } from '@toeverything/infra';
 import { GlobalCache, GlobalState } from '../storage/providers/global';
 import { GlobalStateService } from '../storage/services/global';
 import { GlobalContextService } from '../global-context';
-import { UrlService } from '../url';
 import { WorkspaceScope, WorkspaceService } from '../workspace';
 import { CloudDocMeta } from './entities/cloud-doc-meta';
 import { Invoices } from './entities/invoices';
@@ -147,7 +146,6 @@ export function configureCloudModule(framework: Framework) {
     .service(AuthService, [
       FetchService,
       AuthStore,
-      UrlService,
       GlobalDialogService,
       NbstoreService,
       ServerService,
@@ -165,7 +163,6 @@ export function configureCloudModule(framework: Framework) {
     .store(SubscriptionStore, [
       GraphQLService,
       GlobalCache,
-      UrlService,
       ServerService,
     ])
     .entity(Subscription, [AuthService, ServerService, SubscriptionStore])

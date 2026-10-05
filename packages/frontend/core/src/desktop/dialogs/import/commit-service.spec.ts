@@ -117,7 +117,7 @@ function createCommitService(
 }
 
 describe('ImportCommitService', () => {
-  test('commits native batch blobs, docs, folders, icons, and warnings', async () => {
+  test('commits import batch blobs, docs, folders, icons, and warnings', async () => {
     const collection = new TestWorkspace({ id: 'test' });
     collection.meta.initialize();
     const folderTree = createFolderTree();
@@ -268,7 +268,7 @@ describe('ImportCommitService', () => {
     }
   });
 
-  test('commits native tag names as workspace tags', async () => {
+  test('commits imported tag names as workspace tags', async () => {
     const collection = new TestWorkspace({ id: 'test' });
     collection.meta.initialize();
     const tags = new Map<string, { id: string; value: string }>();

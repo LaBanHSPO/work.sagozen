@@ -13,12 +13,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { logByokError } from './errors';
 import * as styles from './index.css';
-import { readLocalKeys, upsertLocalKey } from './local-storage';
 import {
   byokT,
   endpointHintKey,
   providerLabels,
-  storageLabel,
 } from './metadata';
 import { ModelSelector } from './model-selector';
 import {
@@ -39,11 +37,6 @@ export const AddKeyModal = ({
   open,
   onOpenChange,
   onSaved,
-  localKeys,
-  setLocalKeys,
-  localStorageSupported,
-  canAddServerKey,
-  canAddLocalKey,
   gql,
 }: {
   workspaceId: string;
@@ -52,11 +45,6 @@ export const AddKeyModal = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => Promise<void>;
-  localKeys: ByokKey[];
-  setLocalKeys: (keys: ByokKey[]) => void;
-  localStorageSupported: boolean;
-  canAddServerKey: boolean;
-  canAddLocalKey: boolean;
   gql?: GqlFn;
 }) => {
   const t = useI18n();
@@ -64,7 +52,6 @@ export const AddKeyModal = ({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [profileEnabled, setProfileEnabled] = useState(true);
-  const [storage, setStorage] = useState<ByokStorage>(ByokStorage.server);
   const [apiKey, setApiKey] = useState('');
   const [customEndpoint, setCustomEndpoint] = useState(false);
   const [endpoint, setEndpoint] = useState('');
@@ -76,8 +63,6 @@ export const AddKeyModal = ({
   const [includeImageProbe, setIncludeImageProbe] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  const localStorageUnavailable = !localStorageSupported || !canAddLocalKey;
-  const localStorageDisabled = !!editingKey || localStorageUnavailable;
   const customEndpointMode = settings.policy.customEndpointMode;
   const showCustomEndpoint =
     provider === ByokProvider.openai &&
@@ -101,10 +86,6 @@ export const AddKeyModal = ({
     setName(editingKey?.name ?? providerLabels[nextProvider]);
     setDescription(editingKey?.description ?? '');
     setProfileEnabled(editingKey?.enabled ?? true);
-    setStorage(
-      editingKey?.storage ??
-        (canAddServerKey ? ByokStorage.server : ByokStorage.local)
-    );
     setApiKey('');
     setEndpoint(editingKey?.definition.endpoint.url ?? '');
     setDialect(editingKey?.definition.endpoint.dialect ?? null);
@@ -117,7 +98,7 @@ export const AddKeyModal = ({
     );
     setTestStatus(null);
     setIncludeImageProbe(false);
-  }, [canAddServerKey, editingKey, open, settings]);
+  }, [editingKey, open, settings]);
 
   const definition = useMemo<ByokDefinition>(
     () => ({
@@ -187,32 +168,7 @@ export const AddKeyModal = ({
   const persist = useCallback(
     async (persistedDefinition = definition) => {
       if (!gql) return;
-      if (storage === ByokStorage.local) {
-        const saved = await upsertLocalKey(workspaceId, {
-          id:
-            editingKey?.storage === ByokStorage.local
-              ? editingKey.id
-              : crypto.randomUUID(),
-          provider,
-          name,
-          description,
-          credential: apiKey,
-          definition: persistedDefinition,
-          sortOrder:
-            editingKey?.storage === ByokStorage.local
-              ? editingKey.sortOrder
-              : localKeys.length,
-          enabled: profileEnabled,
-        });
-        if (!saved) {
-          notify.error({
-            title: byokT(t, 'notify.local-save-failed.title'),
-            message: byokT(t, 'notify.local-save-failed.message'),
-          });
-          return;
-        }
-        setLocalKeys(await readLocalKeys(workspaceId));
-      } else if (editingKey?.storage === ByokStorage.server) {
+      if (editingKey) {
         if (editingKey.revision === undefined) {
           notify.error({
             title: byokT(t, 'notify.reload-required.title'),
@@ -261,14 +217,11 @@ export const AddKeyModal = ({
       description,
       editingKey,
       gql,
-      localKeys.length,
       name,
       onOpenChange,
       onSaved,
       provider,
       profileEnabled,
-      setLocalKeys,
-      storage,
       t,
       workspaceId,
     ]
@@ -361,49 +314,8 @@ export const AddKeyModal = ({
               ))}
             </select>
           </label>
-          <div className={styles.storageOptions}>
-            <label
-              className={styles.storageOption}
-              data-disabled={!canAddServerKey}
-            >
-              <input
-                className={styles.storageRadio}
-                type="radio"
-                name="byok-storage"
-                checked={storage === ByokStorage.server}
-                disabled={!!editingKey || !canAddServerKey}
-                onChange={() => setStorage(ByokStorage.server)}
-              />
-              <span className={styles.storageCopy}>
-                <strong>{storageLabel(t, ByokStorage.server)}</strong>
-                <small className={styles.storageDescription}>
-                  {byokT(t, 'storage.server.description')}
-                </small>
-              </span>
-            </label>
-            <label
-              className={styles.storageOption}
-              data-disabled={localStorageUnavailable}
-            >
-              <input
-                className={styles.storageRadio}
-                type="radio"
-                name="byok-storage"
-                checked={storage === ByokStorage.local}
-                disabled={localStorageDisabled}
-                onChange={() => setStorage(ByokStorage.local)}
-              />
-              <span className={styles.storageCopy}>
-                <strong>{storageLabel(t, ByokStorage.local)}</strong>
-                <small className={styles.storageDescription}>
-                  {!BUILD_CONFIG.isElectron
-                    ? byokT(t, 'storage.local.desktop-only')
-                    : !localStorageSupported
-                      ? byokT(t, 'storage.local.unavailable')
-                      : byokT(t, 'storage.local.description')}
-                </small>
-              </span>
-            </label>
+          <div className={styles.storageDescription}>
+            {byokT(t, 'storage.server.description')}
           </div>
           <label className={styles.field}>
             <span className={styles.label}>{byokT(t, 'field.api-key')}</span>
@@ -421,11 +333,6 @@ export const AddKeyModal = ({
                   : ''
               }
             />
-            {storage === ByokStorage.local ? (
-              <span className={styles.fieldHint}>
-                {byokT(t, 'storage.local.test-disclosure')}
-              </span>
-            ) : null}
           </label>
           {showCustomEndpoint ? (
             <>

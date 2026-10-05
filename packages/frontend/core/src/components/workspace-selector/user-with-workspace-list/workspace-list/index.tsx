@@ -32,7 +32,6 @@ import {
 import { useCallback, useMemo } from 'react';
 
 import { WorkspaceCard } from '../../workspace-card';
-import { AddServer } from '../add-server';
 import * as styles from './index.css';
 
 interface WorkspaceModalProps {
@@ -165,10 +164,8 @@ const CloudWorkSpaceList = ({
   const handleSignOut = useSignOut();
 
   const handleSignIn = useAsyncCallback(async () => {
-    globalDialogService.open('sign-in', {
-      server: server.baseUrl,
-    });
-  }, [globalDialogService, server.baseUrl]);
+    globalDialogService.open('sign-in', {});
+  }, [globalDialogService]);
 
   return (
     <>
@@ -332,7 +329,6 @@ export const AFFiNEWorkspaceList = ({
           )}
         </FrameworkScope>
       ))}
-      <AddServer />
       <Divider size="thinner" />
     </>
   );

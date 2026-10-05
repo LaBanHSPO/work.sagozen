@@ -204,7 +204,6 @@ function settings(
       customEndpointMode,
       privateEndpointSupported: false,
     },
-    localStorageSupported: false,
     keys: [],
     catalog: {
       version: 'catalog-1',
@@ -266,11 +265,6 @@ describe('BYOK settings behavior', () => {
       open: true,
       onOpenChange: vi.fn(),
       onSaved: vi.fn(),
-      localKeys: [],
-      setLocalKeys: vi.fn(),
-      localStorageSupported: false,
-      canAddServerKey: true,
-      canAddLocalKey: false,
       gql: vi.fn() as never,
     };
     const { rerender } = render(<AddKeyModal {...props} />);
@@ -305,22 +299,12 @@ describe('BYOK settings behavior', () => {
         open
         onOpenChange={vi.fn()}
         onSaved={vi.fn()}
-        localKeys={[]}
-        setLocalKeys={vi.fn()}
-        localStorageSupported={false}
-        canAddServerKey
-        canAddLocalKey={false}
         gql={vi.fn() as never}
       />
     );
 
     expect(screen.getByText('Model A')).toBeTruthy();
     expect(screen.queryByText('Model B')).toBeNull();
-    expect(
-      (screen.getByRole('radio', { name: /local/i }) as HTMLInputElement)
-        .disabled
-    ).toBe(true);
-    expect(screen.getByText('desktop-only')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'add-model' }));
     fireEvent.click(screen.getByRole('checkbox', { name: /Model B/ }));
@@ -401,11 +385,6 @@ describe('BYOK settings behavior', () => {
         open
         onOpenChange={vi.fn()}
         onSaved={vi.fn()}
-        localKeys={[]}
-        setLocalKeys={vi.fn()}
-        localStorageSupported={false}
-        canAddServerKey
-        canAddLocalKey={false}
         gql={gql as never}
       />
     );
@@ -464,11 +443,6 @@ describe('BYOK settings behavior', () => {
         open
         onOpenChange={vi.fn()}
         onSaved={vi.fn()}
-        localKeys={[]}
-        setLocalKeys={vi.fn()}
-        localStorageSupported={false}
-        canAddServerKey
-        canAddLocalKey={false}
         gql={gql as never}
       />
     );
@@ -550,11 +524,6 @@ describe('BYOK settings behavior', () => {
         open
         onOpenChange={vi.fn()}
         onSaved={vi.fn()}
-        localKeys={[]}
-        setLocalKeys={vi.fn()}
-        localStorageSupported={false}
-        canAddServerKey
-        canAddLocalKey={false}
         gql={gql as never}
       />
     );

@@ -31,7 +31,6 @@ import {
   OpenInNewIcon,
   PlusIcon,
   ResetIcon,
-  SplitViewIcon,
 } from '@blocksuite/icons/rc';
 import { useLiveData, useService, useServices } from '@toeverything/infra';
 import type { MouseEvent } from 'react';
@@ -123,11 +122,6 @@ const PageOperationCellMenuItem = ({
     });
   }, [docRecord, openConfirmModal, t]);
 
-  const onOpenInSplitView = useCallback(() => {
-    track.allDocs.list.docMenu.openInSplitView();
-
-    workbench.openDoc(page.id, { at: 'tail' });
-  }, [page.id, workbench]);
 
   const onOpenInNewTab = useCallback(() => {
     workbench.openDoc(page.id, { at: 'new-tab' });
@@ -193,11 +187,6 @@ const PageOperationCellMenuItem = ({
       <MenuItem onClick={onOpenInNewTab} prefixIcon={<OpenInNewIcon />}>
         {t['com.affine.workbench.tab.page-menu-open']()}
       </MenuItem>
-      {BUILD_CONFIG.isElectron ? (
-        <MenuItem onClick={onOpenInSplitView} prefixIcon={<SplitViewIcon />}>
-          {t['com.affine.workbench.split-view.page-menu-open']()}
-        </MenuItem>
-      ) : null}
 
       <MenuItem prefixIcon={<DuplicateIcon />} onSelect={onDuplicate}>
         {t['com.affine.header.option.duplicate']()}

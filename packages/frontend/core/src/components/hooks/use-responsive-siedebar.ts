@@ -37,15 +37,15 @@ export const useResponsiveSidebar = (
 
     OBSERVED = true;
     const unobserve = observeResize(document.body, entry => {
-      if (BUILD_CONFIG.isMobileEdition) {
-        return;
-      }
-
       const width = entry.contentRect.width;
       const previousWidth = previousWidthRef.current;
 
       if (previousWidth === null) {
         previousWidthRef.current = width;
+        handleFloatSidebar(width <= floatThreshold);
+        if (width <= hideThreshold) {
+          handleHideSidebar();
+        }
         return;
       }
 
@@ -54,13 +54,11 @@ export const useResponsiveSidebar = (
         handleHideSidebar();
       }
 
-      if (!BUILD_CONFIG.isElectron) {
-        if (width >= floatThreshold && previousWidth < floatThreshold) {
-          handleFloatSidebar(false);
-        }
-        if (width <= floatThreshold && previousWidth > floatThreshold) {
-          handleFloatSidebar(true);
-        }
+      if (width >= floatThreshold && previousWidth < floatThreshold) {
+        handleFloatSidebar(false);
+      }
+      if (width <= floatThreshold && previousWidth > floatThreshold) {
+        handleFloatSidebar(true);
       }
 
       previousWidthRef.current = width;

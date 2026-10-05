@@ -21,8 +21,6 @@ export const tracker = {
       appVersion: BUILD_CONFIG.appVersion,
       environment: BUILD_CONFIG.appBuildType,
       editorVersion: BUILD_CONFIG.editorVersion,
-      isDesktop: BUILD_CONFIG.isElectron,
-      isMobile: BUILD_CONFIG.isMobileEdition,
       distribution: BUILD_CONFIG.distribution,
     });
   },
@@ -440,8 +438,6 @@ function buildContext(): TelemetryEvent['context'] {
     channel: BUILD_CONFIG.appBuildType as NonNullable<
       TelemetryEvent['context']
     >['channel'],
-    isDesktop: BUILD_CONFIG.isElectron,
-    isMobile: BUILD_CONFIG.isMobileEdition,
     locale: getLocale(),
     timezone: getTimezone(),
     url: getLocationHref(),

@@ -14,7 +14,7 @@ import { desktopStyles, mobileStyles } from './confirm-modal.css';
 import type { ModalProps } from './modal';
 import { Modal } from './modal';
 
-const styles = BUILD_CONFIG.isMobileEdition ? mobileStyles : desktopStyles;
+const styles = environment.isMobile ? mobileStyles : desktopStyles;
 
 export interface ConfirmModalProps extends ModalProps {
   customConfirmButton?: () => React.ReactNode;

@@ -12,7 +12,6 @@ import {
   ExpandFullIcon,
   LinkedPageIcon,
   OpenInNewIcon,
-  SplitViewIcon,
   ToggleDownIcon,
   ToggleRightIcon,
 } from '@blocksuite/icons/rc';
@@ -188,15 +187,6 @@ const MoreMenu = ({
           peek(block);
         },
         enabled: true,
-      },
-      {
-        type: 'open-in-split-view',
-        label: t['com.affine.peek-view-controls.open-doc-in-split-view'](),
-        icon: <SplitViewIcon />,
-        onClick: () => {
-          workbench.openDoc(model.props.pageId, { at: 'beside' });
-        },
-        enabled: BUILD_CONFIG.isElectron,
       },
       {
         type: 'open-in-new-tab',

@@ -1,24 +1,9 @@
 declare interface BUILD_CONFIG_TYPE {
   debug: boolean;
-  distribution: 'web' | 'desktop' | 'admin' | 'mobile' | 'ios' | 'android';
-  /**
-   * 'web' | 'desktop' | 'admin'
-   */
+  distribution: 'web' | 'admin';
+  /** Browser shell layout, independent of the device's screen size. */
   isDesktopEdition: boolean;
-  /**
-   * 'mobile'
-   */
-  isMobileEdition: boolean;
-
-  isElectron: boolean;
   isWeb: boolean;
-  /**
-   * 'desktop' | 'ios' | 'android'
-   */
-  isNative: boolean;
-  isMobileWeb: boolean;
-  isIOS: boolean;
-  isAndroid: boolean;
   isAdmin: boolean;
 
   appVersion: string;

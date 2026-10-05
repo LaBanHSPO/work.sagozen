@@ -2,17 +2,6 @@ import { URLHelper } from './helpers';
 
 const DEV_LOOPBACK_PROTOCOLS = new Set(['http:', 'https:']);
 const DEV_LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
-const MOBILE_CLIENT_ORIGINS = new Set([
-  'https://localhost',
-  'capacitor://localhost',
-  'ionic://localhost',
-]);
-const DESKTOP_CLIENT_ORIGINS = new Set([
-  'assets://.',
-  'assets://another-host',
-  // for old versions of client, which use file:// as origin
-  'file://',
-]);
 
 export const CORS_ALLOWED_METHODS = [
   'GET',
@@ -75,12 +64,8 @@ function normalizeCorsOrigin(origin: string) {
   }
 }
 
-export function buildCorsAllowedOrigins(url: URLHelper) {
-  return new Set<string>([
-    ...url.allowedOrigins,
-    ...MOBILE_CLIENT_ORIGINS,
-    ...DESKTOP_CLIENT_ORIGINS,
-  ]);
+export function buildCorsAllowedOrigins(url: Pick<URLHelper, 'allowedOrigins'>) {
+  return new Set<string>(url.allowedOrigins);
 }
 
 export function isCorsOriginAllowed(

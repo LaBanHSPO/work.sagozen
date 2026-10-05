@@ -23,12 +23,6 @@ export function registerAffineCreationCommands({
       category: 'affine:creation',
       label: t['com.affine.cmdk.affine.new-page'](),
       icon: <PlusIcon />,
-      keyBinding: BUILD_CONFIG.isElectron
-        ? {
-            binding: '$mod+N',
-            skipRegister: true,
-          }
-        : undefined,
       run() {
         track.$.cmdk.creation.createDoc({ mode: 'page' });
 
@@ -53,7 +47,7 @@ export function registerAffineCreationCommands({
     })
   );
 
-  if (!BUILD_CONFIG.isMobileEdition) {
+  if (!environment.isMobile) {
     unsubs.push(
       registerAffineCommand({
         id: 'affine:new-workspace',

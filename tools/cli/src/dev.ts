@@ -8,11 +8,6 @@ export class DevCommand extends PackageSelectorCommand {
   protected override availablePackages: PackageName[] = [
     '@affine/web',
     '@affine/server',
-    '@affine/electron',
-    '@affine/electron-renderer',
-    '@affine/mobile',
-    '@affine/ios',
-    '@affine/android',
     '@affine/admin',
   ];
 

@@ -1,7 +1,7 @@
 import { Button, IconButton, Loading, notify } from '@affine/component';
 import { AuthPageContainer } from '@affine/component/auth-components';
 import { SelfhostGenerateLicenseService } from '@affine/core/modules/cloud';
-import { OpenInAppService } from '@affine/core/modules/open-in-app';
+import { useNavigateHelper } from '@affine/core/components/hooks/use-navigate-helper';
 import { copyTextToClipboard } from '@affine/core/utils/clipboard';
 import { Trans, useI18n } from '@affine/i18n';
 import { CopyIcon } from '@blocksuite/icons/rc';
@@ -53,11 +53,7 @@ export const Component = () => {
 
 const Success = ({ licenseKey }: { licenseKey: string | null }) => {
   const t = useI18n();
-  const openInAppService = useService(OpenInAppService);
-
-  const openAFFiNE = useCallback(() => {
-    openInAppService.showOpenInAppPage();
-  }, [openInAppService]);
+  const { jumpToIndex } = useNavigateHelper();
 
   const onCopy = useCallback(() => {
     if (!licenseKey) {
@@ -114,7 +110,7 @@ const Success = ({ licenseKey }: { licenseKey: string | null }) => {
         </div>
         <div>{t['com.affine.payment.license-success.hint']()}</div>
         <div>
-          <Button variant="primary" size="extraLarge" onClick={openAFFiNE}>
+          <Button variant="primary" size="extraLarge" onClick={() => jumpToIndex()}>
             {t['com.affine.payment.license-success.open-affine']()}
           </Button>
         </div>

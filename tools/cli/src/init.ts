@@ -111,14 +111,6 @@ export class InitCommand extends Command {
   };
 
   genPackageTsConfig = (pkg: Package, prev: string) => {
-    // TODO(@forehalo):
-    //   currently electron-api => electron => nbstore => electron-api
-    //   this is a circular dependency, we need to fix it
-    //   basically, the electron app don't need to use nbstore for exposing js bridge apis
-    if (pkg.name === '@affine/electron-api') {
-      return prev;
-    }
-
     return applyEdits(
       prev,
       modify(
