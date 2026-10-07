@@ -4,19 +4,103 @@ use affine_core::access_control::{
   DomainCommand, ReservedDocumentAccessDecision, authorize_reserved_document, classify_reserved_document,
 };
 use chrono::Duration;
+use futures_util::TryStreamExt;
 use napi::{Result, bindgen_prelude::Buffer};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
+
+use crate::runtime::{RuntimeError, RuntimeResult};
 
 use super::{
   BackendRuntime, SourceIdentity,
   domain_command::{
     authorize_domain, invalidate_doc_blob_projection, lock_workspace_doc_update, lock_workspace_storage_shared,
-    next_workspace_doc_update_timestamp, workspace_root_contains_active_doc,
+    next_workspace_doc_update_timestamp, validate_workspace_root_updates_in, workspace_root_contains_active_doc,
   },
   invalidation::{InvalidationHintV1, InvalidationRuntime},
   napi_error,
-  permission::PermissionAuthorizer,
+  permission::{PermissionAuthorizer, active_workspace_owner_or_admin_in},
 };
+
+/// Internal proof emitted only by the trusted Yjs validator, never an HTTP input.
+#[napi_derive::napi(object)]
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseValidationV1 {
+  pub state_hash: String,
+  pub expires_at: Option<f64>,
+  pub history_hash: Option<String>,
+}
+
+/// Call only while holding the document update lock and locked permission facts.
+pub(super) async fn validate_database_proof(
+  transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+  workspace_id: &str,
+  doc_id: &str,
+  actor_user_id: &str,
+  proof: Option<&DatabaseValidationV1>,
+  history_blob: Option<&[u8]>,
+) -> RuntimeResult<()> {
+  let privileged = active_workspace_owner_or_admin_in(transaction, workspace_id, actor_user_id).await?;
+  if privileged {
+    return Ok(());
+  }
+  let proof = proof.ok_or_else(|| RuntimeError::invalid_input("database_edit_denied"))?;
+  if let Some(blob) = history_blob {
+    let expected = proof
+      .history_hash
+      .as_deref()
+      .ok_or_else(|| RuntimeError::invalid_input("database_edit_denied"))?;
+    if expected != hex::encode(Sha256::digest(blob)) {
+      return Err(RuntimeError::invalid_input("database_validation_stale"));
+    }
+  }
+  if proof.state_hash != database_state_hash(transaction, workspace_id, doc_id).await? {
+    return Err(RuntimeError::invalid_input("database_validation_stale"));
+  }
+  if let Some(expires_at) = proof.expires_at {
+    let now = sqlx::query_scalar::<_, f64>("SELECT EXTRACT(EPOCH FROM clock_timestamp())::double precision * 1000")
+      .fetch_one(&mut **transaction)
+      .await
+      .map_err(|error| RuntimeError::database("load database editing clock", error))?;
+    if !expires_at.is_finite() || now >= expires_at {
+      return Err(RuntimeError::invalid_input("database_edit_denied"));
+    }
+  }
+  Ok(())
+}
+
+pub(super) async fn database_state_hash(
+  transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+  workspace_id: &str,
+  doc_id: &str,
+) -> RuntimeResult<String> {
+  let snapshot = sqlx::query_scalar::<_, Vec<u8>>("SELECT blob FROM snapshots WHERE workspace_id=$1 AND guid=$2")
+    .bind(workspace_id)
+    .bind(doc_id)
+    .fetch_optional(&mut **transaction)
+    .await
+    .map_err(|error| RuntimeError::database("load database validation snapshot", error))?;
+  let mut hash = Sha256::new();
+  hash.update((snapshot.as_deref().unwrap_or_default().len() as u64).to_be_bytes());
+  hash.update(snapshot.as_deref().unwrap_or_default());
+  let mut updates = sqlx::query_scalar::<_, Vec<u8>>(
+    "SELECT blob FROM updates WHERE workspace_id=$1 AND guid=$2 ORDER BY created_at ASC",
+  )
+  .bind(workspace_id)
+  .bind(doc_id)
+  .fetch(&mut **transaction);
+  while let Some(update) = updates
+    .try_next()
+    .await
+    .map_err(|error| RuntimeError::database("load database validation updates", error))?
+  {
+    hash.update((update.len() as u64).to_be_bytes());
+    hash.update(update);
+  }
+  Ok(hex::encode(hash.finalize()))
+}
 
 #[napi_derive::napi(object)]
 pub struct AppendWorkspaceDocUpdatesInputV1 {
@@ -27,6 +111,7 @@ pub struct AppendWorkspaceDocUpdatesInputV1 {
   pub write_intent: WorkspaceDocWriteIntentV1,
   pub permission_doc_id: Option<String>,
   pub expected_permission_generation: Option<i64>,
+  pub database_validation: Option<DatabaseValidationV1>,
 }
 
 #[napi_derive::napi(string_enum = "snake_case")]
@@ -176,6 +261,25 @@ async fn append_authorized_updates(
     input.expected_permission_generation,
   )
   .await?;
+  if input.doc_id == input.workspace_id {
+    validate_workspace_root_updates_in(
+      &mut transaction,
+      &input.workspace_id,
+      input.updates.iter().map(|update| update.as_ref()),
+    )
+    .await
+    .map_err(super::to_napi_error)?;
+  }
+  validate_database_proof(
+    &mut transaction,
+    &input.workspace_id,
+    &input.doc_id,
+    &input.actor_user_id,
+    input.database_validation.as_ref(),
+    None,
+  )
+  .await
+  .map_err(super::to_napi_error)?;
   append_updates_in(
     transaction,
     invalidation,
@@ -396,6 +500,166 @@ mod tests {
       assert_eq!(invalidation.health().published, 2);
     }
 
+    // A role downgrade while waiting for locked permission facts cannot reuse
+    // the owner's proof-free authorization.
+    sqlx::query(
+      "INSERT INTO doc_grants(workspace_id,doc_id,principal_type,principal_id,role) \
+       VALUES($1,$2,'user',$3,'editor')",
+    )
+    .bind(&workspace_id)
+    .bind(&doc_id)
+    .bind(&user_id)
+    .execute(&pool)
+    .await?;
+    let mut downgrade = pool.begin().await?;
+    sqlx::query("UPDATE workspace_members SET role='member' WHERE workspace_id=$1 AND user_id=$2")
+      .bind(&workspace_id)
+      .bind(&user_id)
+      .execute(&mut *downgrade)
+      .await?;
+    let racing_pool = pool.clone();
+    let racing_workspace = workspace_id.clone();
+    let racing_doc = doc_id.clone();
+    let racing_actor = user_id.clone();
+    let downgraded_write = tokio::spawn(async move {
+      append_authorized_updates(
+        &racing_pool,
+        None,
+        crate::runtime::Deployment::Cloud,
+        Default::default(),
+        true,
+        AppendWorkspaceDocUpdatesInputV1 {
+          workspace_id: racing_workspace,
+          doc_id: racing_doc,
+          updates: vec![Buffer::from(vec![8])],
+          actor_user_id: racing_actor,
+          write_intent: WorkspaceDocWriteIntentV1::UpdateDoc,
+          permission_doc_id: None,
+          expected_permission_generation: None,
+          database_validation: None,
+        },
+      )
+      .await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    assert!(!downgraded_write.is_finished());
+    downgrade.commit().await?;
+    assert!(
+      downgraded_write
+        .await?
+        .unwrap_err()
+        .to_string()
+        .contains("database_edit_denied")
+    );
+    // Quota admission is computed from the active workspace owner, not from a
+    // cached projection. Restore that authority before testing proof failures.
+    let replacement_owner_id = format!("doc-writer-replacement-owner-{suffix}");
+    sqlx::query(
+      "INSERT INTO users(id,name,email,registered,email_verified,disabled) \
+       VALUES($1,'Replacement Owner',$2,true,now(),false)",
+    )
+    .bind(&replacement_owner_id)
+    .bind(format!("{replacement_owner_id}@example.com"))
+    .execute(&pool)
+    .await?;
+    sqlx::query("INSERT INTO workspace_members(workspace_id,user_id,role,state) VALUES($1,$2,'owner','active')")
+      .bind(&workspace_id)
+      .bind(&replacement_owner_id)
+      .execute(&pool)
+      .await?;
+    let mut proof_transaction = pool.begin().await?;
+    lock_workspace_doc_update(&mut proof_transaction, &workspace_id, &doc_id).await?;
+    let state_hash = database_state_hash(&mut proof_transaction, &workspace_id, &doc_id).await?;
+    proof_transaction.rollback().await?;
+    for (proof_hash, expires_at, code) in [
+      ("stale".to_string(), None, "database_validation_stale"),
+      (state_hash, Some(0.0), "database_edit_denied"),
+    ] {
+      let error = append_authorized_updates(
+        &pool,
+        None,
+        crate::runtime::Deployment::Cloud,
+        Default::default(),
+        true,
+        AppendWorkspaceDocUpdatesInputV1 {
+          workspace_id: workspace_id.clone(),
+          doc_id: doc_id.clone(),
+          updates: vec![Buffer::from(vec![9])],
+          actor_user_id: user_id.clone(),
+          write_intent: WorkspaceDocWriteIntentV1::UpdateDoc,
+          permission_doc_id: None,
+          expected_permission_generation: None,
+          database_validation: Some(DatabaseValidationV1 {
+            state_hash: proof_hash,
+            expires_at,
+            history_hash: None,
+          }),
+        },
+      )
+      .await
+      .unwrap_err();
+      assert!(error.to_string().contains(code), "{error}");
+    }
+    let mut blocked = pool.begin().await?;
+    lock_workspace_doc_update(&mut blocked, &workspace_id, &doc_id).await?;
+    let blocked_hash = database_state_hash(&mut blocked, &workspace_id, &doc_id).await?;
+    let deadline = chrono::Utc::now().timestamp_millis() as f64 + 200.0;
+    let racing_pool = pool.clone();
+    let racing_workspace = workspace_id.clone();
+    let racing_doc = doc_id.clone();
+    let racing_actor = user_id.clone();
+    let expired_write = tokio::spawn(async move {
+      append_authorized_updates(
+        &racing_pool,
+        None,
+        crate::runtime::Deployment::Cloud,
+        Default::default(),
+        true,
+        AppendWorkspaceDocUpdatesInputV1 {
+          workspace_id: racing_workspace,
+          doc_id: racing_doc,
+          updates: vec![Buffer::from(vec![10])],
+          actor_user_id: racing_actor,
+          write_intent: WorkspaceDocWriteIntentV1::UpdateDoc,
+          permission_doc_id: None,
+          expected_permission_generation: None,
+          database_validation: Some(DatabaseValidationV1 {
+            state_hash: blocked_hash,
+            expires_at: Some(deadline),
+            history_hash: None,
+          }),
+        },
+      )
+      .await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(!expired_write.is_finished());
+    blocked.commit().await?;
+    assert!(
+      expired_write
+        .await?
+        .unwrap_err()
+        .to_string()
+        .contains("database_edit_denied")
+    );
+    assert_eq!(
+      sqlx::query_scalar::<_, i64>("SELECT count(*) FROM updates WHERE workspace_id=$1 AND guid=$2")
+        .bind(&workspace_id)
+        .bind(&doc_id)
+        .fetch_one(&pool)
+        .await?,
+      3,
+    );
+    sqlx::query(
+      "UPDATE workspace_members SET role=CASE WHEN user_id=$2 THEN 'owner' ELSE 'member' END \
+       WHERE workspace_id=$1 AND user_id IN ($2,$3)",
+    )
+    .bind(&workspace_id)
+    .bind(&user_id)
+    .bind(&replacement_owner_id)
+    .execute(&pool)
+    .await?;
+
     let generation = runtime
       .get_sync_permission_generation_v1(workspace_id.clone())
       .await
@@ -425,6 +689,7 @@ mod tests {
           write_intent: WorkspaceDocWriteIntentV1::UpdateDoc,
           permission_doc_id: None,
           expected_permission_generation: Some(generation),
+          database_validation: None,
         },
       )
       .await
@@ -445,6 +710,7 @@ mod tests {
         write_intent: WorkspaceDocWriteIntentV1::UpdateDoc,
         permission_doc_id: None,
         expected_permission_generation: None,
+        database_validation: None,
       })
       .await;
     assert!(
@@ -542,6 +808,7 @@ mod tests {
           write_intent: WorkspaceDocWriteIntentV1::UpdateDoc,
           permission_doc_id: None,
           expected_permission_generation: Some(generation),
+          database_validation: None,
         },
       )
       .await
@@ -569,6 +836,7 @@ mod tests {
           write_intent: WorkspaceDocWriteIntentV1::CreateDoc,
           permission_doc_id: None,
           expected_permission_generation: None,
+          database_validation: None,
         })
         .await;
       assert_eq!(result.is_ok(), allowed, "{reserved_doc_id}: {result:?}");
@@ -601,6 +869,7 @@ mod tests {
         write_intent: WorkspaceDocWriteIntentV1::CreateDoc,
         permission_doc_id: None,
         expected_permission_generation: None,
+        database_validation: None,
       })
       .await;
     assert!(

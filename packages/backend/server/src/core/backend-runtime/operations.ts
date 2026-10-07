@@ -240,6 +240,11 @@ export class BackendRuntimeCoreOperations {
     writeIntent: 'update_doc' | 'create_doc';
     permissionDocId?: string;
     expectedPermissionGeneration?: number;
+    databaseValidation?: {
+      stateHash: string;
+      expiresAt?: number;
+      historyHash?: string;
+    };
   }): Promise<number> {
     return await this.measured('appendWorkspaceDocUpdatesV1', runtime =>
       runtime.appendWorkspaceDocUpdatesV1(input)

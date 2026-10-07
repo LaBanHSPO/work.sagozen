@@ -239,6 +239,7 @@ export interface AppendWorkspaceDocUpdatesInputV1 {
   writeIntent: WorkspaceDocWriteIntentV1
   permissionDocId?: string
   expectedPermissionGeneration?: number
+  databaseValidation?: DatabaseValidationV1
 }
 
 export interface AppendWorkspaceDocUpdatesTrustedInputV1 {
@@ -607,6 +608,13 @@ export interface CreateByokProfileInput {
  * A Buffer containing the y-octo document update binary
  */
 export declare function createDocWithMarkdown(title: string, markdown: string, docId: string): Buffer
+
+/** Internal proof emitted only by the trusted Yjs validator, never an HTTP input. */
+export interface DatabaseValidationV1 {
+  stateHash: string
+  expiresAt?: number
+  historyHash?: string
+}
 
 export interface DocumentEmbeddingProjectionInput {
   docId: string

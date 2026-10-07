@@ -1,9 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { TransactionalAdapterPrisma } from '@nestjs-cls/transactional-adapter-prisma';
-import { chunk } from 'lodash-es';
 
 import {
+  DocActionDenied,
   DocHistoryNotFound,
   DocNotFound,
   EventBus,
@@ -14,10 +14,16 @@ import {
 } from '../../../base';
 import { retryable } from '../../../base/utils/promise';
 import { Models } from '../../../models';
+import { WorkspaceRole } from '../../../models/common';
 import {
   backendRuntimeErrorCode,
   BackendRuntimeProvider,
 } from '../../backend-runtime';
+import {
+  DatabaseEditDenied,
+  validateDatabaseRecovery,
+  validateDatabaseUpdates,
+} from '../database-validation';
 import { DocStorageOptions } from '../options';
 import {
   DocRecord,
@@ -134,48 +140,66 @@ export class PgWorkspaceDocStorageAdapter extends DocStorageAdapter {
       return 0;
     }
 
-    updates = await this.filterValidDocUpdates(workspaceId, docId, updates);
-    if (!updates.length) return 0;
-
+    const trusted = 'trusted' in contract;
+    // Reject a malformed request atomically rather than silently saving its
+    // valid subset. Native and Yjs validation are independent admission gates.
+    const valid = await this.filterValidDocUpdates(workspaceId, docId, updates);
+    if (valid.length !== updates.length) {
+      throw new DocActionDenied({
+        spaceId: workspaceId,
+        docId,
+        action: 'Doc.Update',
+      });
+    }
     const isNewDoc = !(await this.models.doc.exists(workspaceId, docId));
-
-    let pendings = updates;
-    let done = 0;
     let timestamp = Date.now();
     try {
       const appendError = await retryable(async () => {
-        if (done !== 0) {
-          pendings = pendings.slice(done);
-        }
-
-        const batchCount = 10;
-        for (const batch of chunk(pendings, batchCount)) {
+        try {
           const input = {
             workspaceId,
             docId,
-            updates: batch.map(update => Buffer.from(update)),
+            updates: updates.map(update => Buffer.from(update)),
           };
-          try {
-            timestamp =
-              'trusted' in contract
-                ? await this.runtime.appendWorkspaceDocUpdatesTrustedV1({
-                    ...input,
-                    editorId,
-                  })
-                : await this.runtime.appendWorkspaceDocUpdatesV1({
-                    ...input,
-                    ...contract,
-                  });
-          } catch (error) {
-            // Missing documents are permanent failures; let sync acknowledge them.
-            if (backendRuntimeErrorCode(error) === 'doc_not_found') {
-              return new DocNotFound({ spaceId: workspaceId, docId });
-            }
-            throw error;
+          if (trusted) {
+            timestamp = await this.runtime.appendWorkspaceDocUpdatesTrustedV1({
+              ...input,
+              editorId,
+            });
+          } else {
+            // Generated here only; callers cannot supply a validation proof.
+            // Each retry reloads canonical state under the shared SQL lock.
+            const databaseValidation = await this.preflightDatabaseUpdates(
+              workspaceId,
+              docId,
+              contract.actorUserId,
+              updates
+            );
+            timestamp = await this.runtime.appendWorkspaceDocUpdatesV1({
+              ...input,
+              ...contract,
+              databaseValidation,
+            });
           }
-          done += batch.length;
+          return undefined;
+        } catch (error) {
+          const code = backendRuntimeErrorCode(error);
+          if (code === 'doc_not_found') {
+            return new DocNotFound({ spaceId: workspaceId, docId });
+          }
+          if (
+            error instanceof DatabaseEditDenied ||
+            code === 'database_edit_denied' ||
+            code === 'doc_lifecycle_requires_command'
+          ) {
+            return new DocActionDenied({
+              spaceId: workspaceId,
+              docId,
+              action: 'Doc.Update',
+            });
+          }
+          throw error;
         }
-        return undefined;
       });
       if (appendError) throw appendError;
 
@@ -187,12 +211,163 @@ export class PgWorkspaceDocStorageAdapter extends DocStorageAdapter {
         });
       }
     } catch (e) {
-      if (e instanceof DocNotFound) throw e;
+      if (e instanceof DocNotFound || e instanceof DocActionDenied) throw e;
       this.logger.error('Failed to insert doc updates', e);
       metrics.doc.counter('doc_update_insert_failed').add(1);
       throw new FailedToSaveUpdates();
     }
     return timestamp;
+  }
+
+  async appendRootUpdate(
+    workspaceId: string,
+    actorUserId: string,
+    update: string,
+    expectedPermissionGeneration: number
+  ) {
+    let timestamp = 0;
+    const error = await retryable(async () => {
+      try {
+        const databaseValidation = await this.preflightDatabaseUpdates(
+          workspaceId,
+          workspaceId,
+          actorUserId,
+          [Buffer.from(update, 'base64')]
+        );
+        const output = await this.runtime.executeDomainCommandV1({
+          command: 'append_root_update',
+          actorUserId,
+          workspaceId,
+          update,
+          assertPermission: true,
+          expectedPermissionGeneration,
+          databaseValidation,
+        });
+        timestamp = new Date(output.timestamp as string).getTime();
+        return undefined;
+      } catch (error) {
+        const code = backendRuntimeErrorCode(error);
+        if (
+          error instanceof DatabaseEditDenied ||
+          code === 'database_edit_denied' ||
+          code === 'doc_lifecycle_requires_command'
+        ) {
+          return new DocActionDenied({
+            spaceId: workspaceId,
+            docId: workspaceId,
+            action: 'Doc.Update',
+          });
+        }
+        throw error;
+      }
+    });
+    if (error) throw error;
+    return timestamp;
+  }
+
+  @Transactional<TransactionalAdapterPrisma>({ timeout: 60000 })
+  private async preflightDatabaseUpdates(
+    workspaceId: string,
+    docId: string,
+    actorUserId: string,
+    updates: Uint8Array[]
+  ) {
+    await this.models.doc.lockDocContent(workspaceId, docId);
+    const member = await this.models.workspaceUser.getActive(
+      workspaceId,
+      actorUserId
+    );
+    if (
+      member?.type === WorkspaceRole.Owner ||
+      member?.type === WorkspaceRole.Admin
+    ) {
+      // Native rechecks role under its authorization locks. A concurrent
+      // downgrade fails closed because a nonprivileged append requires proof.
+      return undefined;
+    }
+    const snapshot = await this.models.doc.get(workspaceId, docId);
+    const persisted = await this.models.doc.findAllUpdates(workspaceId, docId);
+    return validateDatabaseUpdates(
+      snapshot?.blob ?? null,
+      persisted.map(row => row.blob),
+      updates
+    );
+  }
+
+  @Transactional<TransactionalAdapterPrisma>({ timeout: 60000 })
+  private async preflightDatabaseRecovery(
+    workspaceId: string,
+    docId: string,
+    actorUserId: string,
+    timestamp: number
+  ) {
+    await this.models.doc.lockDocContent(workspaceId, docId);
+    const member = await this.models.workspaceUser.getActive(
+      workspaceId,
+      actorUserId
+    );
+    if (
+      member?.type === WorkspaceRole.Owner ||
+      member?.type === WorkspaceRole.Admin
+    )
+      return undefined;
+    const snapshot = await this.models.doc.get(workspaceId, docId);
+    const persisted = await this.models.doc.findAllUpdates(workspaceId, docId);
+    const history = await this.models.history.get(
+      workspaceId,
+      docId,
+      timestamp
+    );
+    if (!history)
+      throw new DocHistoryNotFound({ spaceId: workspaceId, docId, timestamp });
+    return validateDatabaseRecovery(
+      snapshot?.blob ?? null,
+      persisted.map(row => row.blob),
+      history.blob
+    );
+  }
+
+  async recoverDoc(
+    workspaceId: string,
+    docId: string,
+    actorUserId: string,
+    timestamp: Date
+  ) {
+    const error = await retryable(async () => {
+      try {
+        const databaseValidation = await this.preflightDatabaseRecovery(
+          workspaceId,
+          docId,
+          actorUserId,
+          timestamp.getTime()
+        );
+        await this.runtime.executeDomainCommandV1({
+          command: 'recover_doc',
+          workspaceId,
+          docId,
+          actorUserId,
+          timestamp: timestamp.toISOString(),
+          databaseValidation,
+        });
+        return undefined;
+      } catch (error) {
+        const code = backendRuntimeErrorCode(error);
+        if (
+          error instanceof DatabaseEditDenied ||
+          code === 'database_edit_denied' ||
+          code === 'doc_lifecycle_requires_command'
+        ) {
+          return new DocActionDenied({
+            spaceId: workspaceId,
+            docId,
+            action: 'Doc.History.Recover',
+          });
+        }
+        if (error instanceof DocHistoryNotFound) return error;
+        throw error;
+      }
+    });
+    if (error) throw error;
   }
 
   protected async getDocUpdates(workspaceId: string, docId: string) {

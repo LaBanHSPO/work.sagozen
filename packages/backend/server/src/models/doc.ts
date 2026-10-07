@@ -125,6 +125,15 @@ export class DocModel extends BaseModel {
     return rows.map(r => this.updateToDocRecord(r));
   }
 
+  /** All persisted updates, without the compaction reader's 100-row cap. */
+  async findAllUpdates(workspaceId: string, docId: string): Promise<Doc[]> {
+    const rows = await this.db.update.findMany({
+      where: { workspaceId, id: docId },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map(row => this.updateToDocRecord(row));
+  }
+
   /**
    * Get the pending updates count by workspaceId and docId.
    */

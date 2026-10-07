@@ -3,10 +3,14 @@ use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use sqlx::{FromRow, Postgres, Row, Transaction};
 
-use super::{authorize_domain, invalidate_doc_blob_projection, lock_workspace_doc_update};
+use super::{
+  authorize_domain, invalidate_doc_blob_projection, lifecycle::validate_root_lifecycle_transition,
+  lock_workspace_doc_update,
+};
+use crate::runtime::backend_runtime::doc_writer::{DatabaseValidationV1, validate_database_proof};
 use crate::runtime::{
   RuntimeError, RuntimeResult,
-  backend_runtime::permission::PermissionAuthorizer,
+  backend_runtime::permission::{PermissionAuthorizer, active_workspace_owner_or_admin_in},
   storage_runtime::{CurrentDoc, CurrentDocUpdate, merge_current_doc},
 };
 
@@ -24,6 +28,7 @@ pub(super) async fn recover(
   doc_id: String,
   timestamp: DateTime<Utc>,
   embedding_schema_ready: bool,
+  database_validation: Option<DatabaseValidationV1>,
 ) -> RuntimeResult<Value> {
   let command = DomainCommand::RecoverDoc { doc_id: doc_id.clone() };
   authorize_domain(
@@ -37,7 +42,6 @@ pub(super) async fn recover(
   .await?;
 
   lock_workspace_doc_update(transaction, &workspace_id, &doc_id).await?;
-  invalidate_doc_blob_projection(transaction, &workspace_id, &doc_id, embedding_schema_ready).await?;
 
   let snapshot = sqlx::query_as::<_, LockedSnapshot>(
     "SELECT blob, updated_at FROM snapshots WHERE workspace_id=$1 AND guid=$2 FOR UPDATE",
@@ -75,6 +79,22 @@ pub(super) async fn recover(
   .await
   .map_err(|error| RuntimeError::database("load recovery history", error))?
   .ok_or_else(|| RuntimeError::invalid_input("doc_history_not_found"))?;
+  let history_blob = history
+    .try_get::<Vec<u8>, _>("blob")
+    .map_err(|error| RuntimeError::database("decode recovery history blob", error))?;
+  if workspace_id == doc_id && !active_workspace_owner_or_admin_in(transaction, &workspace_id, &actor_user_id).await? {
+    validate_root_lifecycle_transition(current.blob.clone(), &history_blob)?;
+  }
+  validate_database_proof(
+    transaction,
+    &workspace_id,
+    &doc_id,
+    &actor_user_id,
+    database_validation.as_ref(),
+    Some(&history_blob),
+  )
+  .await?;
+  invalidate_doc_blob_projection(transaction, &workspace_id, &doc_id, embedding_schema_ready).await?;
   sqlx::query(
     r#"INSERT INTO snapshot_histories
          (workspace_id, guid, timestamp, blob, state, expired_at, created_by)
@@ -107,11 +127,7 @@ pub(super) async fn recover(
   )
   .bind(&workspace_id)
   .bind(&doc_id)
-  .bind(
-    history
-      .try_get::<Vec<u8>, _>("blob")
-      .map_err(|error| RuntimeError::database("decode recovery history blob", error))?,
-  )
+  .bind(history_blob)
   .bind(
     history
       .try_get::<Option<Vec<u8>>, _>("state")
@@ -132,6 +148,78 @@ pub(super) async fn recover(
 mod tests {
   use super::*;
   use crate::runtime::Deployment;
+  use sha2::Digest;
+
+  #[tokio::test]
+  async fn root_recovery_cannot_delete_documents_for_member_document_owners() {
+    let _guard = crate::runtime::migrations::DATABASE_TEST_LOCK.lock().await;
+    let Some((pool, workspace_id, actor_user_id)) = super::super::test_support::owner_workspace().await else {
+      return;
+    };
+    let root = affine_doc_loader::add_doc_to_root_doc(vec![0, 0], "kept-document", None).unwrap();
+    let timestamp = Utc::now() - chrono::Duration::minutes(10);
+    sqlx::query("INSERT INTO snapshots(workspace_id,guid,blob,size,updated_at) VALUES($1,$1,$2,$3,now())")
+      .bind(&workspace_id)
+      .bind(&root)
+      .bind(root.len() as i64)
+      .execute(&pool)
+      .await
+      .unwrap();
+    let timestamp = sqlx::query_scalar::<_, DateTime<Utc>>(
+      "INSERT INTO snapshot_histories(workspace_id,guid,timestamp,blob,expired_at) \
+       VALUES($1,$1,$2,$3,now()+interval '30 days') RETURNING timestamp",
+    )
+    .bind(&workspace_id)
+    .bind(timestamp)
+    .bind(vec![0u8, 0])
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+      "INSERT INTO doc_grants(workspace_id,doc_id,principal_type,principal_id,role) VALUES($1,$1,'user',$2,'owner')",
+    )
+    .bind(&workspace_id)
+    .bind(&actor_user_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+      "INSERT INTO entitlements(id,target_type,target_id,source,plan,status) \
+       VALUES($1,'workspace',$2,'admin_grant','team','active')",
+    )
+    .bind(format!("root-recovery-entitlement-{workspace_id}"))
+    .bind(&workspace_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let authorizer = PermissionAuthorizer::new(pool.clone(), Deployment::Cloud);
+    for (role, allowed) in [("owner", true), ("admin", true), ("member", false)] {
+      let mut transaction = pool.begin().await.unwrap();
+      sqlx::query("UPDATE workspace_members SET role=$3 WHERE workspace_id=$1 AND user_id=$2")
+        .bind(&workspace_id)
+        .bind(&actor_user_id)
+        .bind(role)
+        .execute(&mut *transaction)
+        .await
+        .unwrap();
+      let recovered = recover(
+        &authorizer,
+        &mut transaction,
+        actor_user_id.clone(),
+        workspace_id.clone(),
+        workspace_id.clone(),
+        timestamp,
+        true,
+        None,
+      )
+      .await;
+      assert_eq!(recovered.is_ok(), allowed, "{role}");
+      if let Err(error) = recovered {
+        assert!(error.to_string().contains("doc_lifecycle_requires_command"));
+      }
+      transaction.rollback().await.unwrap();
+    }
+  }
 
   #[tokio::test]
   async fn recovery_archives_current_content_and_restores_target_content() {
@@ -197,6 +285,98 @@ mod tests {
     .unwrap();
 
     let authorizer = PermissionAuthorizer::new(pool.clone(), Deployment::Cloud);
+    sqlx::query(
+      "INSERT INTO doc_grants(workspace_id,doc_id,principal_type,principal_id,role) \
+       VALUES($1,$2,'user',$3,'owner')",
+    )
+    .bind(&workspace_id)
+    .bind(&doc_id)
+    .bind(&actor_user_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE workspace_members SET role='member' WHERE workspace_id=$1 AND user_id=$2")
+      .bind(&workspace_id)
+      .bind(&actor_user_id)
+      .execute(&pool)
+      .await
+      .unwrap();
+    let mut proof_transaction = pool.begin().await.unwrap();
+    lock_workspace_doc_update(&mut proof_transaction, &workspace_id, &doc_id)
+      .await
+      .unwrap();
+    let state_hash =
+      crate::runtime::backend_runtime::doc_writer::database_state_hash(&mut proof_transaction, &workspace_id, &doc_id)
+        .await
+        .unwrap();
+    proof_transaction.rollback().await.unwrap();
+    for (proof, code) in [
+      (None, "database_edit_denied"),
+      (
+        Some(DatabaseValidationV1 {
+          state_hash: state_hash.clone(),
+          expires_at: None,
+          history_hash: None,
+        }),
+        "database_edit_denied",
+      ),
+      (
+        Some(DatabaseValidationV1 {
+          state_hash: state_hash.clone(),
+          expires_at: None,
+          history_hash: Some("changed".to_string()),
+        }),
+        "database_validation_stale",
+      ),
+      (
+        Some(DatabaseValidationV1 {
+          state_hash: "changed".to_string(),
+          expires_at: None,
+          history_hash: Some(hex::encode(sha2::Sha256::digest(&target_blob))),
+        }),
+        "database_validation_stale",
+      ),
+    ] {
+      let mut rejected = pool.begin().await.unwrap();
+      let error = recover(
+        &authorizer,
+        &mut rejected,
+        actor_user_id.clone(),
+        workspace_id.clone(),
+        doc_id.clone(),
+        target_timestamp,
+        true,
+        proof,
+      )
+      .await
+      .unwrap_err();
+      assert_eq!(error.to_string(), code);
+      rejected.rollback().await.unwrap();
+    }
+    assert_eq!(
+      sqlx::query_scalar::<_, Vec<u8>>("SELECT blob FROM snapshots WHERE workspace_id=$1 AND guid=$2")
+        .bind(&workspace_id)
+        .bind(&doc_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+      current_blob,
+    );
+    assert_eq!(
+      sqlx::query_scalar::<_, i64>("SELECT count(*) FROM updates WHERE workspace_id=$1 AND guid=$2")
+        .bind(&workspace_id)
+        .bind(&doc_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+      1,
+    );
+    sqlx::query("UPDATE workspace_members SET role='owner' WHERE workspace_id=$1 AND user_id=$2")
+      .bind(&workspace_id)
+      .bind(&actor_user_id)
+      .execute(&pool)
+      .await
+      .unwrap();
     let mut transaction = pool.begin().await.unwrap();
     recover(
       &authorizer,
@@ -206,6 +386,7 @@ mod tests {
       doc_id.clone(),
       target_timestamp,
       true,
+      None,
     )
     .await
     .unwrap();

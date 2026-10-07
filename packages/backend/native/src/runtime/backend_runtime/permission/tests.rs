@@ -178,6 +178,109 @@ async fn canonical_doc_acl_facts_are_evaluated_without_search_state() {
 }
 
 #[tokio::test]
+async fn document_deletion_capabilities_require_active_workspace_owner_or_admin() {
+  let _guard = PERMISSION_TEST_LOCK.lock().await;
+  let Some((pool, workspace_id, user_id)) = setup().await else {
+    return;
+  };
+  sqlx::query(
+    "INSERT INTO entitlements(id,target_type,target_id,source,plan,status) \
+     VALUES($1,'workspace',$2,'admin_grant','team','active')",
+  )
+  .bind(format!("doc-delete-entitlement-{workspace_id}"))
+  .bind(&workspace_id)
+  .execute(&pool)
+  .await
+  .unwrap();
+  sqlx::query("INSERT INTO doc_access_policies(workspace_id,doc_id,member_default_role) VALUES($1,'doc','none')")
+    .bind(&workspace_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+  sqlx::query(
+    "INSERT INTO doc_grants(workspace_id,doc_id,principal_type,principal_id,role) VALUES($1,'doc','user',$2,'owner')",
+  )
+  .bind(&workspace_id)
+  .bind(&user_id)
+  .execute(&pool)
+  .await
+  .unwrap();
+  let authorizer = PermissionAuthorizer::new(pool.clone(), Deployment::Cloud);
+  let request = || AuthorizePermissionInputV1 {
+    version: 1,
+    workspace_id: workspace_id.clone(),
+    actor_user_id: Some(user_id.clone()),
+    workspace_actions: Vec::new(),
+    docs: vec![AuthorizePermissionDocInputV1 {
+      doc_id: "doc".to_string(),
+      actions: ["Doc.Trash", "Doc.Delete", "Doc.Restore", "Doc.Update"]
+        .into_iter()
+        .map(str::to_string)
+        .collect(),
+    }],
+  };
+  for (workspace_role, state, doc_role, allowed) in [
+    ("member", "active", "owner", false),
+    ("member", "active", "manager", false),
+    ("owner", "active", "reader", true),
+    ("admin", "active", "reader", true),
+    ("owner", "suspended", "owner", false),
+    ("admin", "suspended", "owner", false),
+    ("owner", "removed", "owner", false),
+    ("admin", "removed", "owner", false),
+  ] {
+    sqlx::query("UPDATE workspace_members SET role=$3,state=$4 WHERE workspace_id=$1 AND user_id=$2")
+      .bind(&workspace_id)
+      .bind(&user_id)
+      .bind(workspace_role)
+      .bind(state)
+      .execute(&pool)
+      .await
+      .unwrap();
+    sqlx::query("UPDATE doc_grants SET role=$3 WHERE workspace_id=$1 AND principal_id=$2")
+      .bind(&workspace_id)
+      .bind(&user_id)
+      .bind(doc_role)
+      .execute(&pool)
+      .await
+      .unwrap();
+    let result = authorizer.authorize(request()).await.unwrap();
+    let decisions = &result.docs[0].decisions;
+    for decision in &decisions[..2] {
+      assert_eq!(
+        decision.allowed, allowed,
+        "{workspace_role}/{state}/{doc_role}: {}",
+        decision.action
+      );
+    }
+    if workspace_role == "member" && state == "active" {
+      assert!(decisions[2].allowed, "restore retains document-manager permissions");
+      assert!(decisions[3].allowed, "document editing is not a destructive action");
+    }
+  }
+
+  // An assigned administrator still obeys the existing commercial access cap.
+  sqlx::query("UPDATE workspace_members SET role='admin',state='active' WHERE workspace_id=$1 AND user_id=$2")
+    .bind(&workspace_id)
+    .bind(&user_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+  sqlx::query("DELETE FROM doc_grants WHERE workspace_id=$1")
+    .bind(&workspace_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+  sqlx::query("DELETE FROM entitlements WHERE target_type='workspace' AND target_id=$1")
+    .bind(&workspace_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+  let capped = authorizer.authorize(request()).await.unwrap();
+  assert!(capped.docs[0].decisions.iter().all(|decision| !decision.allowed));
+}
+
+#[tokio::test]
 async fn entitlement_start_time_changes_loaded_admin_cap() {
   let _guard = PERMISSION_TEST_LOCK.lock().await;
   let Some((pool, workspace_id, user_id)) = setup().await else {

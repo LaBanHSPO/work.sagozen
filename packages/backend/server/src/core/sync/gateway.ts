@@ -1471,30 +1471,12 @@ export class SpaceSyncGateway
       spaceType === SpaceType.Workspace && docId === spaceId;
     let timestamp: number;
     if (canonicalRoot) {
-      let output: Record<string, unknown>;
-      try {
-        output = await this.runtime.executeDomainCommandV1({
-          command: 'append_root_update',
-          actorUserId: user.id,
-          workspaceId: spaceId,
-          update,
-          assertPermission: true,
-          expectedPermissionGeneration: permissionGeneration,
-        });
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes('doc_lifecycle_requires_command')
-        ) {
-          throw new DocActionDenied({
-            action: 'Doc.Update',
-            docId,
-            spaceId,
-          });
-        }
-        throw error;
-      }
-      timestamp = new Date(output.timestamp as string).getTime();
+      timestamp = await this.workspace.appendRootUpdate(
+        spaceId,
+        user.id,
+        update,
+        permissionGeneration
+      );
     } else {
       try {
         timestamp = await adapter.push(

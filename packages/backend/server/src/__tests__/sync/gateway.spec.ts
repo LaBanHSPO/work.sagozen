@@ -1346,7 +1346,7 @@ test('active users metric should dedupe multiple sockets for one user', async t 
   }
 });
 
-test('workspace sync delete-doc should enforce doc permissions', async t => {
+test('workspace sync rejects member document owners and managers deleting documents', async t => {
   const db = app.get(PrismaClient);
   const models = app.get(Models);
   const { user: owner, cookieHeader: ownerCookieHeader } = await login(app);
@@ -1395,15 +1395,34 @@ test('workspace sync delete-doc should enforce doc permissions', async t => {
     );
     t.true(join.success);
 
-    const error = getErrorResponse(
-      t,
-      await emitWithAck(socket, 'space:delete-doc', {
-        spaceType: 'workspace',
-        spaceId: workspace.id,
-        docId,
-      })
-    );
-    t.true(error.message.includes('Doc.Delete'));
+    for (const docRole of [DocRole.Manager, DocRole.Owner]) {
+      await models.docUser.set(workspace.id, docId, collaborator.id, docRole);
+      const error = getErrorResponse(
+        t,
+        await emitWithAck(socket, 'space:delete-doc', {
+          spaceType: 'workspace',
+          spaceId: workspace.id,
+          docId,
+        })
+      );
+      t.true(error.message.includes('Doc.Delete'));
+      for (const lifecycle of ['trash', 'delete'] as const) {
+        const lifecycleError = getErrorResponse(
+          t,
+          await emitWithAck(socket, 'space:doc-lifecycle', {
+            spaceType: 'workspace',
+            spaceId: workspace.id,
+            docId,
+            lifecycle,
+          })
+        );
+        t.true(
+          lifecycleError.message.includes(
+            lifecycle === 'trash' ? 'Doc.Trash' : 'Doc.Delete'
+          )
+        );
+      }
+    }
 
     const userdataError = getErrorResponse(
       t,

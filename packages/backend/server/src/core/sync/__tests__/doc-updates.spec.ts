@@ -25,6 +25,9 @@ function createSync() {
     {} as never,
     runtime as never
   );
+  Object.defineProperty(storage, 'preflightDatabaseUpdates', {
+    value: async () => ({ stateHash: 'authorized-canonical-state' }),
+  });
   const gateway = new SpaceSyncGateway(
     {} as never,
     storage,
@@ -101,10 +104,10 @@ test('missing workspace documents are acknowledged without retry or broadcast, a
   t.is(sync.broadcast.firstCall.args[1].docId, 'new-doc');
 });
 
-test('storage preserves missing document errors and stops remaining update batches', async t => {
+test('storage preserves missing document errors without retry or publication', async t => {
   const sync = createSync();
   sync.append
-    .onCall(1)
+    .onFirstCall()
     .rejects(new BackendRuntimeError('doc_not_found', 'doc_not_found'));
 
   await t.throwsAsync(
@@ -117,7 +120,7 @@ test('storage preserves missing document errors and stops remaining update batch
       ),
     { instanceOf: DocNotFound }
   );
-  t.is(sync.append.callCount, 2);
+  t.is(sync.append.callCount, 1);
   t.false(sync.created.called);
 });
 

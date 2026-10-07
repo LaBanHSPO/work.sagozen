@@ -13,7 +13,6 @@ import type { SnapshotHistory } from '@prisma/client';
 
 import { canonicalizeDocumentIdentity } from '../../../native';
 import { CurrentUser } from '../../auth';
-import { BackendRuntimeProvider } from '../../backend-runtime';
 import { PgWorkspaceDocStorageAdapter } from '../../doc';
 import { PermissionAccess } from '../../permission';
 import { WorkspaceType } from '../types';
@@ -38,8 +37,7 @@ class DocHistoryType implements Partial<SnapshotHistory> {
 export class DocHistoryResolver {
   constructor(
     private readonly workspace: PgWorkspaceDocStorageAdapter,
-    private readonly ac: PermissionAccess,
-    private readonly runtime: BackendRuntimeProvider
+    private readonly ac: PermissionAccess
   ) {}
 
   @ResolveField(() => [DocHistoryType])
@@ -81,13 +79,12 @@ export class DocHistoryResolver {
   ): Promise<Date> {
     const docId = canonicalizeDocumentIdentity(guid, workspaceId);
 
-    await this.runtime.executeDomainCommandV1({
-      command: 'recover_doc',
-      actorUserId: user.id,
-      workspaceId: docId.workspaceId,
-      docId: docId.docId,
-      timestamp: timestamp.toISOString(),
-    });
+    await this.workspace.recoverDoc(
+      docId.workspaceId,
+      docId.docId,
+      user.id,
+      timestamp
+    );
 
     return timestamp;
   }

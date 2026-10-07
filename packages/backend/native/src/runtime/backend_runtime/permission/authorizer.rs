@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use affine_core::access_control::{
-  AuthorizationDecision, AuthorizationRequest, CommandAuthorizationDecision, CommandDenialReason, CommandFacts,
-  CommandPermission, CommandQuotaFacts, Decision, DocAction, DocAuthorizationRequest, DomainCommand, WorkspaceAction,
-  WorkspaceRole, authorize, authorize_command,
+  AclFacts, AuthorizationDecision, AuthorizationRequest, CommandAuthorizationDecision, CommandDenialReason,
+  CommandFacts, CommandPermission, CommandQuotaFacts, Decision, DenialReason, DocAction, DocAuthorizationRequest,
+  DocLifecycleCommand, DomainCommand, WorkspaceAction, WorkspaceRole, authorize, authorize_command,
 };
 use sqlx::{PgPool, Postgres, Transaction};
 
@@ -292,7 +292,7 @@ impl PermissionAuthorizer {
       .store
       .command_snapshot_in(transaction, workspace_id, actor_user_id, doc_id)
       .await?;
-    let decision = authorize_command(
+    let mut decision = authorize_command(
       command,
       CommandFacts {
         acl: &snapshot.facts,
@@ -300,6 +300,23 @@ impl PermissionAuthorizer {
         quota,
       },
     );
+    if !can_delete_workspace_docs(&snapshot.facts) {
+      let action = match command {
+        DomainCommand::ApplyDocLifecycle {
+          lifecycle: DocLifecycleCommand::Trash,
+          ..
+        } => Some(DocAction::Trash),
+        DomainCommand::ApplyDocLifecycle {
+          lifecycle: DocLifecycleCommand::Delete,
+          ..
+        } => Some(DocAction::Delete),
+        _ => None,
+      };
+      if let Some(action) = action {
+        decision.allowed = false;
+        decision.denial_reason = Some(CommandDenialReason::Permission(CommandPermission::Doc(action)));
+      }
+    }
     command_decision_result(decision, command)
   }
 
@@ -364,7 +381,18 @@ impl PermissionAuthorizer {
 }
 
 fn evaluate_snapshot(snapshot: PermissionSnapshot) -> RuntimeResult<AuthorizedPermission> {
-  let decision = authorize(&snapshot.request, &snapshot.facts, &snapshot.grant);
+  let mut decision = authorize(&snapshot.request, &snapshot.facts, &snapshot.grant);
+  if !can_delete_workspace_docs(&snapshot.facts) {
+    for doc in &mut decision.docs {
+      for action in &mut doc.decisions {
+        if matches!(action.action.as_str(), "Doc.Trash" | "Doc.Delete") {
+          action.allowed = false;
+          action.source = None;
+          action.denial_reason = Some(DenialReason::WorkspaceAdminRequired);
+        }
+      }
+    }
+  }
   let effective_workspace_role = decision.effective_workspace_role;
   let output = permission_evaluation_output(decision.clone());
   Ok(AuthorizedPermission {
@@ -372,6 +400,33 @@ fn evaluate_snapshot(snapshot: PermissionSnapshot) -> RuntimeResult<AuthorizedPe
     output,
     effective_workspace_role,
   })
+}
+
+/// Document ownership does not confer workspace-wide destructive authority.
+/// Keep the core access checks intact, including commercial caps on admins.
+fn can_delete_workspace_docs(facts: &AclFacts) -> bool {
+  facts.active_member
+    && matches!(
+      facts.assigned_workspace_role,
+      Some(WorkspaceRole::Owner | WorkspaceRole::Admin)
+    )
+}
+
+/// Read only while the actor membership is locked by domain authorization.
+pub(in crate::runtime::backend_runtime) async fn active_workspace_owner_or_admin_in(
+  transaction: &mut Transaction<'_, Postgres>,
+  workspace_id: &str,
+  actor_user_id: &str,
+) -> RuntimeResult<bool> {
+  sqlx::query_scalar(
+    "SELECT EXISTS(SELECT 1 FROM workspace_members WHERE workspace_id=$1 AND user_id=$2 AND \
+     state='active' AND role IN ('owner','admin'))",
+  )
+  .bind(workspace_id)
+  .bind(actor_user_id)
+  .fetch_one(&mut **transaction)
+  .await
+  .map_err(|error| RuntimeError::database("load active workspace deletion authority", error))
 }
 
 fn workspace_request(action: WorkspaceAction) -> AuthorizationRequest {

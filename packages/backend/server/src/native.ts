@@ -12,6 +12,7 @@ import serverNativeModule, {
   type CompileScopeInput,
   type ContentPolicyScanInput,
   type ContentPolicyScanResult,
+  type DatabaseValidationV1,
   type DocumentEmbeddingProjectionInput,
   type EmbeddingHealth,
   type EnsureWorkspaceBlobArtifactInput,
@@ -464,6 +465,7 @@ export type DomainCommandInputV1 =
       update: string;
       assertPermission: boolean;
       expectedPermissionGeneration?: number;
+      databaseValidation?: DatabaseValidationV1;
     }
   | {
       command: 'recover_doc';
@@ -471,6 +473,7 @@ export type DomainCommandInputV1 =
       workspaceId: string;
       docId: string;
       timestamp: string;
+      databaseValidation?: DatabaseValidationV1;
     }
   | {
       command: 'transition_workspace_role';

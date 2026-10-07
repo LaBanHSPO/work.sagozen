@@ -210,6 +210,7 @@ pub(in crate::runtime::backend_runtime) async fn execute(
       update,
       assert_permission,
       expected_permission_generation,
+      database_validation,
     } => {
       if !assert_permission {
         return Err(RuntimeError::invalid_input("permission_assertion_required"));
@@ -222,6 +223,7 @@ pub(in crate::runtime::backend_runtime) async fn execute(
         update,
         expected_permission_generation,
         embedding_schema_ready,
+        database_validation,
       )
       .await?
     }
@@ -230,6 +232,7 @@ pub(in crate::runtime::backend_runtime) async fn execute(
       workspace_id,
       doc_id,
       timestamp,
+      database_validation,
     } => {
       history::recover(
         &authorizer,
@@ -239,6 +242,7 @@ pub(in crate::runtime::backend_runtime) async fn execute(
         doc_id,
         timestamp,
         embedding_schema_ready,
+        database_validation,
       )
       .await?
     }
@@ -485,6 +489,7 @@ mod tests {
         update: "AA==".into(),
         assert_permission: false,
         expected_permission_generation: None,
+        database_validation: None,
       },
     )
     .await;

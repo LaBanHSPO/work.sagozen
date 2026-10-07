@@ -14,7 +14,7 @@ use affine_core::access_control::{CommandAuthorizationDecision, DomainCommand};
 use chrono::{DateTime, Utc};
 use comments::{load_target, lock_target, value};
 pub(super) use execute::execute;
-pub(super) use lifecycle::workspace_root_contains_active_doc;
+pub(super) use lifecycle::{validate_workspace_root_updates_in, workspace_root_contains_active_doc};
 use serde::Deserialize;
 use serde_json::Value;
 use sqlx::{Postgres, Transaction};
@@ -95,12 +95,14 @@ pub(super) enum DomainCommandInputV1 {
     update: String,
     assert_permission: bool,
     expected_permission_generation: Option<i64>,
+    database_validation: Option<super::doc_writer::DatabaseValidationV1>,
   },
   RecoverDoc {
     actor_user_id: String,
     workspace_id: String,
     doc_id: String,
     timestamp: chrono::DateTime<chrono::Utc>,
+    database_validation: Option<super::doc_writer::DatabaseValidationV1>,
   },
   TransitionWorkspaceRole {
     actor_user_id: String,
