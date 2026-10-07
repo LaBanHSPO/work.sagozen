@@ -9,7 +9,6 @@ import {
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { DocsService } from '@affine/core/modules/doc';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
-import { GuardService } from '@affine/core/modules/permissions';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { useI18n } from '@affine/i18n';
 import track from '@affine/track';
@@ -23,6 +22,7 @@ import {
 import { useLiveData, useService } from '@toeverything/infra';
 import { useCallback, useContext } from 'react';
 
+import { useGuard } from '../../guard';
 import { useBlockSuiteMetaHelper } from '../../hooks/affine/use-block-suite-meta-helper';
 import { IsFavoriteIcon } from '../../pure/icons';
 import { DocExplorerContext } from '../context';
@@ -97,7 +97,6 @@ const NewTab = ({ docId }: DocOperationProps) => {
   );
 };
 
-
 /**
  * Duplicate Operation
  */
@@ -127,9 +126,7 @@ const MoveToTrash = ({ docId }: DocOperationProps) => {
   const docsService = useService(DocsService);
   const { openConfirmModal } = useConfirmModal();
   const doc = useLiveData(docsService.list.doc$(docId));
-  const guardService = useService(GuardService);
-
-  const canTrash = useLiveData(guardService.can$('Doc_Trash', docId));
+  const canTrash = useGuard('Doc_Trash', docId);
 
   const onMoveToTrash = useCallback(() => {
     if (!doc) {

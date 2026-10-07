@@ -12,14 +12,11 @@ import { WorkbenchService } from '@affine/core/modules/workbench';
 import { UserFriendlyError } from '@affine/error';
 import { useI18n } from '@affine/i18n';
 import track from '@affine/track';
-import {
-  DeleteIcon,
-  OpenInNewIcon,
-  ResetIcon,
-} from '@blocksuite/icons/rc';
+import { DeleteIcon, OpenInNewIcon, ResetIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useService } from '@toeverything/infra';
 import { memo, useCallback, useContext } from 'react';
 
+import { useGuard } from '../../guard';
 import { useBlockSuiteMetaHelper } from '../../hooks/affine/use-block-suite-meta-helper';
 import { IsFavoriteIcon } from '../../pure/icons';
 import { DocExplorerContext } from '../context';
@@ -97,7 +94,6 @@ export const QuickTab = memo(function QuickTab({
   );
 });
 
-
 export const QuickDelete = memo(function QuickDelete({
   doc,
   onClick,
@@ -107,6 +103,7 @@ export const QuickDelete = memo(function QuickDelete({
   const { openConfirmModal } = useConfirmModal();
   const contextValue = useContext(DocExplorerContext);
   const guardService = useService(GuardService);
+  const canTrash = useGuard('Doc_Trash', doc.id);
   const quickTrash = useLiveData(contextValue.quickTrash$);
 
   const onMoveToTrash = useCallback(
@@ -148,7 +145,7 @@ export const QuickDelete = memo(function QuickDelete({
     [doc, guardService, onClick, openConfirmModal, t]
   );
 
-  if (!quickTrash) {
+  if (!quickTrash || !canTrash) {
     return null;
   }
 
@@ -210,6 +207,7 @@ export const QuickDeletePermanently = memo(function QuickDeletePermanently({
 }: QuickActionProps) {
   const t = useI18n();
   const guardService = useService(GuardService);
+  const canDelete = useGuard('Doc_Delete', doc.id);
   const contextValue = useContext(DocExplorerContext);
   const { permanentlyDeletePage } = useBlockSuiteMetaHelper();
   const quickDeletePermanently = useLiveData(
@@ -250,7 +248,7 @@ export const QuickDeletePermanently = memo(function QuickDeletePermanently({
     [handleDeletePermanently, onClick, openConfirmModal, t]
   );
 
-  if (!quickDeletePermanently) {
+  if (!quickDeletePermanently || !canDelete) {
     return null;
   }
 
@@ -282,7 +280,7 @@ export const QuickRestore = memo(function QuickRestore({
       e.stopPropagation();
       e.preventDefault();
       guardService
-        .can('Doc_Delete', doc.id)
+        .can('Doc_Restore', doc.id)
         .then(async can => {
           if (can) {
             await restoreFromTrash(doc.id);

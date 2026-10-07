@@ -63,6 +63,11 @@ export class GuardService extends Service {
     ...args: T extends DocPermissionActions ? [string] : []
   ): LiveData<boolean | undefined> {
     const docId = args[0];
+    const destructiveDocAction =
+      action === 'Doc_Trash' || action === 'Doc_Delete';
+    const localOwner =
+      this.workspaceService.workspace.flavour === 'local' &&
+      !this.workspaceService.workspace.openOptions.isSharedMode;
     return LiveData.from(
       new Observable(subscriber => {
         let prev: boolean | undefined = undefined;
@@ -77,10 +82,12 @@ export class GuardService extends Service {
           >,
           this.isAdmin$,
         ]).subscribe(([permissions, isAdmin]) => {
-          if (isAdmin) {
-            return subscriber.next(true);
-          }
-          const current = permissions[action] ?? undefined;
+          const current =
+            destructiveDocAction && !localOwner
+              ? permissions[action]
+              : isAdmin
+                ? true
+                : permissions[action];
           if (current !== prev) {
             prev = current;
             subscriber.next(current);
@@ -101,11 +108,17 @@ export class GuardService extends Service {
   ): Promise<boolean> {
     const docId = args[0];
 
+    const destructiveDocAction =
+      action === 'Doc_Trash' || action === 'Doc_Delete';
+    const localOwner =
+      this.workspaceService.workspace.flavour === 'local' &&
+      !this.workspaceService.workspace.openOptions.isSharedMode;
+
     if (this.isAdmin$.value === null) {
       await this.workspacePermissionService.permission.waitForRevalidation();
     }
 
-    if (this.isAdmin$.value === true) {
+    if (this.isAdmin$.value === true && (!destructiveDocAction || localOwner)) {
       return true;
     }
 
@@ -117,7 +130,7 @@ export class GuardService extends Service {
   }
 
   revalidateCan<T extends WorkspacePermissionActions | DocPermissionActions>(
-    _action: T,
+    action: T,
     ...args: T extends DocPermissionActions ? [string] : []
   ) {
     // revalidate workspace permission if it's not initialized
@@ -125,8 +138,12 @@ export class GuardService extends Service {
       this.workspacePermissionService.permission.revalidate();
     }
 
-    if (this.isAdmin$.value === true) {
-      // if the user is admin, the permission is always true
+    if (
+      this.isAdmin$.value === true &&
+      (this.workspaceService.workspace.flavour === 'local' ||
+        (action !== 'Doc_Trash' && action !== 'Doc_Delete'))
+    ) {
+      // Destructive document actions retain the server's access checks.
       return;
     }
 

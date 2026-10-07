@@ -9,6 +9,7 @@ import { type Framework } from '@toeverything/infra';
 
 import { CollectionRulesService } from '../collection-rules';
 import { WorkspaceDBService } from '../db';
+import { WorkspacePermissionService } from '../permissions';
 import { WorkspaceScope, WorkspaceService } from '../workspace';
 import { Collection } from './entities/collection';
 import { CollectionService } from './services/collection';
@@ -20,7 +21,7 @@ export function configureCollectionModule(framework: Framework) {
   framework
     .scope(WorkspaceScope)
     .service(CollectionService, [CollectionStore])
-    .store(CollectionStore, [WorkspaceService])
+    .store(CollectionStore, [WorkspaceService, WorkspacePermissionService])
     .entity(Collection, [CollectionStore, CollectionRulesService])
     .store(PinnedCollectionStore, [WorkspaceDBService])
     .service(PinnedCollectionService, [PinnedCollectionStore]);

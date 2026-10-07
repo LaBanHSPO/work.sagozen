@@ -19,10 +19,18 @@ export class WorkspacePermission extends Entity {
     this.store.watchWorkspacePermissionCache(),
     undefined
   );
-  isOwner$ = this.cache$.map(cache => cache?.isOwner ?? null);
-  isAdmin$ = this.cache$.map(cache => cache?.isAdmin ?? null);
-  isOwnerOrAdmin$ = this.cache$.map(
-    cache => (cache?.isOwner ?? null) || (cache?.isAdmin ?? null)
+  isOwner$ = this.cache$.map(cache =>
+    this.workspaceService.workspace.openOptions.isSharedMode
+      ? false
+      : (cache?.isOwner ?? null)
+  );
+  isAdmin$ = this.cache$.map(cache =>
+    this.workspaceService.workspace.openOptions.isSharedMode
+      ? false
+      : (cache?.isAdmin ?? null)
+  );
+  isOwnerOrAdmin$ = LiveData.computed(
+    get => get(this.isOwner$) || get(this.isAdmin$)
   );
   isTeam$ = this.cache$.map(cache => cache?.isTeam ?? null);
   isRevalidating$ = new LiveData(false);
@@ -49,6 +57,9 @@ export class WorkspacePermission extends Entity {
   revalidate = effect(
     exhaustMapWithTrailing(() => {
       return fromPromise(async signal => {
+        if (this.workspaceService.workspace.openOptions.isSharedMode) {
+          return { isOwner: false, isAdmin: false, isTeam: false };
+        }
         if (
           this.workspaceService.workspace.flavour !== 'local' &&
           !this.workspaceService.workspace.openOptions.isSharedMode
@@ -73,6 +84,10 @@ export class WorkspacePermission extends Entity {
           count: Infinity,
         }),
         tap(({ isOwner, isAdmin, isTeam }) => {
+          // Public-view permissions must not overwrite authenticated role facts.
+          if (this.workspaceService.workspace.openOptions.isSharedMode) {
+            return;
+          }
           this.store.setWorkspacePermissionCache({
             isOwner,
             isAdmin,

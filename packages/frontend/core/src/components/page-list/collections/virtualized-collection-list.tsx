@@ -1,3 +1,4 @@
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { Trans } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
@@ -31,6 +32,10 @@ export const VirtualizedCollectionList = ({
   const collectionService = useService(CollectionService);
   const collectionMetas = useLiveData(collectionService.collectionMetas$);
   const currentWorkspace = useService(WorkspaceService).workspace;
+  const canDelete =
+    useLiveData(
+      useService(WorkspacePermissionService).permission.isOwnerOrAdmin$
+    ) === true;
 
   const filteredSelectedCollectionIds = useMemo(() => {
     const ids = new Set(collectionMetas.map(collection => collection.id));
@@ -99,7 +104,7 @@ export const VirtualizedCollectionList = ({
           </Trans>
         }
         onClose={hideFloatingToolbar}
-        onDelete={handleDelete}
+        onDelete={canDelete ? handleDelete : undefined}
       />
     </>
   );

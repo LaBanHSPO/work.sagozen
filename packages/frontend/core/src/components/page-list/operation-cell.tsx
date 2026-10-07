@@ -14,6 +14,7 @@ import {
   CompatibleFavoriteItemsAdapter,
   FavoriteService,
 } from '@affine/core/modules/favorite';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
@@ -121,7 +122,6 @@ const PageOperationCellMenuItem = ({
       },
     });
   }, [docRecord, openConfirmModal, t]);
-
 
   const onOpenInNewTab = useCallback(() => {
     workbench.openDoc(page.id, { at: 'new-tab' });
@@ -337,6 +337,10 @@ export const CollectionOperationCell = ({
     CollectionService,
     WorkspaceService,
   });
+  const canDelete =
+    useLiveData(
+      useService(WorkspacePermissionService).permission.isOwnerOrAdmin$
+    ) === true;
   const { createPage } = usePageHelper(
     workspaceService.workspace.docCollection
   );
@@ -466,6 +470,7 @@ export const CollectionOperationCell = ({
                 prefixIcon={<DeleteIcon />}
                 type="danger"
                 data-testid="delete-collection"
+                disabled={!canDelete}
               >
                 {t['Delete']()}
               </MenuItem>
@@ -498,6 +503,10 @@ export const TagOperationCell = ({
   const { favoriteService } = useServices({
     FavoriteService,
   });
+  const canDelete =
+    useLiveData(
+      useService(WorkspacePermissionService).permission.isOwnerOrAdmin$
+    ) === true;
   const favourite = useLiveData(
     favoriteService.favoriteList.isFavorite$('tag', tag.id)
   );
@@ -548,6 +557,7 @@ export const TagOperationCell = ({
               type="danger"
               onSelect={handleDelete}
               data-testid="delete-tag"
+              disabled={!canDelete}
             >
               {t['Delete']()}
             </MenuItem>

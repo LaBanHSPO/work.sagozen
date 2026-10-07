@@ -9,6 +9,7 @@ export { useDeleteTagConfirmModal } from './view/delete-tag-modal';
 import { type Framework } from '@toeverything/infra';
 
 import { DocsService } from '../doc';
+import { WorkspacePermissionService } from '../permissions';
 import { WorkspaceScope, WorkspaceService } from '../workspace';
 import { Tag } from './entities/tag';
 import { TagList } from './entities/tag-list';
@@ -19,7 +20,7 @@ export function configureTagModule(framework: Framework) {
   framework
     .scope(WorkspaceScope)
     .service(TagService)
-    .store(TagStore, [WorkspaceService])
+    .store(TagStore, [WorkspaceService, WorkspacePermissionService])
     .entity(TagList, [TagStore, DocsService])
     .entity(Tag, [TagStore, DocsService]);
 }

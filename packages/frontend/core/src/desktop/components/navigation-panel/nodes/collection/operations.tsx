@@ -8,6 +8,7 @@ import { usePageHelper } from '@affine/core/blocksuite/block-suite-page-list/uti
 import { IsFavoriteIcon } from '@affine/core/components/pure/icons';
 import { CollectionService } from '@affine/core/modules/collection';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
@@ -34,13 +35,17 @@ export const useNavigationPanelCollectionNodeOperations = (
     workspaceService,
     collectionService,
     compatibleFavoriteItemsAdapter,
+    workspacePermissionService,
   } = useServices({
     WorkbenchService,
     WorkspaceService,
     CollectionService,
     CompatibleFavoriteItemsAdapter,
+    WorkspacePermissionService,
   });
 
+  const canDelete =
+    useLiveData(workspacePermissionService.permission.isOwnerOrAdmin$) === true;
   const { createPage } = usePageHelper(
     workspaceService.workspace.docCollection
   );
@@ -83,7 +88,6 @@ export const useNavigationPanelCollectionNodeOperations = (
       onConfirm: createAndAddDocument,
     });
   }, [createAndAddDocument, openConfirmModal, t]);
-
 
   const handleOpenInNewTab = useCallback(() => {
     workbenchService.workbench.openCollection(collectionId, { at: 'new-tab' });
@@ -172,6 +176,7 @@ export const useNavigationPanelCollectionNodeOperations = (
             prefixIcon={<DeleteIcon />}
             data-testid="collection-delete-button"
             onClick={handleDeleteCollection}
+            disabled={!canDelete}
           >
             {t['Delete']()}
           </MenuItem>
@@ -180,6 +185,7 @@ export const useNavigationPanelCollectionNodeOperations = (
     ],
     [
       favorite,
+      canDelete,
       handleAddDocToCollection,
       handleDeleteCollection,
       handleOpenInNewTab,

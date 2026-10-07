@@ -18,6 +18,7 @@ import type { TagColor, TagLike } from './types';
 
 type TagEditMenuProps = PropsWithChildren<{
   onTagDelete: (tagId: string) => void;
+  canDeleteTag?: boolean;
   colors: TagColor[];
   tag: TagLike;
   onTagChange: (property: keyof TagLike, value: string) => void;
@@ -27,6 +28,7 @@ type TagEditMenuProps = PropsWithChildren<{
 const DesktopTagEditMenu = ({
   tag,
   onTagDelete,
+  canDeleteTag = true,
   children,
   jumpToTag,
   colors,
@@ -69,6 +71,7 @@ const DesktopTagEditMenu = ({
             prefixIcon={<DeleteIcon />}
             type="danger"
             onClick={() => onTagDelete(tag.id)}
+            disabled={!canDeleteTag}
           >
             {t['Delete']()}
           </MenuItem>
@@ -112,7 +115,7 @@ const DesktopTagEditMenu = ({
         </>
       ),
     } satisfies Partial<MenuProps>;
-  }, [tag, t, jumpToTag, colors, onTagChange, onTagDelete]);
+  }, [tag, t, jumpToTag, colors, onTagChange, onTagDelete, canDeleteTag]);
 
   return <Menu {...menuProps}>{children}</Menu>;
 };
@@ -120,6 +123,7 @@ const DesktopTagEditMenu = ({
 const MobileTagEditMenu = ({
   tag,
   onTagDelete,
+  canDeleteTag = true,
   children,
   colors,
   onTagChange,
@@ -198,15 +202,17 @@ const MobileTagEditMenu = ({
           ))}
         </ConfigModal.RowGroup>
 
-        <ConfigModal.RowGroup>
-          <ConfigModal.Row
-            className={styles.mobileTagEditDeleteRow}
-            onClick={() => onTagDelete(tag.id)}
-          >
-            <DeleteIcon />
-            {t['Delete']()}
-          </ConfigModal.Row>
-        </ConfigModal.RowGroup>
+        {canDeleteTag && (
+          <ConfigModal.RowGroup>
+            <ConfigModal.Row
+              className={styles.mobileTagEditDeleteRow}
+              onClick={() => onTagDelete(tag.id)}
+            >
+              <DeleteIcon />
+              {t['Delete']()}
+            </ConfigModal.Row>
+          </ConfigModal.RowGroup>
+        )}
       </ConfigModal>
       <div onClick={handleTriggerClick} className={styles.mobileTagEditTrigger}>
         {children}

@@ -2,6 +2,7 @@ import type { MenuItemProps } from '@affine/component';
 import { Menu, MenuItem, usePromptModal } from '@affine/component';
 import { WorkspaceDialogService } from '@affine/core/modules/dialogs';
 import { CompatibleFavoriteItemsAdapter } from '@affine/core/modules/favorite';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { useI18n } from '@affine/i18n';
 import track from '@affine/track';
@@ -45,6 +46,10 @@ export const CollectionOperations = ({
   const workbench = workbenchService.workbench;
   const t = useI18n();
   const { openPromptModal } = usePromptModal();
+  const canDelete =
+    useLiveData(
+      useService(WorkspacePermissionService).permission.isOwnerOrAdmin$
+    ) === true;
 
   const showEditName = useCallback(() => {
     // use openRenameModal if it is in the sidebar collection list
@@ -77,7 +82,6 @@ export const CollectionOperations = ({
     });
   }, [workspaceDialogService, collection.id]);
 
-
   const openCollectionNewTab = useCallback(() => {
     workbench.openCollection(collection.id, { at: 'new-tab' });
   }, [collection.id, workbench]);
@@ -102,6 +106,7 @@ export const CollectionOperations = ({
           name: string;
           click: () => void;
           type?: MenuItemProps['type'];
+          disabled?: boolean;
           element?: undefined;
         }
       | {
@@ -151,10 +156,12 @@ export const CollectionOperations = ({
           service.deleteCollection(collection.id);
         },
         type: 'danger',
+        disabled: !canDelete,
       },
     ],
     [
       t,
+      canDelete,
       showEditName,
       showEdit,
       onAddDocToCollection,
@@ -180,6 +187,7 @@ export const CollectionOperations = ({
                 type={action.type}
                 prefixIcon={action.icon}
                 onClick={action.click}
+                disabled={action.disabled}
               >
                 {action.name}
               </MenuItem>

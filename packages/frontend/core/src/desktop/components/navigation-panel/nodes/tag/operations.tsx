@@ -3,16 +3,13 @@ import { usePageHelper } from '@affine/core/blocksuite/block-suite-page-list/uti
 import { IsFavoriteIcon } from '@affine/core/components/pure/icons';
 import { DocsService } from '@affine/core/modules/doc';
 import { FavoriteService } from '@affine/core/modules/favorite';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { TagService } from '@affine/core/modules/tag';
 import { WorkbenchService } from '@affine/core/modules/workbench';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { useI18n } from '@affine/i18n';
 import { track } from '@affine/track';
-import {
-  DeleteIcon,
-  OpenInNewIcon,
-  PlusIcon,
-} from '@blocksuite/icons/rc';
+import { DeleteIcon, OpenInNewIcon, PlusIcon } from '@blocksuite/icons/rc';
 import { useLiveData, useServices } from '@toeverything/infra';
 import { useCallback, useMemo } from 'react';
 
@@ -27,15 +24,23 @@ export const useNavigationPanelTagNodeOperations = (
   }
 ): NodeOperation[] => {
   const t = useI18n();
-  const { workbenchService, workspaceService, tagService, favoriteService } =
-    useServices({
-      WorkbenchService,
-      WorkspaceService,
-      TagService,
-      DocsService,
-      FavoriteService,
-    });
+  const {
+    workbenchService,
+    workspaceService,
+    tagService,
+    favoriteService,
+    workspacePermissionService,
+  } = useServices({
+    WorkbenchService,
+    WorkspaceService,
+    TagService,
+    DocsService,
+    FavoriteService,
+    WorkspacePermissionService,
+  });
 
+  const canDelete =
+    useLiveData(workspacePermissionService.permission.isOwnerOrAdmin$) === true;
   const favorite = useLiveData(
     favoriteService.favoriteList.favorite$('tag', tagId)
   );
@@ -59,7 +64,6 @@ export const useNavigationPanelTagNodeOperations = (
     track.$.navigationPanel.organize.deleteOrganizeItem({ type: 'tag' });
     toast(t['com.affine.tags.delete-tags.toast']());
   }, [t, tagId, tagService.tagList]);
-
 
   const handleToggleFavoriteTag = useCallback(() => {
     favoriteService.favoriteList.toggle('tag', tagId);
@@ -124,6 +128,7 @@ export const useNavigationPanelTagNodeOperations = (
             prefixIcon={<DeleteIcon />}
             onClick={handleMoveToTrash}
             data-testid="tag-delete-button"
+            disabled={!canDelete}
           >
             {t['Delete']()}
           </MenuItem>
@@ -132,6 +137,7 @@ export const useNavigationPanelTagNodeOperations = (
     ],
     [
       favorite,
+      canDelete,
       handleMoveToTrash,
       handleNewDoc,
       handleOpenInNewTab,

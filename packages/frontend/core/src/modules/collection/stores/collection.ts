@@ -11,6 +11,7 @@ import { distinctUntilChanged, map, type Observable, switchMap } from 'rxjs';
 import { Array as YArray } from 'yjs';
 
 import type { FilterParams } from '../../collection-rules';
+import type { WorkspacePermissionService } from '../../permissions';
 import type { WorkspaceService } from '../../workspace';
 
 export interface CollectionInfo {
@@ -23,7 +24,10 @@ export interface CollectionInfo {
 }
 
 export class CollectionStore extends Store {
-  constructor(private readonly workspaceService: WorkspaceService) {
+  constructor(
+    private readonly workspaceService: WorkspaceService,
+    private readonly workspacePermissionService: WorkspacePermissionService
+  ) {
     super();
   }
 
@@ -133,6 +137,13 @@ export class CollectionStore extends Store {
   }
 
   deleteCollection(id: string) {
+    if (
+      this.workspacePermissionService.permission.isOwnerOrAdmin$.value !== true
+    ) {
+      throw new Error(
+        'Only workspace owners and admins may delete collections'
+      );
+    }
     const yArray = this.rootYDoc.getMap('setting').get('collections') as
       | YArray<any>
       | undefined;

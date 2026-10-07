@@ -3,6 +3,7 @@ import { Trans, useI18n } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
 import { useCallback } from 'react';
 
+import { WorkspacePermissionService } from '../../permissions';
 import { TagService } from '../service/tag';
 
 /**
@@ -13,10 +14,14 @@ export const useDeleteTagConfirmModal = () => {
 
   const t = useI18n();
   const tagService = useService(TagService);
+  const permission = useService(WorkspacePermissionService).permission;
   const tags = useLiveData(tagService.tagList.tags$);
 
   const confirm = useCallback(
     (tagIdsToDelete: string[]) => {
+      if (permission.isOwnerOrAdmin$.value !== true) {
+        return Promise.resolve(false);
+      }
       let closed = false;
       const { resolve, promise } = Promise.withResolvers<boolean>();
       const tagToDelete = tags.find(tag => tagIdsToDelete.includes(tag.id));
@@ -24,9 +29,10 @@ export const useDeleteTagConfirmModal = () => {
       const handleClose = (state: boolean) => {
         if (!closed) {
           closed = true;
-          resolve(state);
+          const confirmed = state && permission.isOwnerOrAdmin$.value === true;
+          resolve(confirmed);
 
-          if (state) {
+          if (confirmed) {
             tagIdsToDelete.forEach(tagId => {
               tagService.tagList.deleteTag(tagId);
             });
@@ -70,7 +76,7 @@ export const useDeleteTagConfirmModal = () => {
       });
       return promise;
     },
-    [openConfirmModal, t, tagService.tagList, tags]
+    [openConfirmModal, t, tagService.tagList, tags, permission]
   );
 
   return confirm;

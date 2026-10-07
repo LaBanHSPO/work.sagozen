@@ -7,6 +7,7 @@ import {
   RowInput,
   Scrollable,
 } from '@affine/component';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import { TagService, useDeleteTagConfirmModal } from '@affine/core/modules/tag';
 import { useI18n } from '@affine/i18n';
 import { DoneIcon, MoreHorizontalIcon } from '@blocksuite/icons/rc';
@@ -40,6 +41,7 @@ export interface TagsEditorProps {
   tagColors: TagColor[];
   onTagChange: (id: string, property: keyof TagLike, value: string) => void;
   onDeleteTag: (id: string) => void; // a candidate to be deleted
+  canDeleteTag?: boolean;
   jumpToTag?: (id: string) => void;
   tagMode: 'inline-tag' | 'db-label';
   style?: React.CSSProperties;
@@ -73,6 +75,7 @@ export const TagsEditor = ({
   onCreateTag,
   tagColors,
   onDeleteTag,
+  canDeleteTag = true,
   onTagChange,
   jumpToTag,
   tagMode,
@@ -342,6 +345,7 @@ export const TagsEditor = ({
                     <TagEditMenu
                       tag={tag}
                       onTagDelete={handleDeleteTag}
+                      canDeleteTag={canDeleteTag}
                       onTagChange={(property, value) => {
                         onTagChange(tag.id, property, value);
                       }}
@@ -498,6 +502,10 @@ export const WorkspaceTagsInlineEditor = ({
 >) => {
   const tagService = useService(TagService);
   const tags = useLiveData(tagService.tagList.tagMetas$);
+  const canDeleteTag =
+    useLiveData(
+      useService(WorkspacePermissionService).permission.isOwnerOrAdmin$
+    ) === true;
   const openDeleteTagConfirmModal = useDeleteTagConfirmModal();
   const tagColors = tagService.tagColors;
   const adaptedTagColors = useMemo(() => {
@@ -510,14 +518,14 @@ export const WorkspaceTagsInlineEditor = ({
 
   const onDeleteTag = useAsyncCallback(
     async (tagId: string) => {
-      if (await openDeleteTagConfirmModal([tagId])) {
-        tagService.tagList.deleteTag(tagId);
-        if (selectedTags.includes(tagId)) {
-          onDeselectTag(tagId);
-        }
+      if (
+        (await openDeleteTagConfirmModal([tagId])) &&
+        selectedTags.includes(tagId)
+      ) {
+        onDeselectTag(tagId);
       }
     },
-    [tagService.tagList, openDeleteTagConfirmModal, selectedTags, onDeselectTag]
+    [openDeleteTagConfirmModal, selectedTags, onDeselectTag]
   );
   const onCreateTag = useCallback(
     (name: string, color: string) => {
@@ -552,6 +560,7 @@ export const WorkspaceTagsInlineEditor = ({
       ref={ref}
       onEditorClose={onEditorClose}
       {...otherProps}
+      canDeleteTag={canDeleteTag}
     />
   );
 };

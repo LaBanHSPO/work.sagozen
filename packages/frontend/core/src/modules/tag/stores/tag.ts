@@ -10,6 +10,7 @@ import { nanoid } from 'nanoid';
 import { map, switchMap } from 'rxjs';
 import { Array as YArray } from 'yjs';
 
+import type { WorkspacePermissionService } from '../../permissions';
 import type { WorkspaceService } from '../../workspace';
 
 export type Tag = {
@@ -51,7 +52,10 @@ export class TagStore extends Store {
     return disposable.unsubscribe.bind(disposable);
   }
 
-  constructor(private readonly workspaceService: WorkspaceService) {
+  constructor(
+    private readonly workspaceService: WorkspaceService,
+    private readonly workspacePermissionService: WorkspacePermissionService
+  ) {
     super();
   }
 
@@ -75,6 +79,14 @@ export class TagStore extends Store {
   }
 
   updateProperties = (properties: DocsPropertiesMeta) => {
+    if (
+      this.workspacePermissionService.permission.isOwnerOrAdmin$.value !== true
+    ) {
+      const retainedIds = new Set(properties.tags?.options.map(tag => tag.id));
+      if (this.properties.tags?.options.some(tag => !retainedIds.has(tag.id))) {
+        throw new Error('Only workspace owners and admins may delete tags');
+      }
+    }
     this.workspaceService.workspace.docCollection.meta.setProperties(
       properties
     );
@@ -96,6 +108,11 @@ export class TagStore extends Store {
   };
 
   removeTagOption = (id: string) => {
+    if (
+      this.workspacePermissionService.permission.isOwnerOrAdmin$.value !== true
+    ) {
+      throw new Error('Only workspace owners and admins may delete tags');
+    }
     this.workspaceService.workspace.docCollection.doc.transact(() => {
       this.updateTagOptions(this.tagOptions$.value.filter(o => o.id !== id));
       // need to remove tag from all pages

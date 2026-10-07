@@ -1,7 +1,8 @@
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
 import type { Tag } from '@affine/core/modules/tag';
 import { WorkspaceService } from '@affine/core/modules/workspace';
 import { Trans } from '@affine/i18n';
-import { useService } from '@toeverything/infra';
+import { useLiveData, useService } from '@toeverything/infra';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { ListFloatingToolbar } from '../components/list-floating-toolbar';
@@ -28,6 +29,10 @@ export const VirtualizedTagList = ({
   const [showCreateTagInput, setShowCreateTagInput] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const currentWorkspace = useService(WorkspaceService).workspace;
+  const canDelete =
+    useLiveData(
+      useService(WorkspacePermissionService).permission.isOwnerOrAdmin$
+    ) === true;
 
   const tagOperations = useCallback(
     (tag: TagMeta) => {
@@ -114,7 +119,7 @@ export const VirtualizedTagList = ({
           </Trans>
         }
         onClose={hideFloatingToolbar}
-        onDelete={handleDelete}
+        onDelete={canDelete ? handleDelete : undefined}
       />
     </>
   );
