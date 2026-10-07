@@ -15,6 +15,8 @@ export const databaseBlockSelectedStyles = css({
 });
 
 export const databaseOpsStyles = css({
+  border: 'none',
+  backgroundColor: 'transparent',
   padding: '2px',
   borderRadius: '4px',
   display: 'flex',

@@ -40,7 +40,7 @@ export class NoteRenderer
   });
 
   allowCreateDoc$ = computed(() => {
-    return isPureText(this.rowText$.value);
+    return !this.view.readonly$.value && isPureText(this.rowText$.value);
   });
 
   get databaseBlock(): DatabaseBlockModel {
@@ -48,6 +48,7 @@ export class NoteRenderer
   }
 
   addNote() {
+    if (this.view.readonly$.value) return;
     const collection = this.host?.std.workspace;
     if (!collection) {
       return;

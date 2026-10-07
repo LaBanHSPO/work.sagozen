@@ -18,6 +18,7 @@ export type DatabaseBlockProps = {
   cells: SerializedCells;
   columns: Array<ColumnDataType>;
   comments?: Record<string, boolean>;
+  memberEditUntil?: number;
 };
 
 export class DatabaseBlockModel extends BlockModel<DatabaseBlockProps> {}
@@ -31,6 +32,7 @@ export const DatabaseBlockSchema = defineBlockSchema({
     cells: Object.create(null),
     columns: [],
     comments: undefined,
+    memberEditUntil: undefined,
   }),
   metadata: {
     role: 'hub',

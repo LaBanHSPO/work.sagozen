@@ -69,6 +69,7 @@ export class HeaderAreaTextCell extends BaseCellRenderer<Text, string> {
   };
 
   private readonly _onCut = (e: ClipboardEvent) => {
+    if (this.readonly) return;
     const inlineEditor = this.inlineEditor;
     if (!inlineEditor) return;
 
@@ -91,6 +92,7 @@ export class HeaderAreaTextCell extends BaseCellRenderer<Text, string> {
   };
 
   private readonly _onPaste = (e: ClipboardEvent) => {
+    if (this.readonly) return;
     const inlineEditor = this.inlineEditor;
     const inlineRange = inlineEditor?.getInlineRange();
     if (!inlineEditor || !inlineRange) return;
@@ -159,6 +161,7 @@ export class HeaderAreaTextCell extends BaseCellRenderer<Text, string> {
   };
 
   insertDelta = (delta: DeltaInsert) => {
+    if (this.readonly) return;
     const inlineEditor = this.inlineEditor;
     const range = inlineEditor?.getInlineRange();
     if (!range || !delta.insert) {
@@ -199,6 +202,21 @@ export class HeaderAreaTextCell extends BaseCellRenderer<Text, string> {
     };
 
     this.disposables.addFromEvent(this, 'keydown', selectAll);
+    this.disposables.addFromEvent(
+      this,
+      'keydown',
+      e => {
+        if (
+          this.readonly &&
+          (e.metaKey || e.ctrlKey) &&
+          e.key.toLowerCase() === 'z'
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true
+    );
   }
 
   private readonly _handleKeyDown = (event: KeyboardEvent) => {
@@ -262,7 +280,7 @@ export class HeaderAreaTextCell extends BaseCellRenderer<Text, string> {
       .attributeRenderer="${this.inlineManager?.getRenderer()}"
       .embedChecker="${this.inlineManager?.embedChecker}"
       .markdownMatches="${this.inlineManager?.markdownMatches}"
-      .readonly="${!this.isEditing$.value}"
+      .readonly="${!this.isEditing$.value || this.readonly}"
       .enableClipboard="${false}"
       .verticalScrollContainerGetter="${() =>
         this.topContenteditableElement?.host

@@ -24,10 +24,11 @@ import { propertyPresets } from '@blocksuite/data-view/property-presets';
 import { IS_MOBILE } from '@blocksuite/global/env';
 import { BlockSuiteError, ErrorCode } from '@blocksuite/global/exceptions';
 import type { EditorHost } from '@blocksuite/std';
-import { type BlockModel } from '@blocksuite/store';
+import type { BlockModel, Text } from '@blocksuite/store';
 import { computed, type ReadonlySignal, signal } from '@preact/signals-core';
 
 import { getIcon } from './block-icons.js';
+import { DatabaseConfigExtension } from './config.js';
 import {
   databaseBlockProperties,
   databasePropertyConverts,
@@ -198,9 +199,18 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     return result;
   });
 
+  permissionTime$ = signal(Date.now());
+
+  private memberEditingOpen(now: number) {
+    const until = this._model.props.memberEditUntil$.value;
+    return typeof until === 'number' && Number.isFinite(until) && until > now;
+  }
+
   readonly$: ReadonlySignal<boolean> = computed(() => {
     return (
       this._model.store.readonly ||
+      (!this.canManage$.value &&
+        !this.memberEditingOpen(this.permissionTime$.value)) ||
       (IS_MOBILE &&
         !this._model.store.provider
           .get(FeatureFlagService)
@@ -225,7 +235,9 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   defaultViewId$ = computed(() => {
     const sharedViews = this.viewDataList$.value.filter(view => !view.ownerId);
     const selected = this._model.props.defaultViewId$.value;
-    return sharedViews.find(view => view.id === selected)?.id ?? sharedViews[0]?.id;
+    return (
+      sharedViews.find(view => view.id === selected)?.id ?? sharedViews[0]?.id
+    );
   });
 
   override viewManager: ViewManager = new DatabaseViewManager(this);
@@ -249,11 +261,24 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   constructor(
     model: DatabaseBlockModel,
     init?: (dataSource: DatabaseBlockDataSource) => void,
-    readonly currentUserId$: ReadonlySignal<string> = signal('')
+    readonly currentUserId$: ReadonlySignal<string> = signal(''),
+    private readonly canManage$: ReadonlySignal<boolean> = signal(true)
   ) {
     super();
     this._model = model; // ensure invariants first
     init?.(this); // then allow external initialisation
+  }
+
+  private assertCanEdit() {
+    if (
+      this.readonly$.value ||
+      (!this.canManage$.value && !this.memberEditingOpen(Date.now()))
+    ) {
+      throw new BlockSuiteError(
+        ErrorCode.DatabaseBlockError,
+        'This database is read-only'
+      );
+    }
   }
 
   private _runCapture() {
@@ -288,6 +313,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   cellValueChange(rowId: string, propertyId: string, value: unknown): void {
+    this.assertCanEdit();
     this._runCapture();
 
     const type = this.propertyTypeGet(propertyId);
@@ -350,6 +376,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
       name?: string;
     }
   ): string | undefined {
+    this.assertCanEdit();
     this.doc.captureSync();
     const { type, name } = ops ?? {};
     const property = this.propertyMetaGet(
@@ -418,6 +445,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   private updateProperty(id: string, updater: ColumnUpdater) {
+    this.assertCanEdit();
     const result = this.getPropertyAndIndex(id);
     if (!result) {
       return;
@@ -468,6 +496,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   propertyDelete(id: string): void {
+    this.assertCanEdit();
     if (this.isFixedProperty(id)) {
       return;
     }
@@ -483,6 +512,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   propertyDuplicate(propertyId: string): string | undefined {
+    this.assertCanEdit();
     if (this.isFixedProperty(propertyId)) {
       return;
     }
@@ -547,6 +577,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   propertyTypeSet(propertyId: string, toType: string): void {
+    this.assertCanEdit();
     if (this.isFixedProperty(propertyId)) {
       return;
     }
@@ -588,16 +619,23 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     updateCells(this._model, propertyId, cells);
   }
 
-  rowAdd(insertPosition: InsertToPosition | number): string {
+  rowAdd(insertPosition: InsertToPosition | number, text?: Text): string {
+    this.assertCanEdit();
     this.doc.captureSync();
     const index =
       typeof insertPosition === 'number'
         ? insertPosition
         : insertPositionToIndex(insertPosition, this._model.children);
-    return this.doc.addBlock('affine:paragraph', {}, this._model.id, index);
+    return this.doc.addBlock(
+      'affine:paragraph',
+      text ? { text } : {},
+      this._model.id,
+      index
+    );
   }
 
   rowDelete(ids: string[]): void {
+    this.assertCanEdit();
     this.doc.captureSync();
     for (const id of ids) {
       const block = this.doc.getBlock(id);
@@ -609,6 +647,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   rowMove(rowId: string, position: InsertToPosition): void {
+    this.assertCanEdit();
     const model = this.doc.getModelById(rowId);
     if (model) {
       const index = insertPositionToIndex(position, this._model.children);
@@ -621,6 +660,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   viewDataAdd(viewData: DataViewDataType): string {
+    this.assertCanEdit();
     this._model.store.captureSync();
     this._model.store.transact(() => {
       this._model.props.views = [...this._model.props.views, viewData];
@@ -629,6 +669,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   viewDataDelete(viewId: string): void {
+    this.assertCanEdit();
     const view = this.viewDataGet(viewId);
     if (!view) return;
     if (
@@ -642,6 +683,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   viewDataDuplicate(id: string): string {
+    this.assertCanEdit();
     if (!this.viewDataGet(id)) return id;
     return duplicateView(this._model, id);
   }
@@ -651,6 +693,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
   }
 
   viewDataMoveTo(id: string, position: InsertToPosition): void {
+    this.assertCanEdit();
     if (!this.viewDataGet(id)) return;
     moveViewTo(this._model, id, position);
   }
@@ -659,6 +702,7 @@ export class DatabaseBlockDataSource extends DataSourceBase {
     id: string,
     updater: (data: ViewData) => Partial<ViewData>
   ): void {
+    this.assertCanEdit();
     if (!this.viewDataGet(id)) return;
     updateView(this._model, id, updater);
   }
@@ -702,6 +746,12 @@ export const databaseViewInitTemplate = (
   datasource.viewManager.viewAdd(viewType);
 };
 export const convertToDatabase = (host: EditorHost, viewType: string) => {
+  if (
+    host.std.getOptional(DatabaseConfigExtension.identifier)?.canManage$
+      ?.value === false
+  ) {
+    return;
+  }
   const [_, ctx] = host.std.command.exec(getSelectedModelsCommand, {
     types: ['block', 'text'],
   });

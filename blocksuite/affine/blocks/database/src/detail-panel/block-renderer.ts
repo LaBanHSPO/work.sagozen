@@ -4,7 +4,7 @@ import type {
   KanbanSingleView,
   TableSingleView,
 } from '@blocksuite/data-view/view-presets';
-import { WithDisposable } from '@blocksuite/global/lit';
+import { SignalWatcher, WithDisposable } from '@blocksuite/global/lit';
 import type { EditorHost } from '@blocksuite/std';
 import { ShadowlessElement } from '@blocksuite/std';
 import { cssVarV2 } from '@toeverything/theme/v2';
@@ -12,7 +12,7 @@ import { css, html, unsafeCSS } from 'lit';
 import { property } from 'lit/decorators.js';
 
 export class BlockRenderer
-  extends WithDisposable(ShadowlessElement)
+  extends SignalWatcher(WithDisposable(ShadowlessElement))
   implements DetailSlotProps
 {
   static override styles = css`
@@ -96,6 +96,15 @@ export class BlockRenderer
       this,
       'keydown',
       e => {
+        if (
+          this.view.readonly$.value &&
+          (e.metaKey || e.ctrlKey) &&
+          e.key.toLowerCase() === 'z'
+        ) {
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
           e.stopPropagation();
           e.preventDefault();
@@ -125,6 +134,7 @@ export class BlockRenderer
       ${this.renderIcon()}
       <rich-text
         .yText=${model.text}
+        .readonly=${this.view.readonly$.value}
         .attributesSchema=${this.attributesSchema}
         .attributeRenderer=${this.attributeRenderer}
         .embedChecker=${this.inlineManager.embedChecker}

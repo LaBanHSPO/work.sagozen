@@ -5,6 +5,8 @@ import {
 } from '@affine/core/components/hooks/affine/use-share-url';
 import { ServerService } from '@affine/core/modules/cloud';
 import { EditorService } from '@affine/core/modules/editor';
+import { WorkspacePermissionService } from '@affine/core/modules/permissions';
+import { WorkspaceService } from '@affine/core/modules/workspace';
 import { copyLinkToBlockStdScopeClipboard } from '@affine/core/utils/clipboard';
 import { I18n } from '@affine/i18n';
 import { track } from '@affine/track';
@@ -18,6 +20,13 @@ import type { FrameworkProvider } from '@toeverything/infra';
 
 export function createDatabaseOptionsConfig(framework: FrameworkProvider) {
   return {
+    canManage$: framework
+      .get(WorkspacePermissionService)
+      .permission.isOwnerOrAdmin$.map(
+        allowed =>
+          !framework.get(WorkspaceService).workspace.openOptions.isSharedMode &&
+          allowed === true
+      ).signal,
     configure: (model: DatabaseBlockModel, options: MenuOptions) => {
       const items = options.items;
 

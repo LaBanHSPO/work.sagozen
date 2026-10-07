@@ -2,6 +2,7 @@ import type { DatabaseBlockModel } from '@blocksuite/affine-model';
 import type { Command } from '@blocksuite/std';
 import type { BlockModel, Store } from '@blocksuite/store';
 
+import { DatabaseConfigExtension } from './config';
 import {
   DatabaseBlockDataSource,
   databaseViewInitTemplate,
@@ -20,6 +21,12 @@ export const insertDatabaseBlockCommand: Command<
 > = (ctx, next) => {
   const { selectedModels, viewType, place, removeEmptyLine, std } = ctx;
   if (!selectedModels?.length) return;
+  if (
+    std.getOptional(DatabaseConfigExtension.identifier)?.canManage$?.value ===
+    false
+  ) {
+    return;
+  }
 
   const targetModel =
     place === 'before'

@@ -108,6 +108,7 @@ export class RichTextCell extends BaseCellRenderer<Text, string> {
   }
 
   private readonly _handleKeyDown = (event: KeyboardEvent) => {
+    if (this.readonly) return;
     if (event.key !== 'Escape') {
       if (event.key === 'Tab') {
         event.preventDefault();
@@ -178,11 +179,13 @@ export class RichTextCell extends BaseCellRenderer<Text, string> {
   };
 
   private readonly _initYText = (text?: string) => {
+    if (this.readonly) return;
     const yText = new Text(text);
     this.valueSetImmediate(yText);
   };
 
   private readonly _onSoftEnter = () => {
+    if (this.readonly) return;
     if (this.value && this.inlineEditor$.value) {
       const inlineRange = this.inlineEditor$.value.getInlineRange();
       if (!inlineRange) return;
@@ -214,6 +217,7 @@ export class RichTextCell extends BaseCellRenderer<Text, string> {
   };
 
   private readonly _onCut = (e: ClipboardEvent) => {
+    if (this.readonly) return;
     const inlineEditor = this.inlineEditor$.value;
     if (!inlineEditor) return;
 
@@ -236,6 +240,7 @@ export class RichTextCell extends BaseCellRenderer<Text, string> {
   };
 
   private readonly _onPaste = (e: ClipboardEvent) => {
+    if (this.readonly) return;
     e.preventDefault();
     e.stopPropagation();
     const inlineEditor = this.inlineEditor$.value;
@@ -321,6 +326,21 @@ export class RichTextCell extends BaseCellRenderer<Text, string> {
       }
     };
     this.disposables.addFromEvent(this, 'keydown', selectAll);
+    this.disposables.addFromEvent(
+      this,
+      'keydown',
+      e => {
+        if (
+          this.readonly &&
+          (e.metaKey || e.ctrlKey) &&
+          e.key.toLowerCase() === 'z'
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true
+    );
     this.disposables.add(
       effect(() => {
         const editor = this.inlineEditor$.value;
@@ -352,6 +372,7 @@ export class RichTextCell extends BaseCellRenderer<Text, string> {
   }
 
   override beforeEnterEditMode() {
+    if (this.readonly) return false;
     if (!this.value || typeof this.value === 'string') {
       this._initYText(this.value);
     }
@@ -390,6 +411,7 @@ export class RichTextCell extends BaseCellRenderer<Text, string> {
   }
 
   insertDelta = (delta: DeltaInsert<AffineTextAttributes>) => {
+    if (this.readonly) return;
     const inlineEditor = this.inlineEditor$.value;
     const range = inlineEditor?.getInlineRange();
     if (!range || !delta.insert) {

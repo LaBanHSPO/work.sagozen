@@ -83,6 +83,7 @@ export class DatabaseTitle extends SignalWatcher(
 
   private readonly compositionEnd = () => {
     this.isComposing$.value = false;
+    if (this.readonly$.value) return;
     this.titleText.replace(0, this.titleText.length, this.input.value);
   };
 
@@ -98,6 +99,7 @@ export class DatabaseTitle extends SignalWatcher(
   };
 
   private readonly onInput = (e: InputEvent) => {
+    if (this.readonly$.value) return;
     this.text$.value = this.input.value;
     if (!e.isComposing) {
       this.titleText.replace(0, this.titleText.length, this.input.value);

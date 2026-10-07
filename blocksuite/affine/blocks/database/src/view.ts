@@ -6,6 +6,7 @@ import {
 import { DatabaseBlockModel } from '@blocksuite/affine-model';
 import { SlashMenuConfigExtension } from '@blocksuite/affine-widget-slash-menu';
 import { BlockViewExtension, FlavourExtension } from '@blocksuite/std';
+import type { ReadonlySignal } from '@preact/signals-core';
 import { literal } from 'lit/static-html.js';
 import { z } from 'zod';
 
@@ -18,6 +19,7 @@ const optionsSchema = z.object({
     .function()
     .args(z.instanceof(DatabaseBlockModel), z.custom<MenuOptions>())
     .returns(z.custom<MenuOptions>()),
+  canManage$: z.custom<ReadonlySignal<boolean>>().optional(),
 });
 
 export type DatabaseViewExtensionOptions = z.infer<typeof optionsSchema>;
@@ -44,7 +46,10 @@ export class DatabaseViewExtension extends ViewExtensionProvider<DatabaseViewExt
     ]);
     if (options) {
       context.register(
-        DatabaseConfigExtension({ configure: options.configure })
+        DatabaseConfigExtension({
+          configure: options.configure,
+          canManage$: options.canManage$,
+        })
       );
     }
   }

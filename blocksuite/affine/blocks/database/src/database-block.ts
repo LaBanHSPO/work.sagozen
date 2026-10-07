@@ -19,6 +19,10 @@ import {
   TelemetryProvider,
   UserProvider,
 } from '@blocksuite/affine-shared/services';
+import {
+  downloadBlob,
+  openSingleFileWith,
+} from '@blocksuite/affine-shared/utils';
 import { getDropResult } from '@blocksuite/affine-widget-drag-handle';
 import {
   createRecordDetail,
@@ -49,8 +53,8 @@ import { type BlockComponent, BlockSelection } from '@blocksuite/std';
 import { RANGE_SYNC_EXCLUDE_ATTR } from '@blocksuite/std/inline';
 import { nanoid, Slice } from '@blocksuite/store';
 import { autoUpdate } from '@floating-ui/dom';
-import { computed, signal } from '@preact/signals-core';
-import { html, nothing } from 'lit';
+import { computed, effect, signal } from '@preact/signals-core';
+import { html } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
@@ -72,6 +76,7 @@ import {
 import { BlockRenderer } from './detail-panel/block-renderer.js';
 import { NoteRenderer } from './detail-panel/note-renderer.js';
 import { DatabaseSelection } from './selection.js';
+import { exportDatabaseCsv, importDatabaseCsv } from './utils/csv.js';
 import { currentViewStorage } from './utils/current-view.js';
 import { getSingleDocIdFromText } from './utils/title-doc.js';
 import type { DatabaseViewExtensionOptions } from './view';
@@ -82,7 +87,8 @@ let localViewerId: string | undefined;
 function getLocalViewerId(): string {
   if (localViewerId) return localViewerId;
   try {
-    localViewerId = globalThis.localStorage?.getItem(localViewerKey) ?? undefined;
+    localViewerId =
+      globalThis.localStorage?.getItem(localViewerKey) ?? undefined;
     if (!localViewerId) {
       localViewerId = `local:${nanoid()}`;
       globalThis.localStorage?.setItem(localViewerKey, localViewerId);
@@ -96,20 +102,64 @@ function getLocalViewerId(): string {
 }
 
 export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBlockModel> {
+  private readonly canManage$ = computed(
+    () => this.optionsConfig.canManage$?.value ?? true
+  );
+
+  private readonly memberWindowOpen$ = computed(() => {
+    const until = this.model.props.memberEditUntil$.value;
+    return (
+      typeof until === 'number' &&
+      Number.isFinite(until) &&
+      until > this.dataSource.value.permissionTime$.value
+    );
+  });
+
+  private setMemberEditing(minutes: string | null) {
+    if (!this.canManage$.value || this.store.readonly) return;
+    const duration = minutes === null ? 0 : Number(minutes);
+    const until = minutes === null ? 0 : Date.now() + duration * 60_000;
+    if (
+      minutes !== null &&
+      (!Number.isSafeInteger(duration) ||
+        duration <= 0 ||
+        !Number.isSafeInteger(until))
+    ) {
+      toast(this.host, 'Enter a positive whole number of minutes.');
+      return;
+    }
+    this.store.captureSync();
+    this.store.transact(() => {
+      this.model.props.memberEditUntil = until;
+    });
+    toast(
+      this.host,
+      minutes === null
+        ? 'Members can no longer edit this database.'
+        : `Member editing opened for ${duration} minutes.`
+    );
+  }
+
   private readonly clickDatabaseOps = (e: MouseEvent) => {
+    this.memberEditDuration = '15';
     const options = this.optionsConfig.configure(this.model, {
       items: [
-        menu.input({
-          initialValue: this.model.props.title.toString(),
-          placeholder: 'Database title',
-          onChange: text => {
-            this.model.props.title.replace(
-              0,
-              this.model.props.title.length,
-              text
-            );
-          },
-        }),
+        ...(!this.dataSource.value.readonly$.value
+          ? [
+              menu.input({
+                initialValue: this.model.props.title.toString(),
+                placeholder: 'Database title',
+                onChange: text => {
+                  if (this.dataSource.value.readonly$.value) return;
+                  this.model.props.title.replace(
+                    0,
+                    this.model.props.title.length,
+                    text
+                  );
+                },
+              }),
+            ]
+          : []),
         menu.action({
           prefix: CommentIcon(),
           name: 'Comment',
@@ -138,12 +188,93 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
         menu.group({
           items: [
             menu.action({
+              name: 'Export CSV',
+              select: () => {
+                try {
+                  const csv = exportDatabaseCsv(this.dataSource.value);
+                  const title = this.model.props.title.toString() || 'Database';
+                  downloadBlob(
+                    new Blob([csv], { type: 'text/csv;charset=utf-8' }),
+                    `${title.replace(/[\\/:*?"<>|]/g, '_')}.csv`
+                  );
+                } catch (error) {
+                  toast(
+                    this.host,
+                    error instanceof Error
+                      ? error.message
+                      : 'CSV export failed.'
+                  );
+                }
+              },
+            }),
+            menu.action({
+              name: 'Import CSV',
+              hide: () => this.dataSource.value.readonly$.value,
+              select: () => {
+                const importFile = async () => {
+                  if (this.dataSource.value.readonly$.value) return;
+                  const file = await openSingleFileWith('Any');
+                  if (!file) return;
+                  if (!/\.csv$/i.test(file.name)) {
+                    throw new Error('Please select a CSV file (.csv).');
+                  }
+                  const csv = await file.text();
+                  // Permissions may expire while the picker or file read is open.
+                  const count = importDatabaseCsv(this.dataSource.value, csv);
+                  toast(
+                    this.host,
+                    `Imported ${count} ${count === 1 ? 'row' : 'rows'}.`
+                  );
+                };
+                importFile().catch(error => {
+                  toast(
+                    this.host,
+                    error instanceof Error
+                      ? error.message
+                      : 'CSV import failed.'
+                  );
+                });
+              },
+            }),
+          ],
+        }),
+        menu.subMenu({
+          name: 'Member editing',
+          hide: () => !this.canManage$.value || this.store.readonly,
+          options: {
+            title: { text: 'Member editing (minutes)' },
+            items: [
+              menu.input({
+                initialValue: '15',
+                placeholder: 'Duration in minutes',
+                onChange: value => {
+                  this.memberEditDuration = value;
+                },
+                disableAutoFocus: true,
+              }),
+              menu.action({
+                name: 'Open editing window',
+                select: () => this.setMemberEditing(this.memberEditDuration),
+              }),
+              menu.action({
+                name: 'Close editing window',
+                hide: () => !this.memberWindowOpen$.value,
+                select: () => this.setMemberEditing(null),
+              }),
+            ],
+          },
+        }),
+        menu.group({
+          items: [
+            menu.action({
               prefix: DeleteIcon(),
               class: {
                 'delete-item': true,
               },
               name: 'Delete Database',
+              hide: () => this.dataSource.value.readonly$.value,
               select: () => {
+                if (this.dataSource.value.readonly$.value) return;
                 this.model.children.slice().forEach(block => {
                   this.store.deleteBlock(block);
                 });
@@ -187,7 +318,8 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
             );
           });
       },
-      currentUserId$
+      currentUserId$,
+      this.canManage$
     );
     const id = currentViewStorage.getCurrentView(this.model.id);
     if (id && dataSource.viewManager.viewGet(id)) {
@@ -241,6 +373,16 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
           <div class="${databaseTitleRowStyles}">
             ${this.renderTitle(props.dataViewLogic)} ${this.renderDatabaseOps()}
           </div>
+          <div
+            role="status"
+            style="font-size: 12px; color: var(--affine-text-secondary-color); margin-bottom: 8px"
+          >
+            ${
+              this.memberWindowOpen$.value
+                ? `Member editing until ${new Date(this.model.props.memberEditUntil ?? 0).toLocaleString()}`
+                : 'Members read-only'
+            }
+          </div>
           <div class="${databaseToolbarRowStyles} ${databaseHeaderBarStyles}">
             <div class="${databaseViewBarContainerStyles}">
               ${renderUniLit(widgetPresets.viewBar, {
@@ -261,6 +403,8 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
   indicator = new DropIndicator();
 
   onDrag = (evt: MouseEvent, id: string): (() => void) => {
+    this.dataSource.value.permissionTime$.value = Date.now();
+    if (this.dataSource.value.readonly$.value) return () => {};
     const result = getDropResult(evt);
     if (result && result.rect) {
       document.body.append(this.indicator);
@@ -272,6 +416,8 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
       );
       return () => {
         this.indicator.remove();
+        this.dataSource.value.permissionTime$.value = Date.now();
+        if (this.dataSource.value.readonly$.value) return;
         const model = this.store.getBlock(id)?.model;
         const target = result.modelState.model;
         let parent = this.store.getParent(target.id);
@@ -352,6 +498,7 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
   });
 
   private readonly virtualPadding$ = signal(0);
+  private memberEditDuration = '15';
 
   get optionsConfig(): DatabaseViewExtensionOptions {
     return {
@@ -378,16 +525,15 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
   }
 
   private renderDatabaseOps() {
-    if (this.dataSource.value.readonly$.value) {
-      return nothing;
-    }
-    return html` <div
+    return html` <button
+      type="button"
+      aria-label="Database options"
       data-testid="database-ops"
       class="${databaseOpsStyles}"
       @click="${this.clickDatabaseOps}"
     >
       ${MoreHorizontalIcon()}
-    </div>`;
+    </button>`;
   }
 
   override connectedCallback() {
@@ -397,6 +543,53 @@ export class DatabaseBlockComponent extends CaptionedBlockComponent<DatabaseBloc
     this.classList.add(databaseBlockStyles);
     this.listenFullWidthChange();
     this.handleMobileEditing();
+    this.disposables.addFromEvent(
+      window,
+      'keydown',
+      e => {
+        const path = e.composedPath();
+        if (!path.includes(this.host)) return;
+        if (
+          !path.includes(this) &&
+          !this.selection.value.some(
+            selection => selection.blockId === this.blockId
+          )
+        )
+          return;
+        const source = this.dataSource.value;
+        source.permissionTime$.value = Date.now();
+        if (
+          source.readonly$.value &&
+          (e.metaKey || e.ctrlKey) &&
+          e.key.toLowerCase() === 'z'
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      },
+      true
+    );
+    this.disposables.add(
+      effect(() => {
+        const until = this.model.props.memberEditUntil$.value;
+        const source = this.dataSource.value;
+        let timer: number | undefined;
+        const refresh = () => {
+          const now = Date.now();
+          source.permissionTime$.value = now;
+          if (typeof until !== 'number' || !Number.isFinite(until)) return;
+          const delay = until - now;
+          if (delay > 0) {
+            timer = window.setTimeout(refresh, Math.min(delay, 2_147_483_647));
+          }
+        };
+        refresh();
+        return () => clearTimeout(timer);
+      })
+    );
+    this.disposables.addFromEvent(window, 'focus', () => {
+      this.dataSource.value.permissionTime$.value = Date.now();
+    });
   }
 
   listenFullWidthChange() {
